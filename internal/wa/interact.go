@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -55,6 +56,93 @@ func (c *Client) DeleteMessage(ctx context.Context, chat types.JID, target store
 	}
 	c.log.Info("deleted message", "chat", chat.String(), "id", target.MessageID)
 	return nil
+}
+
+// EditMessage replaces the text, or the caption, of one of the account's own
+// messages and applies the edit to the archive. It returns the message as
+// edited.
+func (c *Client) EditMessage(ctx context.Context, chat types.JID, target store.Message, text string) (store.Message, error) {
+	if !c.cli.IsLoggedIn() {
+		return store.Message{}, errors.New("not logged in to WhatsApp")
+	}
+	now := time.Now()
+	if err := editable(target, text, now); err != nil {
+		return store.Message{}, err
+	}
+	content, err := editContent(target, text)
+	if err != nil {
+		return store.Message{}, err
+	}
+	if _, err := c.cli.SendMessage(ctx, chat, c.cli.BuildEdit(chat, target.MessageID, content)); err != nil {
+		return store.Message{}, fmt.Errorf("edit message: %w", err)
+	}
+	edited := target
+	edited.Text, edited.MediaType = messageContent(content)
+	edited.EditedAt = now.Unix()
+	if _, err := c.store.ApplyEdit(ctx, chat.String(), target.MessageID, edited.Text, edited.MediaType, edited.EditedAt); err != nil {
+		// The edit went out; failing to archive it shouldn't fail the call.
+		c.log.Error("archive edited message", "err", err, "chat", chat.String(), "id", target.MessageID)
+	}
+	c.log.Info("edited message", "chat", chat.String(), "id", target.MessageID)
+	return edited, nil
+}
+
+// editable reports why m can't be edited to text at now, if it can't.
+// WhatsApp only takes edits of your own messages within whatsmeow.EditWindow
+// of sending; later edits are refused here rather than risk WhatsApp
+// accepting one that recipients never see.
+func editable(m store.Message, text string, now time.Time) error {
+	switch {
+	case !m.FromMe:
+		return fmt.Errorf("message %s was not sent by you", m.MessageID)
+	case m.Deleted:
+		return fmt.Errorf("message %s was deleted", m.MessageID)
+	case text == "":
+		return errors.New("the new text is empty")
+	case now.Sub(time.Unix(m.Timestamp, 0)) > whatsmeow.EditWindow:
+		return fmt.Errorf("message %s is too old to edit: WhatsApp only allows edits within %s of sending",
+			m.MessageID, whatsmeow.EditWindow)
+	}
+	switch m.MediaType {
+	case "", "image", "video", "document":
+	default:
+		return fmt.Errorf("message %s is %s without a caption, so it has no text to edit", m.MessageID, articled(m.MediaType))
+	}
+	if m.MediaType != "" && len(m.MediaRef) == 0 {
+		return fmt.Errorf("message %s was archived without its media details, so its caption can't be edited", m.MessageID)
+	}
+	return nil
+}
+
+func articled(kind string) string {
+	if kind == "audio" {
+		return "audio"
+	}
+	return "a " + kind
+}
+
+// editContent builds the new content for an edit of m: the text itself for
+// a text message, or the original media with the new caption.
+func editContent(m store.Message, text string) (*waE2E.Message, error) {
+	if m.MediaType == "" {
+		return &waE2E.Message{Conversation: proto.String(text)}, nil
+	}
+	sub, _, err := decodeMediaRef(m.MediaType, m.MediaRef)
+	if err != nil {
+		return nil, err
+	}
+	switch s := sub.(type) {
+	case *waE2E.ImageMessage:
+		s.Caption = proto.String(text)
+		return &waE2E.Message{ImageMessage: s}, nil
+	case *waE2E.VideoMessage:
+		s.Caption = proto.String(text)
+		return &waE2E.Message{VideoMessage: s}, nil
+	case *waE2E.DocumentMessage:
+		s.Caption = proto.String(text)
+		return &waE2E.Message{DocumentMessage: s}, nil
+	}
+	return nil, fmt.Errorf("%s messages have no caption to edit", m.MediaType)
 }
 
 // MarkChatRead sends read receipts for the chat's latest incoming messages

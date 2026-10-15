@@ -110,6 +110,12 @@ func (f *fakeWA) React(_ context.Context, chat types.JID, target store.Message, 
 	return nil
 }
 
+func (f *fakeWA) EditMessage(_ context.Context, chat types.JID, target store.Message, text string) (store.Message, error) {
+	f.sent = append(f.sent, fmt.Sprintf("edit %s/%s %q", chat, target.MessageID, text))
+	target.Text, target.EditedAt = text, 1_700_000_000
+	return target, nil
+}
+
 func (f *fakeWA) DeleteMessage(_ context.Context, chat types.JID, target store.Message) error {
 	f.sent = append(f.sent, fmt.Sprintf("delete %s/%s", chat, target.MessageID))
 	return nil
@@ -192,7 +198,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "delete_message", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "delete_message", "edit_message", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

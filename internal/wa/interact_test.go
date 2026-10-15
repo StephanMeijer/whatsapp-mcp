@@ -4,8 +4,12 @@ package wa
 
 import (
 	"testing"
+	"time"
 
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
@@ -53,5 +57,61 @@ func TestChooseWireSender(t *testing.T) {
 				t.Errorf("chooseWireSender = %s, want %s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEditable(t *testing.T) {
+	now := time.Unix(10_000, 0)
+	sent := now.Add(-time.Minute).Unix()
+	own := store.Message{MessageID: "M", FromMe: true, Timestamp: sent}
+	withRef := func(m store.Message, kind string) store.Message {
+		m.MediaType, m.MediaRef = kind, []byte{1}
+		return m
+	}
+	if err := editable(own, "fixed", now); err != nil {
+		t.Errorf("own recent text: %v", err)
+	}
+	if err := editable(withRef(own, "image"), "new caption", now); err != nil {
+		t.Errorf("own recent image: %v", err)
+	}
+	atLimit := own
+	atLimit.Timestamp = now.Add(-whatsmeow.EditWindow).Unix()
+	if err := editable(atLimit, "fixed", now); err != nil {
+		t.Errorf("at the edit window: %v", err)
+	}
+	for name, m := range map[string]store.Message{
+		"someone else's": {MessageID: "M", Timestamp: sent},
+		"deleted":        {MessageID: "M", FromMe: true, Deleted: true, Timestamp: sent},
+		"too old":        {MessageID: "M", FromMe: true, Timestamp: now.Add(-whatsmeow.EditWindow - time.Second).Unix()},
+		"audio":          withRef(own, "audio"),
+		"sticker":        withRef(own, "sticker"),
+		"image, no ref":  {MessageID: "M", FromMe: true, Timestamp: sent, MediaType: "image"},
+	} {
+		if err := editable(m, "fixed", now); err == nil {
+			t.Errorf("%s: want error", name)
+		}
+	}
+	if err := editable(own, "", now); err == nil {
+		t.Error("empty text: want error")
+	}
+}
+
+func TestEditContent(t *testing.T) {
+	msg, err := editContent(store.Message{MessageID: "M"}, "fixed")
+	if err != nil || msg.GetConversation() != "fixed" {
+		t.Errorf("text edit = %v, %v", msg, err)
+	}
+
+	ref, err := proto.Marshal(&waE2E.ImageMessage{URL: proto.String("https://mmg/x"), Mimetype: proto.String("image/jpeg"), Caption: proto.String("old")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err = editContent(store.Message{MessageID: "M", MediaType: "image", MediaRef: ref}, "new caption")
+	img := msg.GetImageMessage()
+	if err != nil || img.GetCaption() != "new caption" || img.GetURL() != "https://mmg/x" || img.GetMimetype() != "image/jpeg" {
+		t.Errorf("caption edit = %v, %v", msg, err)
+	}
+	if text, kind := messageContent(msg); text != "new caption" || kind != "image" {
+		t.Errorf("archived as %q/%q", text, kind)
 	}
 }

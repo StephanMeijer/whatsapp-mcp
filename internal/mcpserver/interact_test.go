@@ -51,6 +51,11 @@ func TestReplyReactMarkRead(t *testing.T) {
 		t.Error("empty emoji: want removed")
 	}
 	call(t, cs, "mark_read", map[string]any{"chat_jid": "+31 6 0000 0001"}, nil)
+	var edited Message
+	call(t, cs, "edit_message", map[string]any{"chat_jid": alice, "message_id": "MINE", "text": "oops, fixed"}, &edited)
+	if edited.Text != "oops, fixed" || edited.EditedAt == "" || !edited.FromMe {
+		t.Errorf("edit_message = %+v", edited)
+	}
 	var deleted DeleteMessageOut
 	call(t, cs, "delete_message", map[string]any{"chat_jid": alice, "message_id": "MINE"}, &deleted)
 	if !deleted.Deleted || deleted.MessageID != "MINE" {
@@ -62,6 +67,7 @@ func TestReplyReactMarkRead(t *testing.T) {
 		`react ` + alice + `/A1 "👍"`,
 		`react ` + alice + `/A1 ""`,
 		"read " + alice,
+		"edit " + alice + `/MINE "oops, fixed"`,
 		"delete " + alice + "/MINE",
 	}
 	if !slices.Equal(fake.sent, want) {
@@ -83,6 +89,11 @@ func TestInteractErrorsSendNothing(t *testing.T) {
 		{"react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": "not an emoji"}},
 		{"react", map[string]any{"chat_jid": alice, "emoji": "👍"}},
 		{"mark_read", map[string]any{}},
+		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "A1", "text": "x"}}, // not yours
+		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "UNKNOWN", "text": "x"}},
+		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "GONE", "text": "x"}},
+		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "S2", "text": "x"}}, // other chat
+		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "MINE", "text": " "}},
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "A1"}}, // not yours
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "UNKNOWN"}},
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "GONE"}},
@@ -109,6 +120,7 @@ func TestInteractRespectsAllowlist(t *testing.T) {
 		{"send_message", map[string]any{"recipient": stranger, "text": "x", "reply_to": "S1"}},
 		{"react", map[string]any{"chat_jid": stranger, "message_id": "S1", "emoji": "👍"}},
 		{"mark_read", map[string]any{"chat_jid": stranger}},
+		{"edit_message", map[string]any{"chat_jid": stranger, "message_id": "S2", "text": "x"}},
 		{"delete_message", map[string]any{"chat_jid": stranger, "message_id": "S2"}},
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
