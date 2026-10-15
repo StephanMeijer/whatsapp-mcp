@@ -29,10 +29,14 @@ func (c *Client) handleEvent(evt any) {
 		c.onMessage(e)
 	case *events.HistorySync:
 		c.onHistorySync(e)
-		go c.reconcileWithTimeout()
+		go c.reconcileWithTimeout(false)
 	case *events.Connected:
 		c.log.Info("connected to WhatsApp")
-		go c.reconcileWithTimeout()
+		go c.reconcileWithTimeout(true)
+	case *events.GroupInfo:
+		c.onGroupInfo(e)
+	case *events.JoinedGroup:
+		c.onJoinedGroup(e)
 	case *events.Disconnected:
 		c.log.Warn("disconnected from WhatsApp")
 	case *events.LoggedOut:
@@ -59,6 +63,11 @@ func (c *Client) onMessage(e *events.Message) {
 	}
 	if err := c.store.Save(ctx, chats, []store.Message{m}); err != nil {
 		c.log.Error("archive message", "err", err, "chat", m.ChatJID, "id", m.MessageID)
+		return
+	}
+	// After saving, so a brand-new group's chat exists to be named.
+	if e.Info.IsGroup {
+		c.nameGroupIfNeeded(e.Info.Chat)
 	}
 }
 

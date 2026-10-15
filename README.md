@@ -105,6 +105,7 @@ Tools accept either form.
 
 Edits are applied to the archived message (tools show `edited_at`), and a message deleted for
 everyone has its text removed from the archive and the search index and no longer appears in any tool.
+Group names are refreshed on every connect and follow renames live.
 
 Both live in one database. The archive goes through [GORM](https://gorm.io). Full-text search is
 the one dialect-specific part: FTS5 on SQLite, a generated `tsvector` column with a GIN index on

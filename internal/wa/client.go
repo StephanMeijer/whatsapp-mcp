@@ -41,6 +41,8 @@ type Client struct {
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
+
+	groupLookups groupLookups // groups whose missing name was looked up this run
 }
 
 // Status describes the connection.

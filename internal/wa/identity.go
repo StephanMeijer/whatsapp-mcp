@@ -47,19 +47,23 @@ func (c *Client) memoCanonical(ctx context.Context) func(types.JID) types.JID {
 
 // reconcile brings archived data in line with what is now known: chats and
 // senders stored under an @lid whose phone number has since been learned are
-// merged, then chats are named after contacts. It runs on every connect and
-// after every history sync, which is when new mappings and names arrive.
-func (c *Client) reconcile(ctx context.Context) {
+// merged, then chats are named after contacts and, when withGroups is set,
+// groups after their current names. It runs on every connect (withGroups)
+// and after every history sync, which is when new mappings and names arrive.
+func (c *Client) reconcile(ctx context.Context, withGroups bool) {
 	c.reconcileMu.Lock()
 	defer c.reconcileMu.Unlock()
 	c.mergeLIDChats(ctx)
 	c.syncChatNames(ctx)
+	if withGroups {
+		c.syncGroupNames(ctx)
+	}
 }
 
-func (c *Client) reconcileWithTimeout() {
+func (c *Client) reconcileWithTimeout(withGroups bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
 	defer cancel()
-	c.reconcile(ctx)
+	c.reconcile(ctx, withGroups)
 }
 
 func (c *Client) mergeLIDChats(ctx context.Context) {
