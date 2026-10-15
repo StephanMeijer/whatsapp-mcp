@@ -7,6 +7,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
 // Config is the runtime configuration of the server.
@@ -19,6 +21,11 @@ type Config struct {
 	AuthToken string
 	// LogLevel is one of debug, info, warn, error.
 	LogLevel string
+	// ReadOnly leaves out every tool that changes anything on WhatsApp.
+	ReadOnly bool
+	// AllowRecipients, when non-empty, limits write tools to these JIDs or
+	// phone numbers (plus the account's own number).
+	AllowRecipients []string
 }
 
 // Load parses args (without the program name). Flags take precedence over
@@ -32,8 +39,20 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 		return def
 	}
 
+	readOnlyDefault := false
+	if v := getenv("WHATSAPP_MCP_READ_ONLY"); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return Config{}, fmt.Errorf("WHATSAPP_MCP_READ_ONLY: %w", err)
+		}
+		readOnlyDefault = b
+	}
+
 	cfg := Config{AuthToken: getenv("WHATSAPP_MCP_TOKEN")}
+	var allow string
 	fs := flag.NewFlagSet("whatsapp-mcp", flag.ContinueOnError)
+	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
+	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
 	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", "127.0.0.1:8080"), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
 	fs.StringVar(&cfg.DatabaseURL, "database-url", envOr("DATABASE_URL", "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
 	fs.StringVar(&cfg.LogLevel, "log-level", envOr("WHATSAPP_MCP_LOG_LEVEL", "info"), "debug, info, warn or error (env WHATSAPP_MCP_LOG_LEVEL)")
@@ -46,5 +65,20 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	if cfg.AuthToken == "" {
 		return Config{}, errors.New("WHATSAPP_MCP_TOKEN must be set: the server exposes your WhatsApp account")
 	}
+	cfg.AllowRecipients = splitList(allow)
+	if cfg.ReadOnly && len(cfg.AllowRecipients) > 0 {
+		return Config{}, errors.New("-allow-recipients has no effect with -read-only; set one or the other")
+	}
 	return cfg, nil
+}
+
+// splitList splits a comma-separated list, trimming spaces and dropping empty entries.
+func splitList(s string) []string {
+	var out []string
+	for item := range strings.SplitSeq(s, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }

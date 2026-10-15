@@ -38,8 +38,28 @@ session without a new QR code.
 | `-addr` | `WHATSAPP_MCP_ADDR` | `127.0.0.1:8080` |
 | `-database-url` | `DATABASE_URL` | `sqlite://data/whatsapp.db` |
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
+| `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
+| `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
 
 `DATABASE_URL` is `sqlite://<path>` or `postgres://user:pass@host/db`.
+
+### Guardrails
+
+By default the client may message anyone. Two options limit that:
+
+```sh
+# Reading and searching only: send tools are not offered to the client at all.
+whatsapp-mcp -read-only
+
+# Sending only to these recipients (and always to your own number).
+whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
+```
+
+Allowlist entries are normalised, so `+31 6 1234 5678` and `31612345678@s.whatsapp.net` match each
+other. A contact's `@lid` privacy ID is not yet matched to their phone number
+([#2](https://github.com/StephanMeijer/whatsapp-mcp/issues/2)), so list it separately if needed.
+Every message sent is logged with recipient and message ID (not its text), and so is every refused
+recipient.
 
 ### Endpoints
 

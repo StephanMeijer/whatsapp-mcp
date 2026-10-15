@@ -16,8 +16,9 @@ import (
 )
 
 type tools struct {
-	wa    WhatsApp
-	store *store.Store
+	wa     WhatsApp
+	store  *store.Store
+	policy *policy
 }
 
 func registerTools(s *mcp.Server, t *tools) {
@@ -48,6 +49,12 @@ func registerTools(s *mcp.Server, t *tools) {
 		Description: "Search the address book by name, push name or phone number.",
 		Annotations: readOnly,
 	}, t.searchContacts)
+
+	// Write tools: registered only when not read-only, and each must check
+	// its recipient with t.policy.
+	if t.policy.readOnly {
+		return
+	}
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "send_message",
 		Description: "Send a text message. This is delivered immediately and cannot be undone.",
@@ -188,7 +195,11 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	m, err := t.wa.SendText(ctx, in.Recipient, in.Text)
+	to, err := t.policy.checkRecipient(in.Recipient, t.wa.Status().JID)
+	if err != nil {
+		return nil, Message{}, err
+	}
+	m, err := t.wa.SendText(ctx, to.String(), in.Text)
 	if err != nil {
 		return nil, Message{}, err
 	}

@@ -185,6 +185,8 @@ func (c *Client) SendText(ctx context.Context, recipient, text string) (store.Me
 		return store.Message{}, fmt.Errorf("send: %w", err)
 	}
 
+	c.log.Info("sent message", "recipient", to.String(), "id", resp.ID)
+
 	m := store.Message{
 		ChatJID:   to.String(),
 		MessageID: resp.ID,

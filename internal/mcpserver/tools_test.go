@@ -5,6 +5,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"slices"
 	"testing"
 
@@ -32,11 +33,18 @@ func (f *fakeWA) SendText(_ context.Context, recipient, text string) (store.Mess
 	return store.Message{ChatJID: recipient, MessageID: "OUT1", Timestamp: 1_700_000_000, FromMe: true, Text: text}, nil
 }
 
-func connect(t *testing.T, whatsapp WhatsApp, st *store.Store) *mcp.ClientSession {
+func connect(t *testing.T, whatsapp WhatsApp, st *store.Store, opts Options) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	serverT, clientT := mcp.NewInMemoryTransports()
-	ss, err := New("test", whatsapp, st).Connect(ctx, serverT, nil)
+	if opts.Logger == nil {
+		opts.Logger = slog.New(slog.DiscardHandler)
+	}
+	srv, err := New("test", whatsapp, st, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ss, err := srv.Connect(ctx, serverT, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +77,7 @@ func call(t *testing.T, cs *mcp.ClientSession, name string, args map[string]any,
 }
 
 func TestToolsAreListed(t *testing.T) {
-	cs := connect(t, &fakeWA{}, storetest.New(t))
+	cs := connect(t, &fakeWA{}, storetest.New(t), Options{})
 	res, err := cs.ListTools(context.Background(), nil)
 	if err != nil {
 		t.Fatal(err)
@@ -94,7 +102,7 @@ func TestReadTools(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	cs := connect(t, &fakeWA{}, st)
+	cs := connect(t, &fakeWA{}, st, Options{})
 
 	var status wa.Status
 	call(t, cs, "connection_status", nil, &status)
@@ -128,7 +136,7 @@ func TestReadTools(t *testing.T) {
 }
 
 func TestToolErrors(t *testing.T) {
-	cs := connect(t, &fakeWA{}, storetest.New(t))
+	cs := connect(t, &fakeWA{}, storetest.New(t), Options{})
 	tests := []struct {
 		tool string
 		args map[string]any
@@ -148,13 +156,13 @@ func TestToolErrors(t *testing.T) {
 
 func TestSendMessage(t *testing.T) {
 	fake := &fakeWA{}
-	cs := connect(t, fake, storetest.New(t))
+	cs := connect(t, fake, storetest.New(t), Options{})
 	var sent Message
 	call(t, cs, "send_message", map[string]any{"recipient": "+31600000001", "text": "hi"}, &sent)
 	if sent.ID != "OUT1" || !sent.FromMe {
 		t.Errorf("send_message = %+v", sent)
 	}
-	if want := []string{"+31600000001: hi"}; !slices.Equal(fake.sent, want) {
+	if want := []string{"31600000001@s.whatsapp.net: hi"}; !slices.Equal(fake.sent, want) {
 		t.Errorf("sent = %v, want %v", fake.sent, want)
 	}
 }

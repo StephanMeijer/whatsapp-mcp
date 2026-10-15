@@ -74,7 +74,15 @@ func run() error {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.Handle("GET /pair", httpx.RequireBearer(cfg.AuthToken, pairHandler(client)))
-	mux.Handle("/mcp", httpx.RequireBearer(cfg.AuthToken, mcpserver.Handler(mcpserver.New(version, client, st))))
+	mcpSrv, err := mcpserver.New(version, client, st, mcpserver.Options{
+		ReadOnly:        cfg.ReadOnly,
+		AllowRecipients: cfg.AllowRecipients,
+		Logger:          log,
+	})
+	if err != nil {
+		return err
+	}
+	mux.Handle("/mcp", httpx.RequireBearer(cfg.AuthToken, mcpserver.Handler(mcpSrv)))
 
 	// Cancelled when shutdown starts, so long-lived MCP streams end instead of
 	// holding Shutdown open until its deadline.
@@ -88,7 +96,8 @@ func run() error {
 	}
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("serving MCP", "url", "http://"+cfg.Addr+"/mcp", "version", version)
+		log.Info("serving MCP", "url", "http://"+cfg.Addr+"/mcp", "version", version,
+			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients))
 		errc <- srv.ListenAndServe()
 	}()
 
