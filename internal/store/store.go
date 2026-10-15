@@ -255,6 +255,57 @@ func (s *Store) ListMessages(ctx context.Context, chatJID string, before time.Ti
 	return msgs, err
 }
 
+// RecentQuery selects messages in a time window, for RecentMessages.
+type RecentQuery struct {
+	// Since is inclusive and required; Until is exclusive and optional.
+	Since, Until time.Time
+	// ChatJID restricts the result to one chat when set.
+	ChatJID string
+	// IncludeFromMe also returns the account's own messages.
+	IncludeFromMe bool
+	Limit         int
+}
+
+// RecentMessages returns messages in the window, newest first. When more
+// than the limit match, it returns the newest ones and reports truncated.
+func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Message, truncated bool, err error) {
+	limit := clampLimit(q.Limit)
+	tx := s.db.WithContext(ctx).Where("timestamp >= ?", q.Since.Unix())
+	if !q.Until.IsZero() {
+		tx = tx.Where("timestamp < ?", q.Until.Unix())
+	}
+	if q.ChatJID != "" {
+		tx = tx.Where("chat_jid = ?", q.ChatJID)
+	}
+	if !q.IncludeFromMe {
+		tx = tx.Where("from_me = ?", false)
+	}
+	err = tx.Order("timestamp DESC").Order("seq DESC").Limit(limit + 1).Find(&msgs).Error
+	if err != nil {
+		return nil, false, err
+	}
+	if len(msgs) > limit {
+		return msgs[:limit], true, nil
+	}
+	return msgs, false, nil
+}
+
+// ChatsByJID returns the stored chats among jids, keyed by JID.
+func (s *Store) ChatsByJID(ctx context.Context, jids []string) (map[string]Chat, error) {
+	out := make(map[string]Chat, len(jids))
+	if len(jids) == 0 {
+		return out, nil
+	}
+	var chats []Chat
+	if err := s.db.WithContext(ctx).Where("jid IN ?", jids).Find(&chats).Error; err != nil {
+		return nil, err
+	}
+	for _, c := range chats {
+		out[c.JID] = c
+	}
+	return out, nil
+}
+
 // SearchMessages full-text searches message text, optionally within one chat,
 // best matches first.
 func (s *Store) SearchMessages(ctx context.Context, query, chatJID string, limit int) ([]Message, error) {

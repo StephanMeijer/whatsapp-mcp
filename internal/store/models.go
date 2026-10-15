@@ -20,7 +20,7 @@ type Message struct {
 	MessageID string `gorm:"not null;uniqueIndex:idx_messages_chat_message"`
 	SenderJID string `gorm:"column:sender_jid;not null"`
 	// Timestamp is a Unix timestamp in seconds.
-	Timestamp int64  `gorm:"not null;index:idx_messages_chat_ts,priority:2"`
+	Timestamp int64  `gorm:"not null;index:idx_messages_chat_ts,priority:2;index:idx_messages_ts"`
 	FromMe    bool   `gorm:"not null"`
 	Text      string `gorm:"not null;default:''"`
 	// MediaType is empty for plain text, otherwise image, video, audio, document or sticker.

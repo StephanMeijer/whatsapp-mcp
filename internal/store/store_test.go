@@ -304,6 +304,53 @@ func TestSearchMessages(t *testing.T) {
 	})
 }
 
+func TestRecentMessages(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const a, b = "1@s.whatsapp.net", "2@s.whatsapp.net"
+		mine := msg(a, "mine", 150, "my own")
+		mine.FromMe = true
+		must(t, s.Save(ctx, []store.Chat{{JID: a, Name: "Alice"}}, []store.Message{
+			msg(a, "old", 99, "before the window"),
+			msg(a, "a1", 100, "exactly at since"),
+			mine,
+			msg(b, "b1", 160, "bob"),
+			msg(a, "a2", 199, "last second"),
+			msg(a, "late", 200, "exactly at until"),
+		}))
+		since, until := time.Unix(100, 0), time.Unix(200, 0)
+
+		tests := []struct {
+			name          string
+			q             store.RecentQuery
+			want          []string
+			wantTruncated bool
+		}{
+			{"window, others only", store.RecentQuery{Since: since, Until: until}, []string{"a2", "b1", "a1"}, false},
+			{"no until", store.RecentQuery{Since: since}, []string{"late", "a2", "b1", "a1"}, false},
+			{"include own", store.RecentQuery{Since: since, Until: until, IncludeFromMe: true}, []string{"a2", "b1", "mine", "a1"}, false},
+			{"one chat", store.RecentQuery{Since: since, Until: until, ChatJID: b}, []string{"b1"}, false},
+			{"truncated keeps newest", store.RecentQuery{Since: since, Until: until, Limit: 2}, []string{"a2", "b1"}, true},
+			{"limit exactly fits", store.RecentQuery{Since: since, Until: until, Limit: 3}, []string{"a2", "b1", "a1"}, false},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				msgs, truncated, err := s.RecentMessages(ctx, tt.q)
+				must(t, err)
+				if got := ids(msgs); !slices.Equal(got, tt.want) || truncated != tt.wantTruncated {
+					t.Errorf("got %v truncated=%v, want %v truncated=%v", got, truncated, tt.want, tt.wantTruncated)
+				}
+			})
+		}
+
+		chats, err := s.ChatsByJID(ctx, []string{a, b, "unknown@s.whatsapp.net"})
+		must(t, err)
+		if len(chats) != 2 || chats[a].Name != "Alice" {
+			t.Errorf("ChatsByJID = %+v", chats)
+		}
+	})
+}
+
 func TestReopenKeepsData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wa.db")
 	ctx := context.Background()

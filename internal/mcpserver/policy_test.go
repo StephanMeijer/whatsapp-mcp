@@ -31,7 +31,7 @@ func toolNames(t *testing.T, opts Options) []string {
 
 func TestReadOnlyHidesWriteTools(t *testing.T) {
 	got := toolNames(t, Options{ReadOnly: true})
-	want := []string{"connection_status", "list_chats", "list_messages", "search_contacts", "search_messages"}
+	want := []string{"connection_status", "list_chats", "list_messages", "recent_messages", "search_contacts", "search_messages"}
 	if !slices.Equal(got, want) {
 		t.Errorf("read-only tools = %v, want %v", got, want)
 	}
