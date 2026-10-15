@@ -49,10 +49,10 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, react, mark_read and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, react, delete_message, mark_read and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
-# Writing (sending, reacting, marking read, rejecting calls) only in these chats, and always your own.
+# Writing (sending, reacting, deleting, marking read, rejecting calls) only in these chats, and always your own.
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
 
@@ -119,6 +119,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected or missed |
 | `reject_call` | decline a call that is still ringing |
 | `react` | react to a message with an emoji (empty removes it) |
+| `delete_message` | delete one of your own messages for everyone (WhatsApp allows this only for a limited time) |
 | `mark_read` | mark a chat as read on all your devices |
 
 ## Why a database

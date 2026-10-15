@@ -22,8 +22,10 @@ func interactStore(t *testing.T) *store.Store {
 	ctx := context.Background()
 	if err := st.Save(ctx, nil, []store.Message{
 		{ChatJID: alice, MessageID: "A1", SenderJID: alice, Timestamp: 1, Text: "dinner at 8?"},
+		{ChatJID: alice, MessageID: "MINE", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 4, Text: "oops"},
 		{ChatJID: alice, MessageID: "GONE", SenderJID: alice, Timestamp: 2, Text: "deleted"},
 		{ChatJID: stranger, MessageID: "S1", SenderJID: stranger, Timestamp: 3, Text: "hi"},
+		{ChatJID: stranger, MessageID: "S2", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 5, Text: "hello"},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -45,12 +47,18 @@ func TestReplyReactMarkRead(t *testing.T) {
 		t.Error("empty emoji: want removed")
 	}
 	call(t, cs, "mark_read", map[string]any{"chat_jid": "+31 6 0000 0001"}, nil)
+	var deleted DeleteMessageOut
+	call(t, cs, "delete_message", map[string]any{"chat_jid": alice, "message_id": "MINE"}, &deleted)
+	if !deleted.Deleted || deleted.MessageID != "MINE" {
+		t.Errorf("delete_message = %+v", deleted)
+	}
 
 	want := []string{
 		alice + ": sounds good (reply to A1)",
 		`react ` + alice + `/A1 "👍"`,
 		`react ` + alice + `/A1 ""`,
 		"read " + alice,
+		"delete " + alice + "/MINE",
 	}
 	if !slices.Equal(fake.sent, want) {
 		t.Errorf("calls =\n%q\nwant\n%q", fake.sent, want)
@@ -71,6 +79,11 @@ func TestInteractErrorsSendNothing(t *testing.T) {
 		{"react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": "not an emoji"}},
 		{"react", map[string]any{"chat_jid": alice, "emoji": "👍"}},
 		{"mark_read", map[string]any{}},
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "A1"}}, // not yours
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "UNKNOWN"}},
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "GONE"}},
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "S1"}}, // other chat
+		{"delete_message", map[string]any{"chat_jid": alice}},
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
 			t.Errorf("%s(%v): want tool error", c.tool, c.args)
@@ -91,6 +104,7 @@ func TestInteractRespectsAllowlist(t *testing.T) {
 		{"send_message", map[string]any{"recipient": stranger, "text": "x", "reply_to": "S1"}},
 		{"react", map[string]any{"chat_jid": stranger, "message_id": "S1", "emoji": "👍"}},
 		{"mark_read", map[string]any{"chat_jid": stranger}},
+		{"delete_message", map[string]any{"chat_jid": stranger, "message_id": "S2"}},
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
 			t.Errorf("%s to a chat outside the allowlist: want tool error", c.tool)

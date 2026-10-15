@@ -36,6 +36,27 @@ func (c *Client) React(ctx context.Context, chat types.JID, target store.Message
 	return nil
 }
 
+// DeleteMessage deletes one of the account's own messages for everyone and
+// marks it deleted in the archive.
+func (c *Client) DeleteMessage(ctx context.Context, chat types.JID, target store.Message) error {
+	if !c.cli.IsLoggedIn() {
+		return errors.New("not logged in to WhatsApp")
+	}
+	if !target.FromMe {
+		return fmt.Errorf("message %s was not sent by you", target.MessageID)
+	}
+	// An empty sender makes it a revoke of the account's own message.
+	if _, err := c.cli.SendMessage(ctx, chat, c.cli.BuildRevoke(chat, types.EmptyJID, target.MessageID)); err != nil {
+		return fmt.Errorf("delete message: %w", err)
+	}
+	if _, err := c.store.MarkDeleted(ctx, chat.String(), target.MessageID); err != nil {
+		// The deletion went out; failing to archive it shouldn't fail the call.
+		c.log.Error("archive deleted message", "err", err, "chat", chat.String(), "id", target.MessageID)
+	}
+	c.log.Info("deleted message", "chat", chat.String(), "id", target.MessageID)
+	return nil
+}
+
 // MarkChatRead sends read receipts for the chat's latest incoming messages
 // (blue ticks for their senders) and marks the chat as read across the
 // account's devices, clearing its unread badge.
