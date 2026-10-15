@@ -48,10 +48,10 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send tools are not offered to the client at all.
+# Reading and searching only: send_message, react and mark_read are not offered at all.
 whatsapp-mcp -read-only
 
-# Sending only to these recipients (and always to your own number).
+# Writing (sending, reacting, marking read) only in these chats, and always your own.
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
 
@@ -87,7 +87,9 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `fetch_older_messages` | ask your phone for older messages in a chat (up to 50 per call; the phone must be online) |
 | `search_contacts` | address book lookup |
-| `send_message` | send a text to a JID or phone number |
+| `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
+| `react` | react to a message with an emoji (empty removes it) |
+| `mark_read` | mark a chat as read on all your devices |
 
 ## Why a database
 
@@ -137,10 +139,9 @@ a static build on every push and pull request.
 
 ## Not yet
 
-- Sending and downloading media
-- Message edits and deletions (edits are currently skipped)
-- Group names and metadata (group chats appear by JID until named in a history sync)
-- Read receipts, reactions, presence
+- Downloading and sending media ([#9](https://github.com/StephanMeijer/whatsapp-mcp/issues/9), [#10](https://github.com/StephanMeijer/whatsapp-mcp/issues/10))
+- Group metadata beyond names (participants, admins)
+- Presence (typing indicators, online status) and archiving incoming reactions
 
 ## License
 

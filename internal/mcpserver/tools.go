@@ -84,10 +84,23 @@ func registerTools(s *mcp.Server, t *tools) {
 		return
 	}
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "send_message",
-		Description: "Send a text message. This is delivered immediately and cannot be undone.",
+		Name: "send_message",
+		Description: "Send a text message. This is delivered immediately and cannot be undone. " +
+			"Set reply_to to a message id in the same chat to send it as a reply quoting that message.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true)},
 	}, t.sendMessage)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "react",
+		Description: "React to a message with an emoji, visible to everyone in the chat. " +
+			"An empty emoji removes your reaction.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+	}, t.react)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "mark_read",
+		Description: "Mark a chat as read: senders of its latest messages see blue ticks, and the unread " +
+			"badge clears on all your devices.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+	}, t.markRead)
 }
 
 // Message is the tool-facing form of store.Message.
@@ -452,6 +465,7 @@ func (t *tools) searchContacts(ctx context.Context, _ *mcp.CallToolRequest, in S
 type SendMessageIn struct {
 	Recipient string `json:"recipient" jsonschema:"a JID (from list_chats or search_contacts) or an international phone number such as +31612345678"`
 	Text      string `json:"text" jsonschema:"the message text"`
+	ReplyTo   string `json:"reply_to,omitempty" jsonschema:"id of a message in the same chat to reply to (quoted)"`
 }
 
 func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in SendMessageIn) (*mcp.CallToolResult, Message, error) {
@@ -462,11 +476,88 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 	if err != nil {
 		return nil, Message{}, err
 	}
-	m, err := t.wa.SendText(ctx, to.String(), in.Text)
+	var quoted *store.Message
+	if in.ReplyTo != "" {
+		q, err := t.archivedMessage(ctx, to, in.ReplyTo)
+		if err != nil {
+			return nil, Message{}, err
+		}
+		quoted = &q
+	}
+	m, err := t.wa.SendText(ctx, to.String(), in.Text, quoted)
 	if err != nil {
 		return nil, Message{}, err
 	}
 	return nil, t.toMessages(ctx, []store.Message{m})[0], nil
+}
+
+// archivedMessage looks up a message that a write tool acts on.
+func (t *tools) archivedMessage(ctx context.Context, chat types.JID, id string) (store.Message, error) {
+	m, err := t.store.MessageByID(ctx, chat.String(), id)
+	if errors.Is(err, store.ErrNotFound) {
+		return store.Message{}, fmt.Errorf("message %s is not archived in chat %s; find it with list_messages, "+
+			"or fetch_older_messages for older history", id, chat)
+	}
+	return m, err
+}
+
+type ReactIn struct {
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
+	MessageID string `json:"message_id" jsonschema:"id of the message to react to"`
+	Emoji     string `json:"emoji" jsonschema:"a single emoji, or empty to remove your reaction"`
+}
+
+type ReactOut struct {
+	ChatJID   string `json:"chat_jid"`
+	MessageID string `json:"message_id"`
+	Removed   bool   `json:"removed" jsonschema:"true if the reaction was removed"`
+}
+
+// maxEmojiLen bounds the reaction string: an emoji with modifiers and
+// joiners, not text.
+const maxEmojiLen = 32
+
+func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (*mcp.CallToolResult, ReactOut, error) {
+	if in.ChatJID == "" || in.MessageID == "" {
+		return nil, ReactOut{}, errors.New("chat_jid and message_id are required")
+	}
+	if len(in.Emoji) > maxEmojiLen || strings.ContainsAny(in.Emoji, " \t\n") {
+		return nil, ReactOut{}, errors.New("emoji must be a single emoji (or empty to remove)")
+	}
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	if err != nil {
+		return nil, ReactOut{}, err
+	}
+	target, err := t.archivedMessage(ctx, chat, in.MessageID)
+	if err != nil {
+		return nil, ReactOut{}, err
+	}
+	if err := t.wa.React(ctx, chat, target, in.Emoji); err != nil {
+		return nil, ReactOut{}, err
+	}
+	return nil, ReactOut{ChatJID: chat.String(), MessageID: in.MessageID, Removed: in.Emoji == ""}, nil
+}
+
+type MarkReadIn struct {
+	ChatJID string `json:"chat_jid" jsonschema:"the chat's JID"`
+}
+
+type MarkReadOut struct {
+	ChatJID string `json:"chat_jid"`
+}
+
+func (t *tools) markRead(ctx context.Context, _ *mcp.CallToolRequest, in MarkReadIn) (*mcp.CallToolResult, MarkReadOut, error) {
+	if in.ChatJID == "" {
+		return nil, MarkReadOut{}, errors.New("chat_jid is required")
+	}
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	if err != nil {
+		return nil, MarkReadOut{}, err
+	}
+	if err := t.wa.MarkChatRead(ctx, chat); err != nil {
+		return nil, MarkReadOut{}, err
+	}
+	return nil, MarkReadOut{ChatJID: chat.String()}, nil
 }
 
 // canonicalChat maps a chat JID given by a client to the archive's form, so

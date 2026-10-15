@@ -19,7 +19,12 @@ import (
 type WhatsApp interface {
 	Status() wa.Status
 	Contacts(ctx context.Context, query string) ([]wa.Contact, error)
-	SendText(ctx context.Context, recipient, text string) (store.Message, error)
+	// SendText sends a message, as a reply quoting quoted when it is set.
+	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
+	// React sets the account's reaction to a message; "" removes it.
+	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
+	// MarkChatRead marks a chat as read on all the account's devices.
+	MarkChatRead(ctx context.Context, chat types.JID) error
 	// Canonical maps a JID to the form the archive uses: the phone-number
 	// JID for an @lid whose number is known, without a device part.
 	Canonical(ctx context.Context, jid types.JID) types.JID

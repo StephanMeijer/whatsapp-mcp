@@ -70,9 +70,23 @@ func (f *fakeWA) Contacts(context.Context, string) ([]wa.Contact, error) {
 	return []wa.Contact{{JID: "31600000001@s.whatsapp.net", Name: "Alice"}}, nil
 }
 
-func (f *fakeWA) SendText(_ context.Context, recipient, text string) (store.Message, error) {
-	f.sent = append(f.sent, recipient+": "+text)
+func (f *fakeWA) SendText(_ context.Context, recipient, text string, quoted *store.Message) (store.Message, error) {
+	entry := recipient + ": " + text
+	if quoted != nil {
+		entry += " (reply to " + quoted.MessageID + ")"
+	}
+	f.sent = append(f.sent, entry)
 	return store.Message{ChatJID: recipient, MessageID: "OUT1", Timestamp: 1_700_000_000, FromMe: true, Text: text}, nil
+}
+
+func (f *fakeWA) React(_ context.Context, chat types.JID, target store.Message, emoji string) error {
+	f.sent = append(f.sent, fmt.Sprintf("react %s/%s %q", chat, target.MessageID, emoji))
+	return nil
+}
+
+func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
+	f.sent = append(f.sent, "read "+chat.String())
+	return nil
 }
 
 func connect(t *testing.T, whatsapp WhatsApp, st *store.Store, opts Options) *mcp.ClientSession {
@@ -129,7 +143,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "fetch_older_messages", "list_chats", "list_messages", "message_context", "recent_messages", "search_contacts", "search_messages", "send_message"}
+	want := []string{"connection_status", "fetch_older_messages", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

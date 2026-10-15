@@ -564,6 +564,43 @@ func TestMigrationAddsEditColumns(t *testing.T) {
 	}
 }
 
+func TestMessageByIDAndLatestIncoming(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		mine := msg(chat, "mine", 40, "from me")
+		mine.FromMe = true
+		must(t, s.Save(ctx, nil, []store.Message{
+			msg(chat, "in1", 10, "a"), msg(chat, "in2", 20, "b"), msg(chat, "gone", 30, "c"), mine,
+			msg("2@s.whatsapp.net", "elsewhere", 50, "d"),
+		}))
+		_, err := s.MarkDeleted(ctx, chat, "gone")
+		must(t, err)
+
+		m, err := s.MessageByID(ctx, chat, "in2")
+		must(t, err)
+		if m.Text != "b" {
+			t.Errorf("MessageByID = %+v", m)
+		}
+		for _, id := range []string{"unknown", "gone", "elsewhere"} {
+			if _, err := s.MessageByID(ctx, chat, id); !errors.Is(err, store.ErrNotFound) {
+				t.Errorf("MessageByID(%s): err = %v, want ErrNotFound", id, err)
+			}
+		}
+
+		in, err := s.LatestIncoming(ctx, chat, 0)
+		must(t, err)
+		if got := ids(in); !slices.Equal(got, []string{"in2", "in1"}) {
+			t.Errorf("LatestIncoming = %v, want [in2 in1] (no own, deleted or other-chat messages)", got)
+		}
+		in, err = s.LatestIncoming(ctx, chat, 1)
+		must(t, err)
+		if got := ids(in); !slices.Equal(got, []string{"in2"}) {
+			t.Errorf("LatestIncoming limit 1 = %v", got)
+		}
+	})
+}
+
 func TestReopenKeepsData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wa.db")
 	ctx := context.Background()

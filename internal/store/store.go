@@ -358,6 +358,31 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 	return out, len(prev), nil
 }
 
+// MessageByID returns one archived message. Deleted messages count as not
+// found, since nothing should be done with them.
+func (s *Store) MessageByID(ctx context.Context, chatJID, messageID string) (Message, error) {
+	var m Message
+	res := s.db.WithContext(ctx).
+		Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).Limit(1).Find(&m)
+	if res.Error != nil {
+		return Message{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return Message{}, ErrNotFound
+	}
+	return m, nil
+}
+
+// LatestIncoming returns up to limit of the newest messages others sent in a
+// chat, newest first.
+func (s *Store) LatestIncoming(ctx context.Context, chatJID string, limit int) ([]Message, error) {
+	var msgs []Message
+	err := s.db.WithContext(ctx).
+		Where("chat_jid = ? AND from_me = ? AND deleted = ?", chatJID, false, false).
+		Order("timestamp DESC").Order("seq DESC").Limit(clampLimit(limit)).Find(&msgs).Error
+	return msgs, err
+}
+
 // OldestMessage returns the earliest archived message in a chat, the anchor
 // for asking the phone for older history. It returns ErrNotFound for a chat
 // without messages.

@@ -41,6 +41,7 @@ type Client struct {
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
+	groupModes groupModes // per-group addressing mode, for message keys
 
 	groupLookups groupLookups // groups whose missing name was looked up this run
 }
@@ -179,8 +180,9 @@ func (c *Client) Contacts(ctx context.Context, query string) ([]Contact, error) 
 }
 
 // SendText sends a text message and archives it. recipient is a JID or a
-// phone number in international format (digits, optional leading +).
-func (c *Client) SendText(ctx context.Context, recipient, text string) (store.Message, error) {
+// phone number in international format (digits, optional leading +). With
+// quoted set, the message is sent as a reply quoting that archived message.
+func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error) {
 	if !c.cli.IsLoggedIn() {
 		return store.Message{}, errors.New("not logged in to WhatsApp")
 	}
@@ -188,12 +190,16 @@ func (c *Client) SendText(ctx context.Context, recipient, text string) (store.Me
 	if err != nil {
 		return store.Message{}, err
 	}
-	resp, err := c.cli.SendMessage(ctx, to, &waE2E.Message{Conversation: proto.String(text)})
+	msg := &waE2E.Message{Conversation: proto.String(text)}
+	if quoted != nil {
+		msg = replyMessage(text, *quoted, c.wireSender(ctx, to, *quoted))
+	}
+	resp, err := c.cli.SendMessage(ctx, to, msg)
 	if err != nil {
 		return store.Message{}, fmt.Errorf("send: %w", err)
 	}
 
-	c.log.Info("sent message", "recipient", to.String(), "id", resp.ID)
+	c.log.Info("sent message", "recipient", to.String(), "id", resp.ID, "reply", quoted != nil)
 
 	m := store.Message{
 		ChatJID:   to.String(),
