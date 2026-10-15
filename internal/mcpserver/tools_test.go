@@ -28,6 +28,9 @@ type fakeWA struct {
 	namesErr   error
 	namesCalls int
 
+	// lastMedia is the file passed to the latest SendMedia.
+	lastMedia []byte
+
 	// media is returned by Media, or mediaErr.
 	media    wa.Media
 	mediaErr error
@@ -95,6 +98,12 @@ func (f *fakeWA) Media(_ context.Context, m store.Message) (wa.Media, error) {
 	return wa.Media{Kind: m.MediaType, MIMEType: f.media.MIMEType, FileName: f.media.FileName, Data: f.media.Data}, nil
 }
 
+func (f *fakeWA) SendMedia(_ context.Context, recipient string, m wa.OutgoingMedia) (store.Message, error) {
+	f.sent = append(f.sent, fmt.Sprintf("media %s %s %q %d bytes %q", recipient, m.Kind, m.FileName, len(m.Data), m.Caption))
+	f.lastMedia = m.Data
+	return store.Message{ChatJID: recipient, MessageID: "MEDIA1", Timestamp: 1_700_000_000, FromMe: true, MediaType: m.Kind, Text: m.Caption}, nil
+}
+
 func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
 	f.sent = append(f.sent, "read "+chat.String())
 	return nil
@@ -154,7 +163,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_message"}
+	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

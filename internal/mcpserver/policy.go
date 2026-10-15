@@ -21,6 +21,8 @@ type Options struct {
 	AllowRecipients []string
 	// Logger records refused writes. Defaults to slog.Default().
 	Logger *slog.Logger
+	// MediaDir, when set, is the only folder send_media may read files from.
+	MediaDir string
 }
 
 // policy decides which recipients write tools may target. Every write tool

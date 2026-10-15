@@ -78,6 +78,7 @@ func run() error {
 		ReadOnly:        cfg.ReadOnly,
 		AllowRecipients: cfg.AllowRecipients,
 		Logger:          log,
+		MediaDir:        cfg.MediaDir,
 	})
 	if err != nil {
 		return err

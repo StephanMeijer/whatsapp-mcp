@@ -57,6 +57,24 @@ func TestLoad(t *testing.T) {
 			wantErr: "no effect",
 		},
 		{
+			name:    "media dir must exist",
+			args:    []string{"-media-dir", "/nonexistent/whatsapp-mcp-media"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			wantErr: "-media-dir",
+		},
+		{
+			name:    "media dir must be a directory",
+			args:    []string{"-media-dir", "config_test.go"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			wantErr: "not a directory",
+		},
+		{
+			name: "media dir",
+			args: []string{"-media-dir", "."},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info", MediaDir: "."},
+		},
+		{
 			name:    "stray argument",
 			args:    []string{"serve"},
 			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},

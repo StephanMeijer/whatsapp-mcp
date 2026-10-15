@@ -39,6 +39,7 @@ session without a new QR code.
 | `-database-url` | `DATABASE_URL` | `sqlite://data/whatsapp.db` |
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
+| `-media-dir` | `WHATSAPP_MCP_MEDIA_DIR` | *(empty: off)* the only folder `send_media` may read files from |
 | `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
 
 `DATABASE_URL` is `sqlite://<path>` or `postgres://user:pass@host/db`.
@@ -48,10 +49,10 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, react and mark_read are not offered at all.
+# Reading and searching only: send_message, send_media, react and mark_read are not offered at all.
 whatsapp-mcp -read-only
 
-# Writing (sending, reacting, marking read) only in these chats, and always your own.
+# Writing (sending, sending media, reacting, marking read) only in these chats, and always your own.
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
 
@@ -89,6 +90,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `get_media` | download a message's photo, video, voice note or document (images are shown to the client; up to 16 MB) |
 | `search_contacts` | address book lookup |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
+| `send_media` | send a photo, video, audio file or document (base64, or a file in `-media-dir`; up to 16 MB) |
 | `react` | react to a message with an emoji (empty removes it) |
 | `mark_read` | mark a chat as read on all your devices |
 
@@ -140,7 +142,8 @@ a static build on every push and pull request.
 
 ## Not yet
 
-- Sending media ([#10](https://github.com/StephanMeijer/whatsapp-mcp/issues/10)); downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
+- Thumbnails for sent photos and videos (recipients see a blurred placeholder until they open them)
+- Downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
 - Group metadata beyond names (participants, admins)
 - Presence (typing indicators, online status) and archiving incoming reactions
 

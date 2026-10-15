@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -26,6 +27,8 @@ type Config struct {
 	// AllowRecipients, when non-empty, limits write tools to these JIDs or
 	// phone numbers (plus the account's own number).
 	AllowRecipients []string
+	// MediaDir, when set, is the only folder send_media may read files from.
+	MediaDir string
 }
 
 // Load parses args (without the program name). Flags take precedence over
@@ -52,6 +55,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	var allow string
 	fs := flag.NewFlagSet("whatsapp-mcp", flag.ContinueOnError)
 	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
+	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
 	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", "127.0.0.1:8080"), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
 	fs.StringVar(&cfg.DatabaseURL, "database-url", envOr("DATABASE_URL", "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
@@ -66,6 +70,15 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 		return Config{}, errors.New("WHATSAPP_MCP_TOKEN must be set: the server exposes your WhatsApp account")
 	}
 	cfg.AllowRecipients = splitList(allow)
+	if cfg.MediaDir != "" {
+		info, err := os.Stat(cfg.MediaDir)
+		if err != nil {
+			return Config{}, fmt.Errorf("-media-dir: %w", err)
+		}
+		if !info.IsDir() {
+			return Config{}, fmt.Errorf("-media-dir: %s is not a directory", cfg.MediaDir)
+		}
+	}
 	if cfg.ReadOnly && len(cfg.AllowRecipients) > 0 {
 		return Config{}, errors.New("-allow-recipients has no effect with -read-only; set one or the other")
 	}
