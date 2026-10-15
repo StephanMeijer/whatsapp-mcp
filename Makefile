@@ -1,8 +1,10 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+REVISION ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
+IMAGE   ?= whatsapp-mcp:$(VERSION)
 BIN     := bin/whatsapp-mcp
 PG_URL  := postgres://postgres:pw@127.0.0.1:55432/wa?sslmode=disable
 
-.PHONY: build run test test-postgres vet clean
+.PHONY: build run test test-postgres vet clean docker-build
 
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o $(BIN) ./cmd/whatsapp-mcp
@@ -23,6 +25,10 @@ test-postgres:
 
 vet:
 	go vet ./...
+
+docker-build:
+	docker buildx build --load --tag $(IMAGE) \
+		--build-arg VERSION=$(VERSION) --build-arg REVISION=$(REVISION) .
 
 clean:
 	rm -rf bin

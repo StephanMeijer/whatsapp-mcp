@@ -67,6 +67,28 @@ recipient.
 - `GET /pair`: the pending pairing QR code as PNG, 404 when there is none (bearer auth)
 - `GET /healthz`: liveness, no auth
 
+## Run with Docker
+
+The image is a single static binary on distroless (non-root, no shell), built for `linux/amd64` and
+`linux/arm64`. The session and archive live in a SQLite database on the `/data` volume.
+
+```sh
+make docker-build                      # or: docker buildx build --load -t whatsapp-mcp .
+
+docker run -d --name whatsapp-mcp \
+  -e WHATSAPP_MCP_TOKEN="$WHATSAPP_MCP_TOKEN" \
+  -v whatsapp-mcp-data:/data \
+  -p 127.0.0.1:8080:8080 \
+  --read-only --cap-drop ALL --security-opt no-new-privileges \
+  whatsapp-mcp
+
+docker logs -f whatsapp-mcp            # scan the QR code shown here on first start
+```
+
+Publish the port on `127.0.0.1` only, as above; the container listens on all interfaces internally.
+Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
+container keeps the session. The other options from the table above work as environment variables.
+
 ## Connect a client
 
 Claude Code:
@@ -134,6 +156,7 @@ internal/httpx       bearer auth
 make test            # unit tests, SQLite
 make test-postgres   # store tests against a throwaway Postgres container (needs Docker)
 make build           # static binary in bin/
+make docker-build    # container image (see "Run with Docker")
 ```
 
 The Go toolchain is pinned in `mise.toml`; `mise install` gets it. CI runs gofmt, `go vet`,

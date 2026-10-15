@@ -99,3 +99,15 @@ jobs:
         run: make build
       - name: Binary is CGO-free
         run: go version -m bin/whatsapp-mcp | grep -q 'CGO_ENABLED=0'
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Dockerfile checks
+        run: docker build --check --build-arg BUILDKIT_DOCKERFILE_CHECK=error=true .
+      - name: Build image for amd64 and arm64
+        run: |
+          docker buildx build --platform linux/amd64,linux/arm64 --output type=cacheonly \
+            --build-arg VERSION="${GITHUB_SHA::7}" --build-arg REVISION="$GITHUB_SHA" .

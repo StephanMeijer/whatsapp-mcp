@@ -1,0 +1,8 @@
+# Allowlist: send the builder only what the Dockerfile copies. In particular
+# data/ holds the paired session, the message archive and the auth token, and
+# must never reach a build context.
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
