@@ -72,15 +72,18 @@ recipient.
 The image is a single static binary on distroless (non-root, no shell), built for `linux/amd64` and
 `linux/arm64`. The session and archive live in a SQLite database on the `/data` volume.
 
+Released images are published to GHCR; or build one yourself:
+
 ```sh
-make docker-build                      # or: docker buildx build --load -t whatsapp-mcp .
+docker pull ghcr.io/stephanmeijer/whatsapp-mcp:latest   # or a version, e.g. :0.1.0
+# make docker-build IMAGE=ghcr.io/stephanmeijer/whatsapp-mcp:latest   # or build it locally
 
 docker run -d --name whatsapp-mcp \
   -e WHATSAPP_MCP_TOKEN="$WHATSAPP_MCP_TOKEN" \
   -v whatsapp-mcp-data:/data \
   -p 127.0.0.1:8080:8080 \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
-  whatsapp-mcp
+  ghcr.io/stephanmeijer/whatsapp-mcp:latest
 
 docker logs -f whatsapp-mcp            # scan the QR code shown here on first start
 ```
@@ -169,6 +172,14 @@ a static build on every push and pull request.
 - Downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
 - Group metadata beyond names (participants, admins)
 - Presence (typing indicators, online status) and archiving incoming reactions
+
+## Releases
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org). On every push to `main`,
+[release-please](https://github.com/googleapis/release-please) keeps a release pull request up to
+date with the next version and the changelog. Merging it tags the release, creates the GitHub Release
+and publishes the image to `ghcr.io/stephanmeijer/whatsapp-mcp` for `linux/amd64` and `linux/arm64`,
+with SBOM and provenance attestations.
 
 ## License
 
