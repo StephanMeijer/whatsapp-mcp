@@ -104,6 +104,11 @@ func (f *fakeWA) SendMedia(_ context.Context, recipient string, m wa.OutgoingMed
 	return store.Message{ChatJID: recipient, MessageID: "MEDIA1", Timestamp: 1_700_000_000, FromMe: true, MediaType: m.Kind, Text: m.Caption}, nil
 }
 
+func (f *fakeWA) RejectCall(_ context.Context, callID string) (store.Call, error) {
+	f.sent = append(f.sent, "reject "+callID)
+	return store.Call{CallID: callID, CallerJID: "31600000001@s.whatsapp.net", Status: store.CallRejected, StartedAt: 1}, nil
+}
+
 func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
 	f.sent = append(f.sent, "read "+chat.String())
 	return nil
@@ -163,7 +168,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

@@ -49,10 +49,10 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, react and mark_read are not offered at all.
+# Reading and searching only: send_message, send_media, react, mark_read and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
-# Writing (sending, sending media, reacting, marking read) only in these chats, and always your own.
+# Writing (sending, reacting, marking read, rejecting calls) only in these chats, and always your own.
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
 
@@ -116,6 +116,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `search_contacts` | address book lookup |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
 | `send_media` | send a photo, video, audio file or document (base64, or a file in `-media-dir`; up to 16 MB) |
+| `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected or missed |
+| `reject_call` | decline a call that is still ringing |
 | `react` | react to a message with an emoji (empty removes it) |
 | `mark_read` | mark a chat as read on all your devices |
 
@@ -172,6 +174,7 @@ a static build on every push and pull request.
 - Downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
 - Group metadata beyond names (participants, admins)
 - Presence (typing indicators, online status) and archiving incoming reactions
+- Answering or placing calls: only call signalling is supported, not audio or video
 
 ## Releases
 

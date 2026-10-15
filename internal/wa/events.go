@@ -37,6 +37,8 @@ func (c *Client) handleEvent(evt any) {
 		c.onGroupInfo(e)
 	case *events.JoinedGroup:
 		c.onJoinedGroup(e)
+	case *events.CallOffer, *events.CallOfferNotice, *events.CallAccept, *events.CallReject, *events.CallTerminate:
+		c.onCallEvent(e)
 	case *events.Disconnected:
 		c.log.Warn("disconnected from WhatsApp")
 	case *events.LoggedOut:

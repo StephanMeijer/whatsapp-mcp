@@ -34,7 +34,7 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 		}
 		t.Cleanup(func() { _ = d.Close() })
 		// Start from empty tables so subtests don't see each other's rows.
-		if err := d.Gorm.Exec("DROP TABLE IF EXISTS messages, chats").Error; err != nil {
+		if err := d.Gorm.Exec("DROP TABLE IF EXISTS messages, chats, calls").Error; err != nil {
 			t.Fatal(err)
 		}
 		s, err := store.New(context.Background(), d)
