@@ -29,10 +29,19 @@ var sqliteSearchSetup = []string{
 }
 
 func (sqliteSearch) setup(tx *gorm.DB) error {
+	var existing int64
+	if err := tx.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE name = 'messages_fts'`).Scan(&existing).Error; err != nil {
+		return err
+	}
 	for _, stmt := range sqliteSearchSetup {
 		if err := tx.Exec(stmt).Error; err != nil {
 			return err
 		}
+	}
+	// A new index over a table that already has rows must be filled once;
+	// the triggers only cover changes made after they exist.
+	if existing == 0 {
+		return tx.Exec(`INSERT INTO messages_fts(messages_fts) VALUES ('rebuild')`).Error
 	}
 	return nil
 }

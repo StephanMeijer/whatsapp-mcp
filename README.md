@@ -103,6 +103,9 @@ archive stores each person under their phone-number JID whenever the mapping is 
 chats archived under an `@lid` once their number becomes known, so one person is one chat.
 Tools accept either form.
 
+Edits are applied to the archived message (tools show `edited_at`), and a message deleted for
+everyone has its text removed from the archive and the search index and no longer appears in any tool.
+
 Both live in one database. The archive goes through [GORM](https://gorm.io). Full-text search is
 the one dialect-specific part: FTS5 on SQLite, a generated `tsvector` column with a GIN index on
 Postgres.

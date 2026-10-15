@@ -25,4 +25,9 @@ type Message struct {
 	Text      string `gorm:"not null;default:''"`
 	// MediaType is empty for plain text, otherwise image, video, audio, document or sticker.
 	MediaType string `gorm:"not null;default:''"`
+	// EditedAt is the Unix time of the last applied edit; 0 if never edited.
+	EditedAt int64 `gorm:"not null;default:0"`
+	// Deleted marks a message deleted for everyone. Its text is cleared and
+	// it is left out of every query that feeds the tools.
+	Deleted bool `gorm:"not null;default:false"`
 }

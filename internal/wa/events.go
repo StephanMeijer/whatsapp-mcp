@@ -43,7 +43,12 @@ func (c *Client) handleEvent(evt any) {
 func (c *Client) onMessage(e *events.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
-	m, ok := toMessage(e, func(jid types.JID) types.JID { return c.Canonical(ctx, jid) })
+	canon := func(jid types.JID) types.JID { return c.Canonical(ctx, jid) }
+	if ch, ok := c.changeFor(ctx, e, canon); ok {
+		c.applyChange(ctx, ch)
+		return
+	}
+	m, ok := toMessage(e, canon)
 	if !ok {
 		return
 	}
@@ -82,9 +87,15 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		}
 		chat := store.Chat{JID: archiveJID.String(), Name: firstNonEmpty(conv.GetName(), conv.GetDisplayName())}
 		var msgs []store.Message
+		var changes []change
 		for _, hm := range conv.GetMessages() {
 			evt, err := c.cli.ParseWebMessage(chatJID, hm.GetMessage())
 			if err != nil {
+				continue
+			}
+			if ch, ok := c.changeFor(syncCtx, evt, canon); ok {
+				ch.chat = chat.JID
+				changes = append(changes, ch)
 				continue
 			}
 			if m, ok := toMessage(evt, canon); ok {
@@ -94,6 +105,12 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		}
 		ctx, cancel := context.WithTimeout(syncCtx, saveTimeout)
 		err = c.store.Save(ctx, []store.Chat{chat}, msgs)
+		if err == nil {
+			// After saving, so changes can target originals from the same batch.
+			for _, ch := range changes {
+				c.applyChange(ctx, ch)
+			}
+		}
 		cancel()
 		if err != nil {
 			c.log.Error("history sync: archive conversation", "err", err, "chat", chat.JID)
@@ -114,7 +131,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 // toMessage converts a whatsmeow message event into an archive row, storing
 // chat and sender under the JIDs canon returns. It reports false for messages
 // with nothing to archive (reactions, protocol messages) and for edits, which
-// are not handled yet.
+// toChange handles.
 func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Message, bool) {
 	if e.IsEdit {
 		return store.Message{}, false

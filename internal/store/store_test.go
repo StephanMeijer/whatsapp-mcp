@@ -426,6 +426,144 @@ func TestOldestMessageAndCountBefore(t *testing.T) {
 	})
 }
 
+func TestEditsAndDeletions(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		must(t, s.Save(ctx, nil, []store.Message{
+			msg(chat, "e", 10, "meet at the station"),
+			msg(chat, "d", 20, "secret plan"),
+			msg(chat, "keep", 30, "unchanged"),
+		}))
+		searchIDs := func(q string) []string {
+			t.Helper()
+			found, err := s.SearchMessages(ctx, q, "", 0)
+			must(t, err)
+			return ids(found)
+		}
+		applied := func(ok bool, err error) bool {
+			t.Helper()
+			must(t, err)
+			return ok
+		}
+
+		// Edit: new text is searchable, the old text is gone.
+		if !applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", 100)) {
+			t.Fatal("edit not applied")
+		}
+		if got := searchIDs("harbour"); !slices.Equal(got, []string{"e"}) {
+			t.Errorf("search new text = %v, want [e]", got)
+		}
+		if got := searchIDs("station"); len(got) != 0 {
+			t.Errorf("old text still found: %v", got)
+		}
+		// A late, older edit must not overwrite the newer one; a replay changes nothing.
+		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the station", "", 50)) {
+			t.Error("older edit was applied")
+		}
+		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", 100)) {
+			t.Error("replayed edit reported a change")
+		}
+		if applied(s.ApplyEdit(ctx, chat, "unknown", "x", "", 100)) {
+			t.Error("edit of an unarchived message reported a change")
+		}
+
+		// Deletion: gone from every tool-facing query, text cleared.
+		if !applied(s.MarkDeleted(ctx, chat, "d")) {
+			t.Fatal("delete not applied")
+		}
+		if applied(s.MarkDeleted(ctx, chat, "d")) {
+			t.Error("second delete reported a change")
+		}
+		if applied(s.ApplyEdit(ctx, chat, "d", "resurrected", "", 200)) {
+			t.Error("edit after delete was applied")
+		}
+		listed, err := s.ListMessages(ctx, chat, time.Time{}, 0)
+		must(t, err)
+		if got := ids(listed); !slices.Equal(got, []string{"keep", "e"}) {
+			t.Errorf("list = %v, want [keep e]", got)
+		}
+		for _, m := range listed {
+			if m.MessageID == "e" && (m.Text != "meet at the harbour" || m.EditedAt != 100) {
+				t.Errorf("edited message = %+v", m)
+			}
+			if m.MessageID == "keep" && m.EditedAt != 0 {
+				t.Errorf("unedited message has EditedAt %d", m.EditedAt)
+			}
+		}
+		if got := searchIDs("secret"); len(got) != 0 {
+			t.Errorf("deleted text still found: %v", got)
+		}
+		recent, _, err := s.RecentMessages(ctx, store.RecentQuery{Since: time.Unix(0, 0)})
+		must(t, err)
+		if slices.Contains(ids(recent), "d") {
+			t.Error("deleted message in recent messages")
+		}
+		around, _, err := s.MessageContext(ctx, chat, "e", 5, 5)
+		must(t, err)
+		if got := ids(around); !slices.Equal(got, []string{"e", "keep"}) {
+			t.Errorf("context = %v, want [e keep]", got)
+		}
+		if _, _, err := s.MessageContext(ctx, chat, "d", 1, 1); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("context of deleted message: err = %v, want ErrNotFound", err)
+		}
+		// Deleted messages still anchor on-demand history fetches.
+		applied(s.MarkDeleted(ctx, chat, "e"))
+		applied(s.MarkDeleted(ctx, chat, "keep"))
+		if _, err := s.OldestMessage(ctx, chat); err != nil {
+			t.Errorf("OldestMessage with only deleted messages: %v", err)
+		}
+	})
+}
+
+// oldMessage is the messages table as it was before edits and deletions
+// were tracked, to check that store.New upgrades existing databases.
+type oldMessage struct {
+	Seq       int64  `gorm:"primaryKey;autoIncrement"`
+	ChatJID   string `gorm:"column:chat_jid;not null;uniqueIndex:idx_messages_chat_message"`
+	MessageID string `gorm:"not null;uniqueIndex:idx_messages_chat_message"`
+	SenderJID string `gorm:"column:sender_jid;not null"`
+	Timestamp int64  `gorm:"not null"`
+	FromMe    bool   `gorm:"not null"`
+	Text      string `gorm:"not null;default:''"`
+	MediaType string `gorm:"not null;default:''"`
+}
+
+func (oldMessage) TableName() string { return "messages" }
+
+func TestMigrationAddsEditColumns(t *testing.T) {
+	ctx := context.Background()
+	d, err := db.Open("sqlite://" + filepath.Join(t.TempDir(), "old.db"))
+	must(t, err)
+	t.Cleanup(func() { _ = d.Close() })
+	must(t, d.Gorm.AutoMigrate(&oldMessage{}))
+	must(t, d.Gorm.Create(&oldMessage{ChatJID: "1@s.whatsapp.net", MessageID: "m1", SenderJID: "x", Timestamp: 1, Text: "from before"}).Error)
+
+	s, err := store.New(ctx, d)
+	must(t, err)
+	msgs, err := s.ListMessages(ctx, "1@s.whatsapp.net", time.Time{}, 0)
+	must(t, err)
+	if len(msgs) != 1 || msgs[0].Deleted || msgs[0].EditedAt != 0 {
+		t.Fatalf("after migration: %+v", msgs)
+	}
+	// Rows from before the search index existed are indexed when it is created.
+	found, err := s.SearchMessages(ctx, "before", "", 0)
+	must(t, err)
+	if len(found) != 1 {
+		t.Errorf("pre-existing row not searchable: %+v", found)
+	}
+	ok, err := s.ApplyEdit(ctx, "1@s.whatsapp.net", "m1", "edited", "", 5)
+	must(t, err)
+	if !ok {
+		t.Error("edit on a migrated row not applied")
+	}
+	found, err = s.SearchMessages(ctx, "edited", "", 0)
+	must(t, err)
+	if len(found) != 1 {
+		t.Errorf("edited migrated row not searchable: %+v", found)
+	}
+}
+
 func TestReopenKeepsData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wa.db")
 	ctx := context.Background()

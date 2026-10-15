@@ -248,7 +248,7 @@ func (s *Store) ListChats(ctx context.Context, query string, limit int) ([]Chat,
 // ListMessages returns a chat's messages, newest first. A non-zero before
 // returns only messages sent strictly before that time, for paging.
 func (s *Store) ListMessages(ctx context.Context, chatJID string, before time.Time, limit int) ([]Message, error) {
-	tx := s.db.WithContext(ctx).Where("chat_jid = ?", chatJID)
+	tx := s.db.WithContext(ctx).Where("chat_jid = ? AND deleted = ?", chatJID, false)
 	if !before.IsZero() {
 		tx = tx.Where("timestamp < ?", before.Unix())
 	}
@@ -272,7 +272,7 @@ type RecentQuery struct {
 // than the limit match, it returns the newest ones and reports truncated.
 func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Message, truncated bool, err error) {
 	limit := clampLimit(q.Limit)
-	tx := s.db.WithContext(ctx).Where("timestamp >= ?", q.Since.Unix())
+	tx := s.db.WithContext(ctx).Where("timestamp >= ? AND deleted = ?", q.Since.Unix(), false)
 	if !q.Until.IsZero() {
 		tx = tx.Where("timestamp < ?", q.Until.Unix())
 	}
@@ -292,6 +292,28 @@ func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Messa
 	return msgs, false, nil
 }
 
+// ApplyEdit replaces an archived message's content with an edit made at
+// editedAt (Unix seconds). It reports false when nothing changed: the message
+// isn't archived, was deleted, or already reflects a later edit, so late or
+// replayed edits never overwrite newer content.
+func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text, mediaType string, editedAt int64) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&Message{}).
+		Where("chat_jid = ? AND message_id = ? AND deleted = ? AND edited_at < ?", chatJID, messageID, false, editedAt).
+		Updates(map[string]any{"text": text, "media_type": mediaType, "edited_at": editedAt})
+	return res.RowsAffected > 0, res.Error
+}
+
+// MarkDeleted records that a message was deleted for everyone and clears its
+// text, removing it from the search index too. The row is kept so a later
+// edit or replay cannot bring the message back. It reports false when the
+// message isn't archived or was already deleted.
+func (s *Store) MarkDeleted(ctx context.Context, chatJID, messageID string) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&Message{}).
+		Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).
+		Updates(map[string]any{"deleted": true, "text": ""})
+	return res.RowsAffected > 0, res.Error
+}
+
 // ErrNotFound is returned when a requested message is not in the archive.
 var ErrNotFound = errors.New("not found")
 
@@ -302,7 +324,7 @@ var ErrNotFound = errors.New("not found")
 func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, before, after int) ([]Message, int, error) {
 	db := s.db.WithContext(ctx)
 	var target Message
-	res := db.Where("chat_jid = ? AND message_id = ?", chatJID, messageID).Limit(1).Find(&target)
+	res := db.Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).Limit(1).Find(&target)
 	if res.Error != nil {
 		return nil, 0, res.Error
 	}
@@ -312,8 +334,8 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 
 	var prev, next []Message
 	if before > 0 {
-		err := db.Where("chat_jid = ? AND (timestamp < ? OR (timestamp = ? AND seq < ?))",
-			chatJID, target.Timestamp, target.Timestamp, target.Seq).
+		err := db.Where("chat_jid = ? AND deleted = ? AND (timestamp < ? OR (timestamp = ? AND seq < ?))",
+			chatJID, false, target.Timestamp, target.Timestamp, target.Seq).
 			Order("timestamp DESC").Order("seq DESC").Limit(before).Find(&prev).Error
 		if err != nil {
 			return nil, 0, err
@@ -321,8 +343,8 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 		slices.Reverse(prev)
 	}
 	if after > 0 {
-		err := db.Where("chat_jid = ? AND (timestamp > ? OR (timestamp = ? AND seq > ?))",
-			chatJID, target.Timestamp, target.Timestamp, target.Seq).
+		err := db.Where("chat_jid = ? AND deleted = ? AND (timestamp > ? OR (timestamp = ? AND seq > ?))",
+			chatJID, false, target.Timestamp, target.Timestamp, target.Seq).
 			Order("timestamp ASC").Order("seq ASC").Limit(after).Find(&next).Error
 		if err != nil {
 			return nil, 0, err
@@ -382,7 +404,7 @@ func (s *Store) SearchMessages(ctx context.Context, query, chatJID string, limit
 	if strings.TrimSpace(query) == "" {
 		return nil, fmt.Errorf("search query is empty")
 	}
-	tx := s.search.apply(s.db.WithContext(ctx).Model(&Message{}), query)
+	tx := s.search.apply(s.db.WithContext(ctx).Model(&Message{}), query).Where("messages.deleted = ?", false)
 	if chatJID != "" {
 		tx = tx.Where("messages.chat_jid = ?", chatJID)
 	}

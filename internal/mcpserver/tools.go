@@ -101,6 +101,7 @@ type Message struct {
 	FromMe     bool   `json:"from_me"`
 	Text       string `json:"text,omitempty"`
 	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document or sticker; empty for text"`
+	EditedAt   string `json:"edited_at,omitempty" jsonschema:"RFC 3339; set if the message was edited"`
 }
 
 // toMessages converts archive rows to tool output, naming senders with one
@@ -118,6 +119,9 @@ func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message 
 			FromMe:     m.FromMe,
 			Text:       m.Text,
 			MediaType:  m.MediaType,
+		}
+		if m.EditedAt > 0 {
+			out[i].EditedAt = formatUnix(m.EditedAt)
 		}
 	}
 	return out

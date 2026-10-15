@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -195,5 +196,122 @@ func TestResolveNames(t *testing.T) {
 	// Only the phone numbers without a name of their own need the LID lookup.
 	if lidCalls != 2 {
 		t.Errorf("LID lookups = %d, want 2 (viaLID and unknown)", lidCalls)
+	}
+}
+
+func TestToChange(t *testing.T) {
+	chat := types.NewJID("31600000001", types.DefaultUserServer)
+	at := time.Unix(1_700_000_000, 0)
+	event := func(m *waE2E.Message, isEdit bool) *events.Message {
+		return &events.Message{
+			Info: types.MessageInfo{
+				MessageSource: types.MessageSource{Chat: chat, Sender: chat},
+				ID:            "WRAPPER", Timestamp: at,
+			},
+			Message: m,
+			IsEdit:  isEdit,
+		}
+	}
+	key := &waCommon.MessageKey{ID: proto.String("ORIGINAL")}
+	editOf := func(content *waE2E.Message, tsMS int64) *waE2E.Message {
+		pm := &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), Key: key, EditedMessage: content}
+		if tsMS != 0 {
+			pm.TimestampMS = proto.Int64(tsMS)
+		}
+		return &waE2E.Message{ProtocolMessage: pm}
+	}
+
+	tests := []struct {
+		name string
+		e    *events.Message
+		want change
+		ok   bool
+	}{
+		{
+			name: "text edit",
+			e:    event(editOf(&waE2E.Message{Conversation: proto.String("fixed typo")}, 1_700_000_100_000), true),
+			want: change{kind: changeEdit, chat: chat.String(), target: "ORIGINAL", text: "fixed typo", at: 1_700_000_100},
+			ok:   true,
+		},
+		{
+			name: "caption edit without its own timestamp",
+			e:    event(editOf(&waE2E.Message{ImageMessage: &waE2E.ImageMessage{Caption: proto.String("new caption")}}, 0), true),
+			want: change{kind: changeEdit, chat: chat.String(), target: "ORIGINAL", text: "new caption", media: "image", at: at.Unix()},
+			ok:   true,
+		},
+		{
+			name: "deleted for everyone",
+			e: event(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+				Type: waE2E.ProtocolMessage_REVOKE.Enum(), Key: key,
+			}}, false),
+			want: change{kind: changeRevoke, chat: chat.String(), target: "ORIGINAL"},
+			ok:   true,
+		},
+		{
+			name: "ordinary message",
+			e:    event(&waE2E.Message{Conversation: proto.String("hi")}, false),
+		},
+		{
+			name: "edit flag without an edit protocol message",
+			e:    event(&waE2E.Message{Conversation: proto.String("odd")}, true),
+		},
+		{
+			name: "other protocol message",
+			e: event(&waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+				Type: waE2E.ProtocolMessage_EPHEMERAL_SETTING.Enum(), Key: key,
+			}}, false),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := toChange(tt.e, types.JID.ToNonAD)
+			if ok != tt.ok || got != tt.want {
+				t.Errorf("toChange = %+v, %v; want %+v, %v", got, ok, tt.want, tt.ok)
+			}
+			// Edits and deletions must never be archived as new messages.
+			if tt.ok {
+				if _, archived := toMessage(tt.e, types.JID.ToNonAD); archived {
+					t.Error("change would also be archived as a message")
+				}
+			}
+		})
+	}
+}
+
+func TestSecretEditChange(t *testing.T) {
+	chat := types.NewJID("31600000001", types.DefaultUserServer)
+	at := time.Unix(1_700_000_000, 0)
+	e := &events.Message{
+		Info: types.MessageInfo{MessageSource: types.MessageSource{Chat: chat}, ID: "WRAPPER", Timestamp: at},
+		Message: &waE2E.Message{SecretEncryptedMessage: &waE2E.SecretEncryptedMessage{
+			SecretEncType:    waE2E.SecretEncryptedMessage_MESSAGE_EDIT.Enum(),
+			TargetMessageKey: &waCommon.MessageKey{ID: proto.String("ORIGINAL")},
+		}},
+	}
+	want := change{kind: changeEdit, chat: chat.String(), target: "ORIGINAL", text: "mango", at: at.Unix()}
+
+	// Plaintext is the new content itself.
+	got, ok := secretEditChange(e, &waE2E.Message{Conversation: proto.String("mango")}, types.JID.ToNonAD)
+	if !ok || got != want {
+		t.Errorf("plain content: %+v %v, want %+v", got, ok, want)
+	}
+
+	// Plaintext wraps the content in a MESSAGE_EDIT protocol message with its own timestamp.
+	wrapped := &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+		Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
+		EditedMessage: &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("mango")}},
+		TimestampMS:   proto.Int64(1_700_000_050_000),
+	}}
+	want.at = 1_700_000_050
+	if got, ok := secretEditChange(e, wrapped, types.JID.ToNonAD); !ok || got != want {
+		t.Errorf("wrapped content: %+v %v, want %+v", got, ok, want)
+	}
+
+	if _, ok := secretEditChange(e, &waE2E.Message{}, types.JID.ToNonAD); ok {
+		t.Error("empty plaintext: want no change")
+	}
+	e.Message.SecretEncryptedMessage.TargetMessageKey = nil
+	if _, ok := secretEditChange(e, &waE2E.Message{Conversation: proto.String("x")}, types.JID.ToNonAD); ok {
+		t.Error("missing target: want no change")
 	}
 }

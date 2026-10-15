@@ -85,3 +85,31 @@ func TestSenderNamesLookupFailureKeepsMessages(t *testing.T) {
 		}
 	}
 }
+
+func TestEditedAndDeletedInOutput(t *testing.T) {
+	st := groupStore(t)
+	ctx := context.Background()
+	if ok, err := st.ApplyEdit(ctx, "120363000000000000@g.us", "m1", "hello group (edited)", "", 1_700_000_000); err != nil || !ok {
+		t.Fatalf("ApplyEdit: %v %v", ok, err)
+	}
+	if ok, err := st.MarkDeleted(ctx, "120363000000000000@g.us", "m2"); err != nil || !ok {
+		t.Fatalf("MarkDeleted: %v %v", ok, err)
+	}
+	cs := connect(t, &fakeWA{}, st, Options{})
+
+	var page MessagesOut
+	call(t, cs, "list_messages", map[string]any{"chat_jid": "120363000000000000@g.us"}, &page)
+	byID := map[string]Message{}
+	for _, m := range page.Messages {
+		byID[m.ID] = m
+	}
+	if _, ok := byID["m2"]; ok {
+		t.Error("deleted message m2 is listed")
+	}
+	if m := byID["m1"]; m.Text != "hello group (edited)" || m.EditedAt != "2023-11-14T22:13:20Z" {
+		t.Errorf("edited message = %+v", m)
+	}
+	if m := byID["m3"]; m.EditedAt != "" {
+		t.Errorf("unedited message has edited_at %q", m.EditedAt)
+	}
+}
