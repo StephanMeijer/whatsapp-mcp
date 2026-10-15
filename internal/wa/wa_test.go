@@ -3,8 +3,12 @@
 package wa
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
+
+	"go.mau.fi/whatsmeow"
 
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -313,5 +317,57 @@ func TestSecretEditChange(t *testing.T) {
 	e.Message.SecretEncryptedMessage.TargetMessageKey = nil
 	if _, ok := secretEditChange(e, &waE2E.Message{Conversation: proto.String("x")}, types.JID.ToNonAD); ok {
 		t.Error("missing target: want no change")
+	}
+}
+
+func TestMediaRefRoundTrip(t *testing.T) {
+	key := []byte("0123456789abcdef0123456789abcdef")
+	tests := []struct {
+		kind     string
+		msg      *waE2E.Message
+		fileName string
+	}{
+		{"image", &waE2E.Message{ImageMessage: &waE2E.ImageMessage{DirectPath: proto.String("/v/img"), MediaKey: key, Mimetype: proto.String("image/jpeg"), FileLength: proto.Uint64(1234)}}, ""},
+		{"video", &waE2E.Message{VideoMessage: &waE2E.VideoMessage{DirectPath: proto.String("/v/vid"), MediaKey: key, Mimetype: proto.String("video/mp4")}}, ""},
+		{"audio", &waE2E.Message{AudioMessage: &waE2E.AudioMessage{DirectPath: proto.String("/v/aud"), MediaKey: key, Mimetype: proto.String("audio/ogg")}}, ""},
+		{"document", &waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{DirectPath: proto.String("/v/doc"), MediaKey: key, Mimetype: proto.String("application/pdf"), FileName: proto.String("invoice.pdf")}}, "invoice.pdf"},
+		{"sticker", &waE2E.Message{StickerMessage: &waE2E.StickerMessage{DirectPath: proto.String("/v/stk"), MediaKey: key, Mimetype: proto.String("image/webp")}}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.kind, func(t *testing.T) {
+			_, kind := messageContent(tt.msg)
+			if kind != tt.kind {
+				t.Fatalf("messageContent kind = %q, want %q", kind, tt.kind)
+			}
+			ref := mediaRef(tt.msg)
+			if len(ref) == 0 {
+				t.Fatal("no ref")
+			}
+			sub, fileName, err := decodeMediaRef(kind, ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if sub.GetDirectPath() == "" || string(sub.GetMediaKey()) != string(key) || sub.GetMimetype() == "" || fileName != tt.fileName {
+				t.Errorf("decoded %+v file %q", sub, fileName)
+			}
+		})
+	}
+	if ref := mediaRef(&waE2E.Message{Conversation: proto.String("text")}); ref != nil {
+		t.Errorf("text message has a ref: %v", ref)
+	}
+	if _, _, err := decodeMediaRef("hologram", []byte{1}); err == nil {
+		t.Error("unknown kind: want error")
+	}
+}
+
+func TestMediaGone(t *testing.T) {
+	for _, err := range []error{whatsmeow.ErrMediaDownloadFailedWith403, whatsmeow.ErrMediaDownloadFailedWith404, whatsmeow.ErrMediaDownloadFailedWith410,
+		fmt.Errorf("wrapped: %w", whatsmeow.ErrMediaDownloadFailedWith403)} {
+		if !mediaGone(err) {
+			t.Errorf("mediaGone(%v) = false", err)
+		}
+	}
+	if mediaGone(errors.New("connection reset")) || mediaGone(nil) {
+		t.Error("transient errors must not count as gone")
 	}
 }

@@ -28,6 +28,10 @@ type fakeWA struct {
 	namesErr   error
 	namesCalls int
 
+	// media is returned by Media, or mediaErr.
+	media    wa.Media
+	mediaErr error
+
 	// fetch is returned by FetchOlder; fetchArgs records each call.
 	fetch     wa.FetchResult
 	fetchErr  error
@@ -82,6 +86,13 @@ func (f *fakeWA) SendText(_ context.Context, recipient, text string, quoted *sto
 func (f *fakeWA) React(_ context.Context, chat types.JID, target store.Message, emoji string) error {
 	f.sent = append(f.sent, fmt.Sprintf("react %s/%s %q", chat, target.MessageID, emoji))
 	return nil
+}
+
+func (f *fakeWA) Media(_ context.Context, m store.Message) (wa.Media, error) {
+	if f.mediaErr != nil {
+		return wa.Media{}, f.mediaErr
+	}
+	return wa.Media{Kind: m.MediaType, MIMEType: f.media.MIMEType, FileName: f.media.FileName, Data: f.media.Data}, nil
 }
 
 func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
@@ -143,7 +154,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "fetch_older_messages", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_message"}
+	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "search_contacts", "search_messages", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

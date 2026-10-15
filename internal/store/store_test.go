@@ -601,6 +601,67 @@ func TestMessageByIDAndLatestIncoming(t *testing.T) {
 	})
 }
 
+func TestMediaRef(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		withRef := func(id, text string, ref []byte) store.Message {
+			m := msg(chat, id, 10, text)
+			m.MediaType = "image"
+			m.MediaRef = ref
+			return m
+		}
+		must(t, s.Save(ctx, nil, []store.Message{
+			withRef("new", "caption", []byte("ref-new")),
+			withRef("old", "old caption", nil), // archived before refs existed
+			withRef("gone", "deleted", nil),
+		}))
+		_, err := s.ApplyEdit(ctx, chat, "old", "edited caption", "image", 50)
+		must(t, err)
+		_, err = s.MarkDeleted(ctx, chat, "gone")
+		must(t, err)
+
+		// A replay brings refs for all three, with stale text.
+		must(t, s.Save(ctx, nil, []store.Message{
+			withRef("new", "caption", []byte("ref-replayed")),
+			withRef("old", "old caption", []byte("ref-old")),
+			withRef("gone", "deleted", []byte("ref-gone")),
+		}))
+
+		get := func(id string) store.Message {
+			t.Helper()
+			var m store.Message
+			msgs, _, err := s.MessageContext(ctx, chat, id, 0, 0)
+			if err == nil {
+				m = msgs[0]
+			}
+			return m
+		}
+		if m := get("new"); string(m.MediaRef) != "ref-new" {
+			t.Errorf("existing ref overwritten: %q", m.MediaRef)
+		}
+		if m := get("old"); string(m.MediaRef) != "ref-old" || m.Text != "edited caption" || m.EditedAt != 50 {
+			t.Errorf("backfill: ref %q text %q edited %d; want ref-old, edit kept", m.MediaRef, m.Text, m.EditedAt)
+		}
+		if _, err := s.MessageByID(ctx, chat, "gone"); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("deleted message reachable: %v", err)
+		}
+		var ref []byte
+		must(t, s.RawRef(ctx, chat, "gone", &ref))
+		if len(ref) != 0 {
+			t.Errorf("deleted message got a media ref back: %q", ref)
+		}
+
+		// Deleting clears the ref.
+		_, err = s.MarkDeleted(ctx, chat, "new")
+		must(t, err)
+		must(t, s.RawRef(ctx, chat, "new", &ref))
+		if len(ref) != 0 {
+			t.Errorf("ref kept after delete: %q", ref)
+		}
+	})
+}
+
 func TestReopenKeepsData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wa.db")
 	ctx := context.Background()

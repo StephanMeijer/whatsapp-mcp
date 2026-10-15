@@ -30,4 +30,8 @@ type Message struct {
 	// Deleted marks a message deleted for everyone. Its text is cleared and
 	// it is left out of every query that feeds the tools.
 	Deleted bool `gorm:"not null;default:false"`
+	// MediaRef is the marshalled media sub-message (e.g. an ImageMessage)
+	// holding what is needed to download and decrypt the file; nil for text
+	// and for media archived before downloads were supported.
+	MediaRef []byte
 }

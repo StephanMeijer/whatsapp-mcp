@@ -112,9 +112,16 @@ func (s *Store) Save(ctx context.Context, chats []Chat, msgs []Message) error {
 			for i := range rows {
 				rows[i].Seq = 0
 			}
+			// An already archived message is left as it is, except that a
+			// replay may supply the media reference it was archived without.
 			err := tx.Clauses(clause.OnConflict{
-				Columns:   []clause.Column{{Name: "chat_jid"}, {Name: "message_id"}},
-				DoNothing: true,
+				Columns: []clause.Column{{Name: "chat_jid"}, {Name: "message_id"}},
+				DoUpdates: clause.Assignments(map[string]any{
+					// An absent ref may be stored as NULL or as an empty blob.
+					"media_ref": gorm.Expr("CASE WHEN messages.deleted THEN messages.media_ref " +
+						"WHEN messages.media_ref IS NULL OR length(messages.media_ref) = 0 THEN excluded.media_ref " +
+						"ELSE messages.media_ref END"),
+				}),
 			}).CreateInBatches(rows, insertBatch).Error
 			if err != nil {
 				return fmt.Errorf("save messages: %w", err)
@@ -310,7 +317,7 @@ func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text, mediaTy
 func (s *Store) MarkDeleted(ctx context.Context, chatJID, messageID string) (bool, error) {
 	res := s.db.WithContext(ctx).Model(&Message{}).
 		Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).
-		Updates(map[string]any{"deleted": true, "text": ""})
+		Updates(map[string]any{"deleted": true, "text": "", "media_ref": nil})
 	return res.RowsAffected > 0, res.Error
 }
 

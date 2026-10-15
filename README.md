@@ -86,6 +86,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `fetch_older_messages` | ask your phone for older messages in a chat (up to 50 per call; the phone must be online) |
+| `get_media` | download a message's photo, video, voice note or document (images are shown to the client; up to 16 MB) |
 | `search_contacts` | address book lookup |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
 | `react` | react to a message with an emoji (empty removes it) |
@@ -139,7 +140,7 @@ a static build on every push and pull request.
 
 ## Not yet
 
-- Downloading and sending media ([#9](https://github.com/StephanMeijer/whatsapp-mcp/issues/9), [#10](https://github.com/StephanMeijer/whatsapp-mcp/issues/10))
+- Sending media ([#10](https://github.com/StephanMeijer/whatsapp-mcp/issues/10)); downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
 - Group metadata beyond names (participants, admins)
 - Presence (typing indicators, online status) and archiving incoming reactions
 
