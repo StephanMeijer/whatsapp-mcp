@@ -115,3 +115,28 @@ func TestEditContent(t *testing.T) {
 		t.Errorf("archived as %q/%q", text, kind)
 	}
 }
+
+func TestEditContentKeepsReplyQuote(t *testing.T) {
+	sender := types.JID{User: "31612345678", Server: types.DefaultUserServer}
+	reply := replyMessage("sounds good", store.Message{MessageID: "ORIG", Text: "dinner at 8?"}, sender)
+	ref := mediaRef(reply)
+	if len(ref) == 0 {
+		t.Fatal("a reply has no ref")
+	}
+	msg, err := editContent(store.Message{MessageID: "M", FromMe: true, Text: "sounds good", MediaRef: ref}, "sounds great")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ext := msg.GetExtendedTextMessage()
+	ci := ext.GetContextInfo()
+	if ext.GetText() != "sounds great" || ci.GetStanzaID() != "ORIG" ||
+		ci.GetQuotedMessage().GetConversation() != "dinner at 8?" || ci.GetParticipant() != sender.String() {
+		t.Errorf("edited reply = %v", msg)
+	}
+	if text, kind := messageContent(msg); text != "sounds great" || kind != "" {
+		t.Errorf("archived as %q/%q", text, kind)
+	}
+	if _, err := editContent(store.Message{MessageID: "M", MediaRef: []byte{0xff}}, "x"); err == nil {
+		t.Error("corrupt ref: want error")
+	}
+}
