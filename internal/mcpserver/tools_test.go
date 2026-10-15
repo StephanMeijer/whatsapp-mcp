@@ -117,7 +117,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "list_chats", "list_messages", "recent_messages", "search_contacts", "search_messages", "send_message"}
+	want := []string{"connection_status", "list_chats", "list_messages", "message_context", "recent_messages", "search_contacts", "search_messages", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

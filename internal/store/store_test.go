@@ -4,6 +4,7 @@ package store_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -347,6 +348,52 @@ func TestRecentMessages(t *testing.T) {
 		must(t, err)
 		if len(chats) != 2 || chats[a].Name != "Alice" {
 			t.Errorf("ChatsByJID = %+v", chats)
+		}
+	})
+}
+
+func TestMessageContext(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat, other = "1@s.whatsapp.net", "2@s.whatsapp.net"
+		var rows []store.Message
+		for i := 1; i <= 10; i++ {
+			rows = append(rows, msg(chat, fmt.Sprintf("m%02d", i), int64(i*10), "x"))
+		}
+		// Two messages in the same second, saved in this order: seq breaks the tie.
+		rows = append(rows, msg(chat, "same-a", 55, "x"), msg(chat, "same-b", 55, "x"))
+		rows = append(rows, msg(other, "o1", 55, "other chat"))
+		must(t, s.Save(ctx, nil, rows))
+
+		tests := []struct {
+			name          string
+			id            string
+			before, after int
+			want          []string
+			wantTarget    int
+		}{
+			{"middle", "m05", 2, 2, []string{"m03", "m04", "m05", "same-a", "same-b"}, 2},
+			{"same second, ordered by seq", "same-a", 1, 1, []string{"m05", "same-a", "same-b"}, 1},
+			{"start of chat", "m01", 5, 1, []string{"m01", "m02"}, 0},
+			{"end of chat", "m10", 1, 5, []string{"m09", "m10"}, 1},
+			{"nothing before", "m06", 0, 1, []string{"m06", "m07"}, 0},
+			{"only the message", "m06", 0, 0, []string{"m06"}, 0},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				msgs, target, err := s.MessageContext(ctx, chat, tt.id, tt.before, tt.after)
+				must(t, err)
+				if got := ids(msgs); !slices.Equal(got, tt.want) || target != tt.wantTarget {
+					t.Errorf("got %v target %d, want %v target %d", got, target, tt.want, tt.wantTarget)
+				}
+			})
+		}
+
+		if _, _, err := s.MessageContext(ctx, chat, "nope", 1, 1); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("unknown message: err = %v, want ErrNotFound", err)
+		}
+		if _, _, err := s.MessageContext(ctx, other, "m05", 1, 1); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("message from another chat: err = %v, want ErrNotFound", err)
 		}
 	})
 }

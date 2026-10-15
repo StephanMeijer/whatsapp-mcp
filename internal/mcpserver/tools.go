@@ -42,8 +42,9 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.listMessages)
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "search_messages",
-		Description: "Full-text search message text and captions, optionally within one chat. All words must match.",
+		Name: "search_messages",
+		Description: "Full-text search message text and captions, optionally within one chat. All words must match. " +
+			"Use message_context with a result's chat_jid and id to see the conversation around it.",
 		Annotations: readOnly,
 	}, t.searchMessages)
 	mcp.AddTool(s, &mcp.Tool{
@@ -54,6 +55,13 @@ func registerTools(s *mcp.Server, t *tools) {
 			"messages were returned: narrow since, or use list_messages for a single chat.",
 		Annotations: readOnly,
 	}, t.recentMessages)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "message_context",
+		Description: "The conversation around one message: up to `before` messages before it and `after` after it " +
+			"in the same chat, oldest first. messages[target_index] is the requested message. " +
+			"Pass the chat_jid and id from a search_messages or list_messages result.",
+		Annotations: readOnly,
+	}, t.messageContext)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "search_contacts",
 		Description: "Search the address book by name, push name or phone number.",
@@ -295,6 +303,69 @@ func (t *tools) recentMessages(ctx context.Context, _ *mcp.CallToolRequest, in R
 		out.Chats[i].Name = chats[out.Chats[i].JID].Name
 	}
 	return nil, out, nil
+}
+
+const (
+	contextDefault = 5
+	contextMax     = 50
+)
+
+type MessageContextIn struct {
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID, from a search or list result"`
+	MessageID string `json:"message_id" jsonschema:"the message id, from a search or list result"`
+	Before    *int   `json:"before,omitempty" jsonschema:"messages before it (default 5, max 50)"`
+	After     *int   `json:"after,omitempty" jsonschema:"messages after it (default 5, max 50)"`
+}
+
+type MessageContextOut struct {
+	ChatJID     string    `json:"chat_jid"`
+	ChatName    string    `json:"chat_name,omitempty"`
+	Messages    []Message `json:"messages" jsonschema:"oldest first"`
+	TargetIndex int       `json:"target_index" jsonschema:"index of the requested message in messages"`
+}
+
+func contextCount(name string, v *int) (int, error) {
+	if v == nil {
+		return contextDefault, nil
+	}
+	if *v < 0 || *v > contextMax {
+		return 0, fmt.Errorf("%s must be between 0 and %d", name, contextMax)
+	}
+	return *v, nil
+}
+
+func (t *tools) messageContext(ctx context.Context, _ *mcp.CallToolRequest, in MessageContextIn) (*mcp.CallToolResult, MessageContextOut, error) {
+	if in.ChatJID == "" || in.MessageID == "" {
+		return nil, MessageContextOut{}, errors.New("chat_jid and message_id are required")
+	}
+	before, err := contextCount("before", in.Before)
+	if err != nil {
+		return nil, MessageContextOut{}, err
+	}
+	after, err := contextCount("after", in.After)
+	if err != nil {
+		return nil, MessageContextOut{}, err
+	}
+	chat := t.canonicalChat(ctx, in.ChatJID)
+
+	msgs, target, err := t.store.MessageContext(ctx, chat, in.MessageID, before, after)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, MessageContextOut{}, fmt.Errorf("message %s not found in chat %s; only archived messages are available",
+			in.MessageID, chat)
+	}
+	if err != nil {
+		return nil, MessageContextOut{}, err
+	}
+	chats, err := t.store.ChatsByJID(ctx, []string{chat})
+	if err != nil {
+		return nil, MessageContextOut{}, err
+	}
+	return nil, MessageContextOut{
+		ChatJID:     chat,
+		ChatName:    chats[chat].Name,
+		Messages:    t.toMessages(ctx, msgs),
+		TargetIndex: target,
+	}, nil
 }
 
 type SearchContactsIn struct {

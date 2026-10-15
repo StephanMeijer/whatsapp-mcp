@@ -7,7 +7,9 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -288,6 +290,50 @@ func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Messa
 		return msgs[:limit], true, nil
 	}
 	return msgs, false, nil
+}
+
+// ErrNotFound is returned when a requested message is not in the archive.
+var ErrNotFound = errors.New("not found")
+
+// MessageContext returns a message with up to before messages preceding it
+// and up to after messages following it in the same chat, oldest first, and
+// the index of the message itself in that slice. Order matches ListMessages:
+// by timestamp, then archive sequence for messages in the same second.
+func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, before, after int) ([]Message, int, error) {
+	db := s.db.WithContext(ctx)
+	var target Message
+	res := db.Where("chat_jid = ? AND message_id = ?", chatJID, messageID).Limit(1).Find(&target)
+	if res.Error != nil {
+		return nil, 0, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return nil, 0, ErrNotFound
+	}
+
+	var prev, next []Message
+	if before > 0 {
+		err := db.Where("chat_jid = ? AND (timestamp < ? OR (timestamp = ? AND seq < ?))",
+			chatJID, target.Timestamp, target.Timestamp, target.Seq).
+			Order("timestamp DESC").Order("seq DESC").Limit(before).Find(&prev).Error
+		if err != nil {
+			return nil, 0, err
+		}
+		slices.Reverse(prev)
+	}
+	if after > 0 {
+		err := db.Where("chat_jid = ? AND (timestamp > ? OR (timestamp = ? AND seq > ?))",
+			chatJID, target.Timestamp, target.Timestamp, target.Seq).
+			Order("timestamp ASC").Order("seq ASC").Limit(after).Find(&next).Error
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	out := make([]Message, 0, len(prev)+1+len(next))
+	out = append(out, prev...)
+	out = append(out, target)
+	out = append(out, next...)
+	return out, len(prev), nil
 }
 
 // ChatsByJID returns the stored chats among jids, keyed by JID.

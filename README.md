@@ -84,6 +84,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `list_messages` | a chat's messages, newest first, paged with `before` |
 | `search_messages` | full-text search over text and captions |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
+| `message_context` | the conversation around one message, e.g. a search hit |
 | `search_contacts` | address book lookup |
 | `send_message` | send a text to a JID or phone number |
 
