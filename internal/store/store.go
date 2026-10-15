@@ -336,6 +336,30 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 	return out, len(prev), nil
 }
 
+// OldestMessage returns the earliest archived message in a chat, the anchor
+// for asking the phone for older history. It returns ErrNotFound for a chat
+// without messages.
+func (s *Store) OldestMessage(ctx context.Context, chatJID string) (Message, error) {
+	var m Message
+	res := s.db.WithContext(ctx).Where("chat_jid = ?", chatJID).
+		Order("timestamp ASC").Order("seq ASC").Limit(1).Find(&m)
+	if res.Error != nil {
+		return Message{}, res.Error
+	}
+	if res.RowsAffected == 0 {
+		return Message{}, ErrNotFound
+	}
+	return m, nil
+}
+
+// CountBefore counts a chat's messages sent strictly before ts (Unix seconds).
+func (s *Store) CountBefore(ctx context.Context, chatJID string, ts int64) (int64, error) {
+	var n int64
+	err := s.db.WithContext(ctx).Model(&Message{}).
+		Where("chat_jid = ? AND timestamp < ?", chatJID, ts).Count(&n).Error
+	return n, err
+}
+
 // ChatsByJID returns the stored chats among jids, keyed by JID.
 func (s *Store) ChatsByJID(ctx context.Context, jids []string) (map[string]Chat, error) {
 	out := make(map[string]Chat, len(jids))

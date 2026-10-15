@@ -38,6 +38,9 @@ type Client struct {
 	qr string // current pairing code, empty when none is pending
 
 	reconcileMu sync.Mutex // serialises reconcile runs
+
+	fetches    pendingFetches // on-demand history requests awaiting the phone
+	fetchLimit rateLimit
 }
 
 // Status describes the connection.
@@ -70,10 +73,11 @@ func New(ctx context.Context, sqlDB *sql.DB, dialect string, st *store.Store, lo
 	}
 
 	c := &Client{
-		cli:   whatsmeow.NewClient(device, waLogger.Sub("client")),
-		store: st,
-		log:   log,
-		qrOut: qrOut,
+		cli:        whatsmeow.NewClient(device, waLogger.Sub("client")),
+		store:      st,
+		log:        log,
+		qrOut:      qrOut,
+		fetchLimit: rateLimit{interval: fetchInterval},
 	}
 	c.cli.AddEventHandler(c.handleEvent)
 	return c, nil

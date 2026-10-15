@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
@@ -61,6 +62,8 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 	defer cancelSync()
 	canon := c.memoCanonical(syncCtx)
 
+	// Answers to FetchOlder; resolved after archiving so the waiter sees the messages.
+	onDemand := e.Data.GetSyncType() == waHistorySync.HistorySync_ON_DEMAND
 	convs := e.Data.GetConversations()
 	saved := 0
 	for _, conv := range convs {
@@ -97,6 +100,12 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			continue
 		}
 		saved += len(msgs)
+		if onDemand {
+			c.fetches.resolve(chat.JID)
+		}
+	}
+	if onDemand {
+		c.fetches.resolveSession(e.Notification.GetPeerDataRequestSessionID())
 	}
 	c.log.Info("history sync archived", "type", e.Data.GetSyncType().String(),
 		"conversations", len(convs), "messages", saved)

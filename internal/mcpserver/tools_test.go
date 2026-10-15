@@ -5,9 +5,11 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.mau.fi/whatsmeow/types"
@@ -25,6 +27,16 @@ type fakeWA struct {
 	names      map[string]string
 	namesErr   error
 	namesCalls int
+
+	// fetch is returned by FetchOlder; fetchArgs records each call.
+	fetch     wa.FetchResult
+	fetchErr  error
+	fetchArgs []string
+}
+
+func (f *fakeWA) FetchOlder(_ context.Context, chatJID string, count int, wait time.Duration) (wa.FetchResult, error) {
+	f.fetchArgs = append(f.fetchArgs, fmt.Sprintf("%s count=%d wait=%s", chatJID, count, wait))
+	return f.fetch, f.fetchErr
 }
 
 func (f *fakeWA) Names(_ context.Context, jids []types.JID) (map[types.JID]string, error) {
@@ -117,7 +129,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "list_chats", "list_messages", "message_context", "recent_messages", "search_contacts", "search_messages", "send_message"}
+	want := []string{"connection_status", "fetch_older_messages", "list_chats", "list_messages", "message_context", "recent_messages", "search_contacts", "search_messages", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

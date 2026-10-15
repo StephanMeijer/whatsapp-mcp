@@ -398,6 +398,34 @@ func TestMessageContext(t *testing.T) {
 	})
 }
 
+func TestOldestMessageAndCountBefore(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		if _, err := s.OldestMessage(ctx, chat); !errors.Is(err, store.ErrNotFound) {
+			t.Fatalf("empty chat: err = %v, want ErrNotFound", err)
+		}
+		// first-a and first-b share the oldest second; first-a was archived first.
+		must(t, s.Save(ctx, nil, []store.Message{
+			msg(chat, "first-a", 10, "x"), msg(chat, "first-b", 10, "x"),
+			msg(chat, "m2", 20, "x"), msg(chat, "m3", 30, "x"),
+			msg("2@s.whatsapp.net", "elsewhere", 1, "x"),
+		}))
+		oldest, err := s.OldestMessage(ctx, chat)
+		must(t, err)
+		if oldest.MessageID != "first-a" {
+			t.Errorf("oldest = %s, want first-a", oldest.MessageID)
+		}
+		for ts, want := range map[int64]int64{10: 0, 11: 2, 30: 3, 31: 4} {
+			n, err := s.CountBefore(ctx, chat, ts)
+			must(t, err)
+			if n != want {
+				t.Errorf("CountBefore(%d) = %d, want %d", ts, n, want)
+			}
+		}
+	})
+}
+
 func TestReopenKeepsData(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "wa.db")
 	ctx := context.Background()

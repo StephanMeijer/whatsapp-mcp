@@ -6,6 +6,7 @@ package mcpserver
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.mau.fi/whatsmeow/types"
@@ -24,6 +25,8 @@ type WhatsApp interface {
 	Canonical(ctx context.Context, jid types.JID) types.JID
 	// Names returns display names for the JIDs it knows; others are absent.
 	Names(ctx context.Context, jids []types.JID) (map[types.JID]string, error)
+	// FetchOlder asks the phone for messages older than the archive has.
+	FetchOlder(ctx context.Context, chatJID string, count int, wait time.Duration) (wa.FetchResult, error)
 }
 
 // New returns an MCP server with the tools opts allows. It fails if an
