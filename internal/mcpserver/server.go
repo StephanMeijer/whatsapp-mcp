@@ -28,6 +28,9 @@ type WhatsApp interface {
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.
 	DeleteMessage(ctx context.Context, chat types.JID, target store.Message) error
+	// EditMessage changes the text or caption of one of the account's own
+	// messages and returns it as edited.
+	EditMessage(ctx context.Context, chat types.JID, target store.Message, text string) (store.Message, error)
 	// MarkChatRead marks a chat as read on all the account's devices.
 	MarkChatRead(ctx context.Context, chat types.JID) error
 	// Canonical maps a JID to the form the archive uses: the phone-number
