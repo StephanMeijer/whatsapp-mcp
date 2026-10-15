@@ -22,6 +22,9 @@ import (
 type WhatsApp interface {
 	Status() wa.Status
 	Contacts(ctx context.Context, query string) ([]wa.Contact, error)
+	// CheckNumbers reports which of the phone numbers ("+" and digits, from
+	// wa.NormalizePhone) are on WhatsApp, one entry per number in order.
+	CheckNumbers(ctx context.Context, phones []string) ([]wa.NumberCheck, error)
 	// SendText sends a message, as a reply quoting quoted when it is set.
 	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.
@@ -61,7 +64,8 @@ func New(version string, whatsapp WhatsApp, st *store.Store, opts Options) (*mcp
 	}
 	instructions := "Read, search and send WhatsApp messages for the paired account. " +
 		"Only messages received while this server ran (plus the initial history sync) are available. " +
-		"Use list_chats or search_contacts to find a JID before calling list_messages or send_message."
+		"Use list_chats or search_contacts to find a JID before calling list_messages or send_message. " +
+		"To message a number that has no chat yet, look it up with check_number first."
 	switch {
 	case pol.readOnly:
 		instructions = "Read and search WhatsApp messages for the paired account. This server is read-only: " +
