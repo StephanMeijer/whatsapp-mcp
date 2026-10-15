@@ -22,6 +22,8 @@ type WhatsApp interface {
 	// Canonical maps a JID to the form the archive uses: the phone-number
 	// JID for an @lid whose number is known, without a device part.
 	Canonical(ctx context.Context, jid types.JID) types.JID
+	// Names returns display names for the JIDs it knows; others are absent.
+	Names(ctx context.Context, jids []types.JID) (map[types.JID]string, error)
 }
 
 // New returns an MCP server with the tools opts allows. It fails if an

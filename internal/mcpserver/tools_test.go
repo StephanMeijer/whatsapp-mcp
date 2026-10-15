@@ -21,6 +21,24 @@ type fakeWA struct {
 	sent []string
 	// lids maps @lid JIDs to phone-number JIDs for Canonical.
 	lids map[string]string
+	// names are returned by Names; namesErr makes it fail.
+	names      map[string]string
+	namesErr   error
+	namesCalls int
+}
+
+func (f *fakeWA) Names(_ context.Context, jids []types.JID) (map[types.JID]string, error) {
+	f.namesCalls++
+	if f.namesErr != nil {
+		return nil, f.namesErr
+	}
+	out := map[types.JID]string{}
+	for _, j := range jids {
+		if n, ok := f.names[j.String()]; ok {
+			out[j] = n
+		}
+	}
+	return out, nil
 }
 
 func (f *fakeWA) Canonical(_ context.Context, jid types.JID) types.JID {

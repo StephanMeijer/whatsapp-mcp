@@ -65,29 +65,62 @@ func registerTools(s *mcp.Server, t *tools) {
 
 // Message is the tool-facing form of store.Message.
 type Message struct {
-	ChatJID   string `json:"chat_jid"`
-	ID        string `json:"id"`
-	Sender    string `json:"sender"`
-	Timestamp string `json:"timestamp" jsonschema:"RFC 3339"`
-	FromMe    bool   `json:"from_me"`
-	Text      string `json:"text,omitempty"`
-	MediaType string `json:"media_type,omitempty" jsonschema:"image, video, audio, document or sticker; empty for text"`
+	ChatJID string `json:"chat_jid"`
+	ID      string `json:"id"`
+	Sender  string `json:"sender"`
+	// SenderName is filled at call time from the contacts store.
+	SenderName string `json:"sender_name,omitempty" jsonschema:"display name: the saved contact name, otherwise their WhatsApp push name"`
+	Timestamp  string `json:"timestamp" jsonschema:"RFC 3339"`
+	FromMe     bool   `json:"from_me"`
+	Text       string `json:"text,omitempty"`
+	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document or sticker; empty for text"`
 }
 
-func toMessages(msgs []store.Message) []Message {
+// toMessages converts archive rows to tool output, naming senders with one
+// contacts lookup for the whole batch. A failed lookup only loses the names.
+func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message {
+	names := t.senderNames(ctx, msgs)
 	out := make([]Message, len(msgs))
 	for i, m := range msgs {
 		out[i] = Message{
-			ChatJID:   m.ChatJID,
-			ID:        m.MessageID,
-			Sender:    m.SenderJID,
-			Timestamp: formatUnix(m.Timestamp),
-			FromMe:    m.FromMe,
-			Text:      m.Text,
-			MediaType: m.MediaType,
+			ChatJID:    m.ChatJID,
+			ID:         m.MessageID,
+			Sender:     m.SenderJID,
+			SenderName: names[m.SenderJID],
+			Timestamp:  formatUnix(m.Timestamp),
+			FromMe:     m.FromMe,
+			Text:       m.Text,
+			MediaType:  m.MediaType,
 		}
 	}
 	return out
+}
+
+func (t *tools) senderNames(ctx context.Context, msgs []store.Message) map[string]string {
+	seen := map[string]bool{}
+	var jids []types.JID
+	for _, m := range msgs {
+		if seen[m.SenderJID] {
+			continue
+		}
+		seen[m.SenderJID] = true
+		if jid, err := types.ParseJID(m.SenderJID); err == nil {
+			jids = append(jids, jid)
+		}
+	}
+	if len(jids) == 0 {
+		return nil
+	}
+	byJID, err := t.wa.Names(ctx, jids)
+	if err != nil {
+		t.policy.log.Warn("look up sender names; returning messages without them", "err", err)
+		return nil
+	}
+	names := make(map[string]string, len(byJID))
+	for jid, name := range byJID {
+		names[jid.String()] = name
+	}
+	return names
 }
 
 func formatUnix(sec int64) string { return time.Unix(sec, 0).UTC().Format(time.RFC3339) }
@@ -151,7 +184,7 @@ func (t *tools) listMessages(ctx context.Context, _ *mcp.CallToolRequest, in Lis
 	if err != nil {
 		return nil, MessagesOut{}, err
 	}
-	return nil, MessagesOut{Messages: toMessages(msgs)}, nil
+	return nil, MessagesOut{Messages: t.toMessages(ctx, msgs)}, nil
 }
 
 type SearchMessagesIn struct {
@@ -169,7 +202,7 @@ func (t *tools) searchMessages(ctx context.Context, _ *mcp.CallToolRequest, in S
 	if err != nil {
 		return nil, MessagesOut{}, err
 	}
-	return nil, MessagesOut{Messages: toMessages(msgs)}, nil
+	return nil, MessagesOut{Messages: t.toMessages(ctx, msgs)}, nil
 }
 
 type SearchContactsIn struct {
@@ -208,7 +241,7 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 	if err != nil {
 		return nil, Message{}, err
 	}
-	return nil, toMessages([]store.Message{m})[0], nil
+	return nil, t.toMessages(ctx, []store.Message{m})[0], nil
 }
 
 // canonicalChat maps a chat JID given by a client to the archive's form, so

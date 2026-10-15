@@ -138,3 +138,58 @@ func mergeContacts(all map[types.JID]types.ContactInfo, canon func(types.JID) ty
 	}
 	return out
 }
+
+// Names returns display names for the given JIDs: the saved contact name,
+// otherwise the push name the person set in WhatsApp. The account's own JID
+// gets its own push name. JIDs without any known name are absent from the
+// result. The address book is loaded once per call.
+func (c *Client) Names(ctx context.Context, jids []types.JID) (map[types.JID]string, error) {
+	all, err := c.cli.Store.Contacts.GetAllContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var self types.JID
+	if id := c.cli.Store.ID; id != nil {
+		self = id.ToNonAD()
+	}
+	lidFor := func(pn types.JID) types.JID {
+		lid, err := c.cli.Store.LIDs.GetLIDForPN(ctx, pn)
+		if err != nil {
+			return types.JID{}
+		}
+		return lid
+	}
+	return resolveNames(all, jids, self, c.cli.Store.PushName, lidFor), nil
+}
+
+// resolveNames is the lookup behind Names. lidFor is only consulted for
+// phone-number JIDs that have no name of their own, since some people are
+// only known to the contact store under their @lid.
+func resolveNames(all map[types.JID]types.ContactInfo, jids []types.JID, self types.JID, ownName string,
+	lidFor func(types.JID) types.JID,
+) map[types.JID]string {
+	nameOf := func(info types.ContactInfo) string {
+		return firstNonEmpty(contactName(info), info.PushName)
+	}
+	out := make(map[types.JID]string, len(jids))
+	for _, jid := range jids {
+		if _, done := out[jid]; done {
+			continue
+		}
+		name := ""
+		if !self.IsEmpty() && jid.ToNonAD() == self {
+			name = firstNonEmpty(nameOf(all[jid]), ownName)
+		} else {
+			name = nameOf(all[jid])
+		}
+		if name == "" && jid.Server == types.DefaultUserServer {
+			if lid := lidFor(jid); !lid.IsEmpty() {
+				name = nameOf(all[lid.ToNonAD()])
+			}
+		}
+		if name != "" {
+			out[jid] = name
+		}
+	}
+	return out
+}

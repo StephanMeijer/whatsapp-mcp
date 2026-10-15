@@ -150,3 +150,50 @@ func TestParseRecipient(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveNames(t *testing.T) {
+	saved := types.NewJID("31600000001", types.DefaultUserServer)
+	pushOnly := types.NewJID("31600000002", types.DefaultUserServer)
+	viaLID := types.NewJID("31600000003", types.DefaultUserServer)
+	lid := types.NewJID("333", types.HiddenUserServer)
+	unknown := types.NewJID("31600000004", types.DefaultUserServer)
+	self := types.NewJID("31600000000", types.DefaultUserServer)
+	group := types.NewJID("120363000000000000", types.GroupServer)
+
+	all := map[types.JID]types.ContactInfo{
+		saved:    {FullName: "Alice Saved", PushName: "alice"},
+		pushOnly: {PushName: "Bob"},
+		lid:      {PushName: "Carol via LID"},
+	}
+	lidCalls := 0
+	lidFor := func(pn types.JID) types.JID {
+		lidCalls++
+		if pn == viaLID {
+			return lid
+		}
+		return types.JID{}
+	}
+
+	got := resolveNames(all, []types.JID{saved, pushOnly, viaLID, unknown, self, saved, group}, self, "Me Myself", lidFor)
+	want := map[types.JID]string{
+		saved:    "Alice Saved",
+		pushOnly: "Bob",
+		viaLID:   "Carol via LID",
+		self:     "Me Myself",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for jid, name := range want {
+		if got[jid] != name {
+			t.Errorf("%s = %q, want %q", jid, got[jid], name)
+		}
+	}
+	if _, ok := got[unknown]; ok {
+		t.Error("unknown sender must be absent, not an empty name")
+	}
+	// Only the phone numbers without a name of their own need the LID lookup.
+	if lidCalls != 2 {
+		t.Errorf("LID lookups = %d, want 2 (viaLID and unknown)", lidCalls)
+	}
+}
