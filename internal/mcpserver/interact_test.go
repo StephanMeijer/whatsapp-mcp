@@ -24,12 +24,16 @@ func interactStore(t *testing.T) *store.Store {
 		{ChatJID: alice, MessageID: "A1", SenderJID: alice, Timestamp: 1, Text: "dinner at 8?"},
 		{ChatJID: alice, MessageID: "MINE", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 4, Text: "oops"},
 		{ChatJID: alice, MessageID: "GONE", SenderJID: alice, Timestamp: 2, Text: "deleted"},
+		{ChatJID: alice, MessageID: "MINEGONE", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 6, Text: "already deleted"},
 		{ChatJID: stranger, MessageID: "S1", SenderJID: stranger, Timestamp: 3, Text: "hi"},
 		{ChatJID: stranger, MessageID: "S2", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 5, Text: "hello"},
 	}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := st.MarkDeleted(ctx, alice, "GONE"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.MarkDeleted(ctx, alice, "MINEGONE"); err != nil {
 		t.Fatal(err)
 	}
 	return st
@@ -82,7 +86,8 @@ func TestInteractErrorsSendNothing(t *testing.T) {
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "A1"}}, // not yours
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "UNKNOWN"}},
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "GONE"}},
-		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "S1"}}, // other chat
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "MINEGONE"}}, // yours, already deleted
+		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "S1"}},       // other chat
 		{"delete_message", map[string]any{"chat_jid": alice}},
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
