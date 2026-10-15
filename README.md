@@ -1,5 +1,7 @@
 # whatsapp-mcp
 
+[![CI](https://github.com/StephanMeijer/whatsapp-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/StephanMeijer/whatsapp-mcp/actions/workflows/ci.yml)
+
 An [MCP](https://modelcontextprotocol.io) server for your personal WhatsApp account, served over
 streamable HTTP. It links to your account as a companion device (like WhatsApp Web) using
 [whatsmeow](https://github.com/tulir/whatsmeow), archives your messages in SQLite or Postgres, and
@@ -97,6 +99,10 @@ make test            # unit tests, SQLite
 make test-postgres   # store tests against a throwaway Postgres container (needs Docker)
 make build           # static binary in bin/
 ```
+
+The Go toolchain is pinned in `mise.toml`; `mise install` gets it. CI runs gofmt, `go vet`,
+`go mod tidy -diff`, govulncheck, the tests with the race detector against SQLite and Postgres, and
+a static build on every push and pull request.
 
 ## Not yet
 
