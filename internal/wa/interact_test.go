@@ -119,7 +119,7 @@ func TestEditContent(t *testing.T) {
 func TestEditContentKeepsReplyQuote(t *testing.T) {
 	sender := types.JID{User: "31612345678", Server: types.DefaultUserServer}
 	reply := replyMessage("sounds good", store.Message{MessageID: "ORIG", Text: "dinner at 8?"}, sender)
-	ref := mediaRef(reply)
+	ref := mediaRef(reply, true)
 	if len(ref) == 0 {
 		t.Fatal("a reply has no ref")
 	}

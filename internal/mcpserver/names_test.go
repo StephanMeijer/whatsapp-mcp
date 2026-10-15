@@ -89,7 +89,7 @@ func TestSenderNamesLookupFailureKeepsMessages(t *testing.T) {
 func TestEditedAndDeletedInOutput(t *testing.T) {
 	st := groupStore(t)
 	ctx := context.Background()
-	if ok, err := st.ApplyEdit(ctx, "120363000000000000@g.us", "m1", "hello group (edited)", "", 1_700_000_000); err != nil || !ok {
+	if ok, err := st.ApplyEdit(ctx, "120363000000000000@g.us", "m1", "hello group (edited)", "", nil, 1_700_000_000); err != nil || !ok {
 		t.Fatalf("ApplyEdit: %v %v", ok, err)
 	}
 	if ok, err := st.MarkDeleted(ctx, "120363000000000000@g.us", "m2"); err != nil || !ok {

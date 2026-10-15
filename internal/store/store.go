@@ -114,11 +114,14 @@ func (s *Store) Save(ctx context.Context, chats []Chat, msgs []Message) error {
 			}
 			// An already archived message is left as it is, except that a
 			// replay may supply the media reference it was archived without.
+			// An edited text message is not given one: the replay holds its
+			// pre-edit text.
 			err := tx.Clauses(clause.OnConflict{
 				Columns: []clause.Column{{Name: "chat_jid"}, {Name: "message_id"}},
 				DoUpdates: clause.Assignments(map[string]any{
 					// An absent ref may be stored as NULL or as an empty blob.
 					"media_ref": gorm.Expr("CASE WHEN messages.deleted THEN messages.media_ref " +
+						"WHEN messages.media_type = '' AND messages.edited_at > 0 THEN messages.media_ref " +
 						"WHEN messages.media_ref IS NULL OR length(messages.media_ref) = 0 THEN excluded.media_ref " +
 						"ELSE messages.media_ref END"),
 				}),
@@ -303,10 +306,19 @@ func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Messa
 // editedAt (Unix seconds). It reports false when nothing changed: the message
 // isn't archived, was deleted, or already reflects a later edit, so late or
 // replayed edits never overwrite newer content.
-func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text, mediaType string, editedAt int64) (bool, error) {
+//
+// ref is the new media_ref of a text message, whose ref (if any) holds the
+// pre-edit text and so is always replaced: pass nil unless the edit has to be
+// rebuilt later. A message with media keeps its ref, which downloads need.
+func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text, mediaType string, ref []byte, editedAt int64) (bool, error) {
 	res := s.db.WithContext(ctx).Model(&Message{}).
 		Where("chat_jid = ? AND message_id = ? AND deleted = ? AND edited_at < ?", chatJID, messageID, false, editedAt).
-		Updates(map[string]any{"text": text, "media_type": mediaType, "edited_at": editedAt})
+		Updates(map[string]any{
+			"text":       text,
+			"media_type": mediaType,
+			"media_ref":  gorm.Expr("CASE WHEN messages.media_type = '' THEN ? ELSE messages.media_ref END", ref),
+			"edited_at":  editedAt,
+		})
 	return res.RowsAffected > 0, res.Error
 }
 

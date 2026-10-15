@@ -33,7 +33,7 @@ type Message struct {
 	// MediaRef is the marshalled media sub-message (e.g. an ImageMessage)
 	// holding what is needed to download and decrypt the file; nil for plain
 	// text and for media archived before downloads were supported. For a
-	// reply or link preview it is the marshalled ExtendedTextMessage, which
-	// keeps the quote for edits.
+	// reply or link preview the account sent it is the marshalled
+	// ExtendedTextMessage, which keeps the quote for edits.
 	MediaRef []byte
 }

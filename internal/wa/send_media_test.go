@@ -56,7 +56,7 @@ func TestBuildMediaMessage(t *testing.T) {
 			if gotKind != kind {
 				t.Fatalf("kind = %q", gotKind)
 			}
-			sub, fileName, err := decodeMediaRef(kind, mediaRef(msg))
+			sub, fileName, err := decodeMediaRef(kind, mediaRef(msg, true))
 			if err != nil {
 				t.Fatal(err)
 			}

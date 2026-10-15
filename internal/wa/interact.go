@@ -79,7 +79,7 @@ func (c *Client) EditMessage(ctx context.Context, chat types.JID, target store.M
 	edited := target
 	edited.Text, edited.MediaType = messageContent(content)
 	edited.EditedAt = now.Unix()
-	if _, err := c.store.ApplyEdit(ctx, chat.String(), target.MessageID, edited.Text, edited.MediaType, edited.EditedAt); err != nil {
+	if _, err := c.store.ApplyEdit(ctx, chat.String(), target.MessageID, edited.Text, edited.MediaType, mediaRef(content, true), edited.EditedAt); err != nil {
 		// The edit went out; failing to archive it shouldn't fail the call.
 		c.log.Error("archive edited message", "err", err, "chat", chat.String(), "id", target.MessageID)
 	}
