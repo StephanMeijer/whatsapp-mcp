@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.1.0...v0.2.0) (2026-10-15)
+
+
+### Features
+
+* add check_number tool ([1a18aa8](https://github.com/StephanMeijer/whatsapp-mcp/commit/1a18aa8226189c744e38e9aeefd9930d8a419f83)), closes [#29](https://github.com/StephanMeijer/whatsapp-mcp/issues/29)
+* show incoming calls and add a reject_call tool ([3b56173](https://github.com/StephanMeijer/whatsapp-mcp/commit/3b56173519689c83ccc07ffb4e718c9bce934007)), closes [#21](https://github.com/StephanMeijer/whatsapp-mcp/issues/21)
+
+
+### Bug Fixes
+
+* **mcpserver:** apply the recipient allowlist to check_number ([0cab4cf](https://github.com/StephanMeijer/whatsapp-mcp/commit/0cab4cfa411cfbbadd4e9c4bfa37052824251709))
+* **wa:** do not report LID-only answers as not on WhatsApp ([723fee9](https://github.com/StephanMeijer/whatsapp-mcp/commit/723fee9b2d0f4fda3284fcc41faa3650adcd8ebb))
+
 ## 0.1.0 (2026-10-15)
 
 
