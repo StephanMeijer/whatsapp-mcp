@@ -90,15 +90,52 @@ func TestNumberChecks(t *testing.T) {
 		{Phone: "+31600000005", OnWhatsApp: true, JID: "31600000005@s.whatsapp.net", BusinessName: "Acme BV"},
 		{Phone: "+31600000006", OnWhatsApp: true, JID: "31600000006@s.whatsapp.net"},
 	}
-	got := numberChecks(phones, resp, canon)
+	got, err := numberChecks(phones, resp, canon)
+	if err != nil {
+		t.Fatalf("numberChecks: %v", err)
+	}
 	if !slices.Equal(got, want) {
 		t.Errorf("numberChecks =\n %+v\nwant\n %+v", got, want)
 	}
 }
 
 func TestNumberChecksWithoutAnyAnswer(t *testing.T) {
-	got := numberChecks([]string{"+31600000001"}, nil, func(j types.JID) types.JID { return j })
+	got, err := numberChecks([]string{"+31600000001"}, nil, func(j types.JID) types.JID { return j })
+	if err != nil {
+		t.Fatalf("numberChecks: %v", err)
+	}
 	if want := []NumberCheck{{Phone: "+31600000001"}}; !slices.Equal(got, want) {
+		t.Errorf("numberChecks = %+v, want %+v", got, want)
+	}
+}
+
+// A registered @lid answer with no Query and no phone number cannot be tied to
+// a phone when several were asked: that is an error, not "not on WhatsApp".
+func TestNumberChecksUnmatchableLIDAnswerIsAnError(t *testing.T) {
+	lid := types.NewJID("111", types.HiddenUserServer)
+	resp := []types.IsOnWhatsAppResponse{{JID: lid, IsIn: true}}
+	phones := []string{"+31600000001", "+31600000002"}
+	if got, err := numberChecks(phones, resp, func(j types.JID) types.JID { return j }); err == nil {
+		t.Errorf("numberChecks = %+v, want error", got)
+	}
+}
+
+// With one phone asked and one answer given, the answer is about that phone.
+func TestNumberChecksSingleLIDAnswerWithoutQuery(t *testing.T) {
+	lid := types.NewJID("111", types.HiddenUserServer)
+	phone := types.NewJID("31600000001", types.DefaultUserServer)
+	canon := func(j types.JID) types.JID {
+		if j == lid {
+			return phone
+		}
+		return j
+	}
+	resp := []types.IsOnWhatsAppResponse{{JID: lid, IsIn: true}}
+	got, err := numberChecks([]string{"+31600000001"}, resp, canon)
+	if err != nil {
+		t.Fatalf("numberChecks: %v", err)
+	}
+	if want := []NumberCheck{{Phone: "+31600000001", OnWhatsApp: true, JID: phone.String()}}; !slices.Equal(got, want) {
 		t.Errorf("numberChecks = %+v, want %+v", got, want)
 	}
 }

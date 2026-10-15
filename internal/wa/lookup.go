@@ -67,16 +67,29 @@ func (c *Client) CheckNumbers(ctx context.Context, phones []string) ([]NumberChe
 	if err != nil {
 		return nil, fmt.Errorf("look up numbers: %w", err)
 	}
-	return numberChecks(phones, resp, func(j types.JID) types.JID { return c.Canonical(ctx, j) }), nil
+	return numberChecks(phones, resp, func(j types.JID) types.JID { return c.Canonical(ctx, j) })
 }
 
 // numberChecks pairs each phone with its answer. WhatsApp's reply is not in
 // query order, and leaves out numbers it has no account for, so answers are
-// matched by the number they echo; no answer means not on WhatsApp.
-func numberChecks(phones []string, resp []types.IsOnWhatsAppResponse, canon func(types.JID) types.JID) []NumberCheck {
+// matched by the number they echo; no answer means not on WhatsApp. An answer
+// that says a number is registered but cannot be tied to any phone is an
+// error: calling that person "not on WhatsApp" would be wrong.
+func numberChecks(phones []string, resp []types.IsOnWhatsAppResponse, canon func(types.JID) types.JID) ([]NumberCheck, error) {
 	answers := make(map[string]types.IsOnWhatsAppResponse, len(resp))
 	for _, r := range resp {
-		answers[answeredDigits(r)] = r
+		digits, ok := answeredDigits(r)
+		if !ok && len(phones) == 1 && len(resp) == 1 {
+			// One question, one answer: it can only be about that phone.
+			digits, ok = digitsOf(phones[0]), true
+		}
+		if !ok {
+			if r.IsIn {
+				return nil, fmt.Errorf("look up numbers: WhatsApp answered for %s without saying which number", r.JID)
+			}
+			continue
+		}
+		answers[digits] = r
 	}
 	out := make([]NumberCheck, len(phones))
 	for i, phone := range phones {
@@ -96,19 +109,23 @@ func numberChecks(phones []string, resp []types.IsOnWhatsAppResponse, canon func
 			out[i].BusinessName = r.VerifiedName.Details.GetVerifiedName()
 		}
 	}
-	return out
+	return out, nil
 }
 
 // answeredDigits is the number an answer is about: the one it echoes, or
-// failing that the one in its JID.
-func answeredDigits(r types.IsOnWhatsAppResponse) string {
+// failing that the one in its JID. An answer that names only an @lid user
+// has no phone number in it, so ok is false.
+func answeredDigits(r types.IsOnWhatsAppResponse) (digits string, ok bool) {
 	if r.Query != "" {
-		return digitsOf(r.Query)
+		return digitsOf(r.Query), true
 	}
 	if !r.PhoneNumber.IsEmpty() {
-		return r.PhoneNumber.User
+		return r.PhoneNumber.User, true
 	}
-	return r.JID.User
+	if r.JID.Server == types.DefaultUserServer {
+		return r.JID.User, true
+	}
+	return "", false
 }
 
 func digitsOf(s string) string {
