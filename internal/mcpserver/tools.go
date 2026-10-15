@@ -136,6 +136,12 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
 	}, t.react)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "delete_message",
+		Description: "Delete one of your own messages for everyone in the chat. This cannot be undone. " +
+			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), DestructiveHint: ptr(true)},
+	}, t.deleteMessage)
+	mcp.AddTool(s, &mcp.Tool{
 		Name: "mark_read",
 		Description: "Mark a chat as read: senders of its latest messages see blue ticks, and the unread " +
 			"badge clears on all your devices.",
@@ -850,6 +856,38 @@ func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (
 		return nil, ReactOut{}, err
 	}
 	return nil, ReactOut{ChatJID: chat.String(), MessageID: in.MessageID, Removed: in.Emoji == ""}, nil
+}
+
+type DeleteMessageIn struct {
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
+	MessageID string `json:"message_id" jsonschema:"id of your own message to delete"`
+}
+
+type DeleteMessageOut struct {
+	ChatJID   string `json:"chat_jid"`
+	MessageID string `json:"message_id"`
+	Deleted   bool   `json:"deleted"`
+}
+
+func (t *tools) deleteMessage(ctx context.Context, _ *mcp.CallToolRequest, in DeleteMessageIn) (*mcp.CallToolResult, DeleteMessageOut, error) {
+	if in.ChatJID == "" || in.MessageID == "" {
+		return nil, DeleteMessageOut{}, errors.New("chat_jid and message_id are required")
+	}
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	if err != nil {
+		return nil, DeleteMessageOut{}, err
+	}
+	target, err := t.archivedMessage(ctx, chat, in.MessageID)
+	if err != nil {
+		return nil, DeleteMessageOut{}, err
+	}
+	if !target.FromMe {
+		return nil, DeleteMessageOut{}, fmt.Errorf("message %s was not sent by you; only your own messages can be deleted", in.MessageID)
+	}
+	if err := t.wa.DeleteMessage(ctx, chat, target); err != nil {
+		return nil, DeleteMessageOut{}, err
+	}
+	return nil, DeleteMessageOut{ChatJID: chat.String(), MessageID: in.MessageID, Deleted: true}, nil
 }
 
 type MarkReadIn struct {

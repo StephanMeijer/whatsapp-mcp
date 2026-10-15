@@ -110,6 +110,11 @@ func (f *fakeWA) React(_ context.Context, chat types.JID, target store.Message, 
 	return nil
 }
 
+func (f *fakeWA) DeleteMessage(_ context.Context, chat types.JID, target store.Message) error {
+	f.sent = append(f.sent, fmt.Sprintf("delete %s/%s", chat, target.MessageID))
+	return nil
+}
+
 func (f *fakeWA) Media(_ context.Context, m store.Message) (wa.Media, error) {
 	if f.mediaErr != nil {
 		return wa.Media{}, f.mediaErr
@@ -187,7 +192,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "delete_message", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}
