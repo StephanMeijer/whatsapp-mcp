@@ -39,6 +39,25 @@ type fakeWA struct {
 	fetch     wa.FetchResult
 	fetchErr  error
 	fetchArgs []string
+
+	// registered maps the phone numbers that are on WhatsApp to their JIDs
+	// for CheckNumbers; checkCalls records the numbers asked about, per call.
+	registered map[string]string
+	checkErr   error
+	checkCalls [][]string
+}
+
+func (f *fakeWA) CheckNumbers(_ context.Context, phones []string) ([]wa.NumberCheck, error) {
+	f.checkCalls = append(f.checkCalls, phones)
+	if f.checkErr != nil {
+		return nil, f.checkErr
+	}
+	out := make([]wa.NumberCheck, len(phones))
+	for i, p := range phones {
+		jid, ok := f.registered[p]
+		out[i] = wa.NumberCheck{Phone: p, OnWhatsApp: ok, JID: jid}
+	}
+	return out, nil
 }
 
 func (f *fakeWA) FetchOlder(_ context.Context, chatJID string, count int, wait time.Duration) (wa.FetchResult, error) {
@@ -168,7 +187,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"connection_status", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

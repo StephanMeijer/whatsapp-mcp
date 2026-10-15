@@ -97,6 +97,14 @@ func registerTools(s *mcp.Server, t *tools) {
 		Description: "Search the address book by name, push name or phone number.",
 		Annotations: readOnly,
 	}, t.searchContacts)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "check_number",
+		Description: "Find out whether phone numbers are on WhatsApp, and get the JID to pass to send_message. " +
+			"Give each number with its country code, as +31612345678 or 0031612345678; at most 10 per call. " +
+			"Only look up numbers you mean to message: WhatsApp treats bulk or speculative lookups as " +
+			"enumeration and may ban the account.",
+		Annotations: readOnly,
+	}, t.checkNumber)
 
 	// Write tools: registered only when not read-only, and each must check
 	// its recipient with t.policy.
@@ -645,6 +653,43 @@ func (t *tools) searchContacts(ctx context.Context, _ *mcp.CallToolRequest, in S
 		return nil, SearchContactsOut{}, err
 	}
 	return nil, SearchContactsOut{Contacts: contacts}, nil
+}
+
+// checkNumberMax caps a lookup: many numbers at once look like enumeration.
+const checkNumberMax = 10
+
+type CheckNumberIn struct {
+	Phones []string `json:"phones" jsonschema:"numbers with a country code, such as +31612345678 or 0031612345678 (at most 10)"`
+}
+
+type CheckNumberOut struct {
+	Numbers []wa.NumberCheck `json:"numbers" jsonschema:"one entry per distinct number, in the order given"`
+}
+
+// checkNumber needs no policy.checkRecipient: it sends nothing to anyone. It
+// does reach WhatsApp, so every input is validated before the lookup.
+func (t *tools) checkNumber(ctx context.Context, _ *mcp.CallToolRequest, in CheckNumberIn) (*mcp.CallToolResult, CheckNumberOut, error) {
+	if len(in.Phones) == 0 {
+		return nil, CheckNumberOut{}, errors.New("phones is required")
+	}
+	if len(in.Phones) > checkNumberMax {
+		return nil, CheckNumberOut{}, fmt.Errorf("at most %d numbers per call", checkNumberMax)
+	}
+	phones := make([]string, 0, len(in.Phones))
+	for _, p := range in.Phones {
+		n, err := wa.NormalizePhone(p)
+		if err != nil {
+			return nil, CheckNumberOut{}, err
+		}
+		if !slices.Contains(phones, n) {
+			phones = append(phones, n)
+		}
+	}
+	checks, err := t.wa.CheckNumbers(ctx, phones)
+	if err != nil {
+		return nil, CheckNumberOut{}, err
+	}
+	return nil, CheckNumberOut{Numbers: checks}, nil
 }
 
 type SendMessageIn struct {
