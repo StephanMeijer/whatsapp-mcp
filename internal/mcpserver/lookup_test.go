@@ -121,3 +121,27 @@ func TestCheckNumberIsAvailableReadOnly(t *testing.T) {
 		t.Errorf("numbers = %+v", out.Numbers)
 	}
 }
+
+func TestCheckNumberHonoursAllowRecipients(t *testing.T) {
+	fake := &fakeWA{registered: map[string]string{"+31600000001": alice}}
+	cs := connect(t, fake, storetest.New(t), Options{AllowRecipients: []string{"+31600000001"}})
+
+	// An allowed number, and the account's own, may be looked up.
+	var out CheckNumberOut
+	if res := call(t, cs, "check_number", map[string]any{"phones": []string{"+31 6 0000 0001", "+31600000000"}}, &out); res.IsError {
+		t.Fatalf("check_number on allowed numbers: %v", res.Content)
+	}
+	if len(out.Numbers) != 2 || !out.Numbers[0].OnWhatsApp {
+		t.Errorf("numbers = %+v", out.Numbers)
+	}
+
+	// One number off the list refuses the whole call, before any lookup.
+	fake.checkCalls = nil
+	res := call(t, cs, "check_number", map[string]any{"phones": []string{"+31600000001", "+31600000002"}}, nil)
+	if !res.IsError {
+		t.Fatal("want tool error for a number outside the allowlist")
+	}
+	if len(fake.checkCalls) != 0 {
+		t.Errorf("WhatsApp was contacted: %v", fake.checkCalls)
+	}
+}

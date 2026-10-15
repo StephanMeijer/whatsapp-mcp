@@ -666,8 +666,10 @@ type CheckNumberOut struct {
 	Numbers []wa.NumberCheck `json:"numbers" jsonschema:"one entry per distinct number, in the order given"`
 }
 
-// checkNumber needs no policy.checkRecipient: it sends nothing to anyone. It
-// does reach WhatsApp, so every input is validated before the lookup.
+// checkNumber sends nothing, but it does reach WhatsApp and reveals who is
+// registered. So every input is validated before the lookup, and when an
+// allowlist is set only the numbers on it (and the account's own) may be
+// looked up: the list is the operator's limit on whom the agent deals with.
 func (t *tools) checkNumber(ctx context.Context, _ *mcp.CallToolRequest, in CheckNumberIn) (*mcp.CallToolResult, CheckNumberOut, error) {
 	if len(in.Phones) == 0 {
 		return nil, CheckNumberOut{}, errors.New("phones is required")
@@ -679,6 +681,9 @@ func (t *tools) checkNumber(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 	for _, p := range in.Phones {
 		n, err := wa.NormalizePhone(p)
 		if err != nil {
+			return nil, CheckNumberOut{}, err
+		}
+		if _, err := t.policy.checkRecipient(ctx, t.wa, n, t.wa.Status().JID); err != nil {
 			return nil, CheckNumberOut{}, err
 		}
 		if !slices.Contains(phones, n) {
