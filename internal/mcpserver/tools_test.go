@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.mau.fi/whatsmeow/types"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/storetest"
@@ -18,6 +19,17 @@ import (
 
 type fakeWA struct {
 	sent []string
+	// lids maps @lid JIDs to phone-number JIDs for Canonical.
+	lids map[string]string
+}
+
+func (f *fakeWA) Canonical(_ context.Context, jid types.JID) types.JID {
+	jid = jid.ToNonAD()
+	if pn, ok := f.lids[jid.String()]; ok {
+		out, _ := types.ParseJID(pn)
+		return out
+	}
+	return jid
 }
 
 func (f *fakeWA) Status() wa.Status {

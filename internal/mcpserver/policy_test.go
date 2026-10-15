@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/storetest"
 )
 
@@ -86,6 +87,58 @@ func TestAllowRecipients(t *testing.T) {
 				t.Errorf("sent = %v, want %v", fake.sent, want)
 			}
 		})
+	}
+}
+
+func TestAllowRecipientsResolvesLIDs(t *testing.T) {
+	lids := map[string]string{"111@lid": "31600000001@s.whatsapp.net"}
+	tests := []struct {
+		name      string
+		allow     string
+		recipient string
+		wantSent  string
+	}{
+		{"recipient given as LID of an allowed number", "+31600000001", "111@lid", "31600000001@s.whatsapp.net"},
+		{"allowlist entry given as LID", "111@lid", "+31600000001", "31600000001@s.whatsapp.net"},
+		{"unmapped LID is refused", "+31600000001", "999@lid", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeWA{lids: lids}
+			cs := connect(t, fake, storetest.New(t), Options{AllowRecipients: []string{tt.allow}})
+			res := call(t, cs, "send_message", map[string]any{"recipient": tt.recipient, "text": "hi"}, nil)
+			if tt.wantSent == "" {
+				if !res.IsError || len(fake.sent) != 0 {
+					t.Fatalf("want refusal, got error=%v sent=%v", res.IsError, fake.sent)
+				}
+				return
+			}
+			if want := []string{tt.wantSent + ": hi"}; res.IsError || !slices.Equal(fake.sent, want) {
+				t.Errorf("error=%v sent=%v, want %v", res.IsError, fake.sent, want)
+			}
+		})
+	}
+}
+
+func TestChatJIDAcceptsLID(t *testing.T) {
+	st := storetest.New(t)
+	const pn = "31600000001@s.whatsapp.net"
+	if err := st.Save(context.Background(), nil, []store.Message{
+		{ChatJID: pn, MessageID: "m1", SenderJID: pn, Timestamp: 1, Text: "archived under the phone number"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cs := connect(t, &fakeWA{lids: map[string]string{"111@lid": pn}}, st, Options{})
+
+	var page MessagesOut
+	call(t, cs, "list_messages", map[string]any{"chat_jid": "111@lid"}, &page)
+	if len(page.Messages) != 1 {
+		t.Errorf("list_messages by LID = %+v, want the phone-number chat's message", page)
+	}
+	var found MessagesOut
+	call(t, cs, "search_messages", map[string]any{"query": "archived", "chat_jid": "111@lid"}, &found)
+	if len(found.Messages) != 1 {
+		t.Errorf("search_messages by LID = %+v, want 1 hit", found)
 	}
 }
 

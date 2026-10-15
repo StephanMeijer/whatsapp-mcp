@@ -143,6 +143,93 @@ func (s *Store) RenameChats(ctx context.Context, names map[string]string) (int64
 	return changed, err
 }
 
+// LIDJIDs returns the distinct @lid JIDs used as chat or sender, the
+// candidates for MergeJIDs once their phone number is known.
+func (s *Store) LIDJIDs(ctx context.Context) ([]string, error) {
+	var jids []string
+	err := s.db.WithContext(ctx).Raw(
+		`SELECT jid FROM chats WHERE jid LIKE '%@lid'
+		 UNION
+		 SELECT DISTINCT sender_jid FROM messages WHERE sender_jid LIKE '%@lid'`,
+	).Scan(&jids).Error
+	return jids, err
+}
+
+// MergeJIDs moves everything archived under each old JID to its new JID:
+// senders are rewritten, messages move to the new chat (dropping copies the
+// new chat already has), and the chat rows are merged, keeping the new chat's
+// name when it has one and the later LastMessageAt. It returns how many old
+// JIDs had anything to move, so a second run returns 0.
+func (s *Store) MergeJIDs(ctx context.Context, renames map[string]string) (int, error) {
+	merged := 0
+	for oldJID, newJID := range renames {
+		if oldJID == newJID || newJID == "" {
+			continue
+		}
+		var changed bool
+		err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			var err error
+			changed, err = mergeJID(tx, oldJID, newJID)
+			return err
+		})
+		if err != nil {
+			return merged, fmt.Errorf("merge %s into %s: %w", oldJID, newJID, err)
+		}
+		if changed {
+			merged++
+		}
+	}
+	return merged, nil
+}
+
+func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
+	var affected int64
+	res := tx.Model(&Message{}).Where("sender_jid = ?", oldJID).Update("sender_jid", newJID)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	affected += res.RowsAffected
+
+	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID,
+		tx.Model(&Message{}).Select("message_id").Where("chat_jid = ?", newJID),
+	).Delete(&Message{})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	affected += res.RowsAffected
+
+	res = tx.Model(&Message{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	affected += res.RowsAffected
+
+	var old Chat
+	res = tx.Where("jid = ?", oldJID).Limit(1).Find(&old)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	if res.RowsAffected > 0 {
+		var target Chat
+		if err := tx.Where("jid = ?", newJID).Limit(1).Find(&target).Error; err != nil {
+			return false, err
+		}
+		target.JID = newJID
+		if target.Name == "" {
+			target.Name = old.Name
+		}
+		target.LastMessageAt = max(target.LastMessageAt, old.LastMessageAt)
+		if err := tx.Save(&target).Error; err != nil {
+			return false, err
+		}
+		if err := tx.Delete(&Chat{}, "jid = ?", oldJID).Error; err != nil {
+			return false, err
+		}
+		affected++
+	}
+	return affected > 0, nil
+}
+
 // ListChats returns chats ordered by most recent activity. A non-empty query
 // filters on name or JID, case-insensitively.
 func (s *Store) ListChats(ctx context.Context, query string, limit int) ([]Chat, error) {

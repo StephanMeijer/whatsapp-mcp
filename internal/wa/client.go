@@ -36,6 +36,8 @@ type Client struct {
 
 	mu sync.RWMutex
 	qr string // current pairing code, empty when none is pending
+
+	reconcileMu sync.Mutex // serialises reconcile runs
 }
 
 // Status describes the connection.
@@ -148,7 +150,7 @@ func (c *Client) Status() Status {
 // Contacts returns address-book entries whose name, push name or JID contains
 // query (case-insensitive), sorted by name.
 func (c *Client) Contacts(ctx context.Context, query string) ([]Contact, error) {
-	all, err := c.cli.Store.Contacts.GetAllContacts(ctx)
+	all, err := c.canonicalContacts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +240,7 @@ func contactName(info types.ContactInfo) string {
 // name if there is one, otherwise the contact's push name. History sync only
 // names groups, so without this most direct chats would show a bare JID.
 func (c *Client) syncChatNames(ctx context.Context) {
-	contacts, err := c.cli.Store.Contacts.GetAllContacts(ctx)
+	contacts, err := c.canonicalContacts(ctx)
 	if err != nil {
 		c.log.Error("sync chat names: load contacts", "err", err)
 		return

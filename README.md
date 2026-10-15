@@ -55,9 +55,8 @@ whatsapp-mcp -read-only
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
 
-Allowlist entries are normalised, so `+31 6 1234 5678` and `31612345678@s.whatsapp.net` match each
-other. A contact's `@lid` privacy ID is not yet matched to their phone number
-([#2](https://github.com/StephanMeijer/whatsapp-mcp/issues/2)), so list it separately if needed.
+Allowlist entries are normalised, so `+31 6 1234 5678`, `31612345678@s.whatsapp.net` and that
+person's `@lid` privacy ID (once WhatsApp has revealed the mapping) all match each other.
 Every message sent is logged with recipient and message ID (not its text), and so is every refused
 recipient.
 
@@ -95,6 +94,11 @@ right after pairing. So the server keeps:
 1. **whatsmeow's device store**: identity keys and Signal sessions. Without it every restart
    needs a new QR scan and old sessions can't be decrypted. Tables are prefixed `whatsmeow_`.
 2. **The message archive** (`chats`, `messages`), which the tools read.
+
+WhatsApp increasingly addresses people by a privacy ID (`…@lid`) instead of their phone number. The
+archive stores each person under their phone-number JID whenever the mapping is known, and merges
+chats archived under an `@lid` once their number becomes known, so one person is one chat.
+Tools accept either form.
 
 Both live in one database. The archive goes through [GORM](https://gorm.io). Full-text search is
 the one dialect-specific part: FTS5 on SQLite, a generated `tsvector` column with a GIN index on

@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.mau.fi/whatsmeow/types"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/wa"
@@ -18,6 +19,9 @@ type WhatsApp interface {
 	Status() wa.Status
 	Contacts(ctx context.Context, query string) ([]wa.Contact, error)
 	SendText(ctx context.Context, recipient, text string) (store.Message, error)
+	// Canonical maps a JID to the form the archive uses: the phone-number
+	// JID for an @lid whose number is known, without a device part.
+	Canonical(ctx context.Context, jid types.JID) types.JID
 }
 
 // New returns an MCP server with the tools opts allows. It fails if an

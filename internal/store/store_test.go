@@ -115,6 +115,99 @@ func TestRenameChats(t *testing.T) {
 	})
 }
 
+func TestMergeJIDs(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const (
+			lidA = "111@lid" // has a PN chat already: must be merged
+			pnA  = "31600000001@s.whatsapp.net"
+			lidB = "222@lid" // no PN chat yet: only renamed
+			pnB  = "31600000002@s.whatsapp.net"
+			lidC = "333@lid" // unmapped: untouched
+			lidS = "444@lid" // only appears as a group sender
+			pnS  = "31600000004@s.whatsapp.net"
+			grp  = "120363000000000000@g.us"
+		)
+		lidMsg := func(chat, id string, ts int64, text, sender string) store.Message {
+			m := msg(chat, id, ts, text)
+			m.SenderJID = sender
+			return m
+		}
+		must(t, s.Save(ctx,
+			[]store.Chat{{JID: pnA, Name: "Alice"}, {JID: lidA, Name: "alice push name"}, {JID: lidB, Name: "Bob"}},
+			[]store.Message{
+				lidMsg(pnA, "dup", 100, "same message seen twice", pnA),
+				lidMsg(pnA, "a1", 110, "via phone number", pnA),
+				lidMsg(lidA, "dup", 100, "same message seen twice", lidA),
+				lidMsg(lidA, "a2", 300, "via lid avocado", lidA),
+				lidMsg(lidB, "b1", 200, "bob here", lidB),
+				lidMsg(lidC, "c1", 50, "unknown", lidC),
+				lidMsg(grp, "g1", 400, "in a group", lidS),
+			}))
+
+		lids, err := s.LIDJIDs(ctx)
+		must(t, err)
+		slices.Sort(lids)
+		if want := []string{lidA, lidB, lidC, lidS}; !slices.Equal(lids, want) {
+			t.Fatalf("LIDJIDs = %v, want %v", lids, want)
+		}
+
+		renames := map[string]string{lidA: pnA, lidB: pnB, lidS: pnS}
+		n, err := s.MergeJIDs(ctx, renames)
+		must(t, err)
+		if n != 3 {
+			t.Errorf("merged = %d, want 3", n)
+		}
+
+		chats, err := s.ListChats(ctx, "", 0)
+		must(t, err)
+		got := map[string]store.Chat{}
+		for _, c := range chats {
+			got[c.JID] = c
+		}
+		if len(got) != 4 {
+			t.Errorf("chats = %v, want pnA, pnB, lidC and the group", chats)
+		}
+		if c := got[pnA]; c.Name != "Alice" || c.LastMessageAt != 300 {
+			t.Errorf("merged chat = %+v, want name Alice (target wins) and last 300", c)
+		}
+		if c := got[pnB]; c.Name != "Bob" || c.LastMessageAt != 200 {
+			t.Errorf("renamed chat = %+v, want name Bob carried over and last 200", c)
+		}
+		if _, ok := got[lidA]; ok {
+			t.Error("old @lid chat still present")
+		}
+
+		msgs, err := s.ListMessages(ctx, pnA, time.Time{}, 0)
+		must(t, err)
+		if got, want := ids(msgs), []string{"a2", "a1", "dup"}; !slices.Equal(got, want) {
+			t.Errorf("merged messages = %v, want %v (duplicate kept once)", got, want)
+		}
+		for _, m := range msgs {
+			if m.SenderJID != pnA {
+				t.Errorf("message %s sender = %s, want %s", m.MessageID, m.SenderJID, pnA)
+			}
+		}
+		groupMsgs, err := s.ListMessages(ctx, grp, time.Time{}, 0)
+		must(t, err)
+		if len(groupMsgs) != 1 || groupMsgs[0].SenderJID != pnS {
+			t.Errorf("group sender not rewritten: %+v", groupMsgs)
+		}
+
+		found, err := s.SearchMessages(ctx, "avocado", "", 0)
+		must(t, err)
+		if len(found) != 1 || found[0].ChatJID != pnA {
+			t.Errorf("search after merge = %+v, want a2 in %s", found, pnA)
+		}
+
+		n, err = s.MergeJIDs(ctx, renames)
+		must(t, err)
+		if n != 0 {
+			t.Errorf("second merge = %d, want 0 (idempotent)", n)
+		}
+	})
+}
+
 func TestListChats(t *testing.T) {
 	eachDialect(t, func(t *testing.T, s *store.Store) {
 		ctx := context.Background()

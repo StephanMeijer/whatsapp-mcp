@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.mau.fi/whatsmeow/types"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/wa"
@@ -146,7 +147,7 @@ func (t *tools) listMessages(ctx context.Context, _ *mcp.CallToolRequest, in Lis
 			return nil, MessagesOut{}, fmt.Errorf("before: want RFC 3339, e.g. 2026-01-02T15:04:05Z: %w", err)
 		}
 	}
-	msgs, err := t.store.ListMessages(ctx, in.ChatJID, before, in.Limit)
+	msgs, err := t.store.ListMessages(ctx, t.canonicalChat(ctx, in.ChatJID), before, in.Limit)
 	if err != nil {
 		return nil, MessagesOut{}, err
 	}
@@ -160,7 +161,11 @@ type SearchMessagesIn struct {
 }
 
 func (t *tools) searchMessages(ctx context.Context, _ *mcp.CallToolRequest, in SearchMessagesIn) (*mcp.CallToolResult, MessagesOut, error) {
-	msgs, err := t.store.SearchMessages(ctx, in.Query, in.ChatJID, in.Limit)
+	chat := in.ChatJID
+	if chat != "" {
+		chat = t.canonicalChat(ctx, chat)
+	}
+	msgs, err := t.store.SearchMessages(ctx, in.Query, chat, in.Limit)
 	if err != nil {
 		return nil, MessagesOut{}, err
 	}
@@ -195,7 +200,7 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	to, err := t.policy.checkRecipient(in.Recipient, t.wa.Status().JID)
+	to, err := t.policy.checkRecipient(ctx, t.wa, in.Recipient, t.wa.Status().JID)
 	if err != nil {
 		return nil, Message{}, err
 	}
@@ -204,6 +209,17 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 		return nil, Message{}, err
 	}
 	return nil, toMessages([]store.Message{m})[0], nil
+}
+
+// canonicalChat maps a chat JID given by a client to the archive's form, so
+// an @lid reference finds a chat archived under the phone number. Input that
+// isn't a JID is passed through; it simply won't match anything.
+func (t *tools) canonicalChat(ctx context.Context, chatJID string) string {
+	jid, err := types.ParseJID(chatJID)
+	if err != nil {
+		return chatJID
+	}
+	return t.wa.Canonical(ctx, jid).String()
 }
 
 func ptr[T any](v T) *T { return &v }

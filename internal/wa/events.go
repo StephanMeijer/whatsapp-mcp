@@ -13,8 +13,14 @@ import (
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
 
-// saveTimeout bounds each archive write made from the event loop.
-const saveTimeout = 30 * time.Second
+const (
+	// saveTimeout bounds each archive write made from the event loop.
+	saveTimeout = 30 * time.Second
+	// reconcileTimeout bounds a full reconcile pass over the archive.
+	reconcileTimeout = 2 * time.Minute
+	// historySyncTimeout bounds archiving one history sync blob.
+	historySyncTimeout = 5 * time.Minute
+)
 
 func (c *Client) handleEvent(evt any) {
 	switch e := evt.(type) {
@@ -22,10 +28,10 @@ func (c *Client) handleEvent(evt any) {
 		c.onMessage(e)
 	case *events.HistorySync:
 		c.onHistorySync(e)
-		go c.syncChatNamesWithTimeout()
+		go c.reconcileWithTimeout()
 	case *events.Connected:
 		c.log.Info("connected to WhatsApp")
-		go c.syncChatNamesWithTimeout()
+		go c.reconcileWithTimeout()
 	case *events.Disconnected:
 		c.log.Warn("disconnected from WhatsApp")
 	case *events.LoggedOut:
@@ -33,16 +39,10 @@ func (c *Client) handleEvent(evt any) {
 	}
 }
 
-// syncChatNamesWithTimeout runs syncChatNames off the event loop, which must
-// not block on a full pass over the address book.
-func (c *Client) syncChatNamesWithTimeout() {
+func (c *Client) onMessage(e *events.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
-	c.syncChatNames(ctx)
-}
-
-func (c *Client) onMessage(e *events.Message) {
-	m, ok := toMessage(e)
+	m, ok := toMessage(e, func(jid types.JID) types.JID { return c.Canonical(ctx, jid) })
 	if !ok {
 		return
 	}
@@ -51,14 +51,16 @@ func (c *Client) onMessage(e *events.Message) {
 	if !e.Info.IsGroup && !e.Info.IsFromMe && e.Info.PushName != "" {
 		chats = append(chats, store.Chat{JID: m.ChatJID, Name: e.Info.PushName})
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
-	defer cancel()
 	if err := c.store.Save(ctx, chats, []store.Message{m}); err != nil {
 		c.log.Error("archive message", "err", err, "chat", m.ChatJID, "id", m.MessageID)
 	}
 }
 
 func (c *Client) onHistorySync(e *events.HistorySync) {
+	syncCtx, cancelSync := context.WithTimeout(context.Background(), historySyncTimeout)
+	defer cancelSync()
+	canon := c.memoCanonical(syncCtx)
+
 	convs := e.Data.GetConversations()
 	saved := 0
 	for _, conv := range convs {
@@ -67,18 +69,27 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			c.log.Warn("history sync: bad chat JID", "jid", conv.GetID(), "err", err)
 			continue
 		}
-		chat := store.Chat{JID: chatJID.String(), Name: firstNonEmpty(conv.GetName(), conv.GetDisplayName())}
+		archiveJID := canon(chatJID)
+		// The conversation may carry the phone number itself even when the
+		// mapping store doesn't know it yet.
+		if archiveJID.Server == types.HiddenUserServer {
+			if pn, err := types.ParseJID(conv.GetPnJID()); err == nil && pn.Server == types.DefaultUserServer {
+				archiveJID = pn.ToNonAD()
+			}
+		}
+		chat := store.Chat{JID: archiveJID.String(), Name: firstNonEmpty(conv.GetName(), conv.GetDisplayName())}
 		var msgs []store.Message
 		for _, hm := range conv.GetMessages() {
 			evt, err := c.cli.ParseWebMessage(chatJID, hm.GetMessage())
 			if err != nil {
 				continue
 			}
-			if m, ok := toMessage(evt); ok {
+			if m, ok := toMessage(evt, canon); ok {
+				m.ChatJID = chat.JID
 				msgs = append(msgs, m)
 			}
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+		ctx, cancel := context.WithTimeout(syncCtx, saveTimeout)
 		err = c.store.Save(ctx, []store.Chat{chat}, msgs)
 		cancel()
 		if err != nil {
@@ -91,10 +102,11 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		"conversations", len(convs), "messages", saved)
 }
 
-// toMessage converts a whatsmeow message event into an archive row. It reports
-// false for messages with nothing to archive (reactions, protocol messages)
-// and for edits, which are not handled yet.
-func toMessage(e *events.Message) (store.Message, bool) {
+// toMessage converts a whatsmeow message event into an archive row, storing
+// chat and sender under the JIDs canon returns. It reports false for messages
+// with nothing to archive (reactions, protocol messages) and for edits, which
+// are not handled yet.
+func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Message, bool) {
 	if e.IsEdit {
 		return store.Message{}, false
 	}
@@ -103,9 +115,9 @@ func toMessage(e *events.Message) (store.Message, bool) {
 		return store.Message{}, false
 	}
 	return store.Message{
-		ChatJID:   e.Info.Chat.ToNonAD().String(),
+		ChatJID:   canon(e.Info.Chat).String(),
 		MessageID: e.Info.ID,
-		SenderJID: e.Info.Sender.ToNonAD().String(),
+		SenderJID: canon(e.Info.Sender).String(),
 		Timestamp: e.Info.Timestamp.Unix(),
 		FromMe:    e.Info.IsFromMe,
 		Text:      text,

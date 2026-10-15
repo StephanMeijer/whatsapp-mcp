@@ -49,7 +49,7 @@ func TestToMessage(t *testing.T) {
 		},
 		Message: &waE2E.Message{Conversation: proto.String("hello")},
 	}
-	m, ok := toMessage(e)
+	m, ok := toMessage(e, types.JID.ToNonAD)
 	if !ok {
 		t.Fatal("toMessage: not ok")
 	}
@@ -59,8 +59,68 @@ func TestToMessage(t *testing.T) {
 	}
 
 	e.IsEdit = true
-	if _, ok := toMessage(e); ok {
+	if _, ok := toMessage(e, types.JID.ToNonAD); ok {
 		t.Error("edits should be skipped")
+	}
+}
+
+func TestToMessageCanonicalisesLIDs(t *testing.T) {
+	lid := types.NewJID("111", types.HiddenUserServer)
+	pn := types.NewJID("31600000001", types.DefaultUserServer)
+	canon := func(j types.JID) types.JID {
+		if j.ToNonAD() == lid {
+			return pn
+		}
+		return j.ToNonAD()
+	}
+	e := &events.Message{
+		Info: types.MessageInfo{
+			MessageSource: types.MessageSource{Chat: lid, Sender: types.NewADJID("111", 0, 2)},
+			ID:            "X",
+		},
+		Message: &waE2E.Message{Conversation: proto.String("hi")},
+	}
+	// NewADJID builds a phone-number JID; give it the LID server like a real LID device.
+	e.Info.Sender.Server = types.HiddenUserServer
+	m, ok := toMessage(e, canon)
+	if !ok {
+		t.Fatal("toMessage: not ok")
+	}
+	if m.ChatJID != pn.String() || m.SenderJID != pn.String() {
+		t.Errorf("chat %s, sender %s; want both %s", m.ChatJID, m.SenderJID, pn)
+	}
+}
+
+func TestMergeContacts(t *testing.T) {
+	lid := types.NewJID("111", types.HiddenUserServer)
+	pn := types.NewJID("31600000001", types.DefaultUserServer)
+	other := types.NewJID("31600000002", types.DefaultUserServer)
+	unmapped := types.NewJID("999", types.HiddenUserServer)
+	canon := func(j types.JID) types.JID {
+		if j == lid {
+			return pn
+		}
+		return j
+	}
+	got := mergeContacts(map[types.JID]types.ContactInfo{
+		pn:       {Found: true, FullName: "Alice Saved"},
+		lid:      {FullName: "ignored, PN entry wins", PushName: "alice"},
+		other:    {PushName: "Bob"},
+		unmapped: {PushName: "Stranger"},
+	}, canon)
+
+	want := map[types.JID]types.ContactInfo{
+		pn:       {Found: true, FullName: "Alice Saved", PushName: "alice"},
+		other:    {PushName: "Bob"},
+		unmapped: {PushName: "Stranger"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d contacts, want %d: %+v", len(got), len(want), got)
+	}
+	for jid, w := range want {
+		if got[jid] != w {
+			t.Errorf("%s = %+v, want %+v", jid, got[jid], w)
+		}
 	}
 }
 
