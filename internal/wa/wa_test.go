@@ -355,6 +355,9 @@ func TestMediaRefRoundTrip(t *testing.T) {
 	if ref := mediaRef(&waE2E.Message{Conversation: proto.String("text")}); ref != nil {
 		t.Errorf("text message has a ref: %v", ref)
 	}
+	if ref := mediaRef(&waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("link https://x")}}); len(ref) == 0 {
+		t.Error("extended text message has no ref")
+	}
 	if _, _, err := decodeMediaRef("hologram", []byte{1}); err == nil {
 		t.Error("unknown kind: want error")
 	}

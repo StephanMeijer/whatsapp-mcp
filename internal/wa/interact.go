@@ -122,10 +122,19 @@ func articled(kind string) string {
 }
 
 // editContent builds the new content for an edit of m: the text itself for
-// a text message, or the original media with the new caption.
+// a text message, or the original media with the new caption. A reply or
+// link preview keeps its quote and preview, restored from the archived ref.
 func editContent(m store.Message, text string) (*waE2E.Message, error) {
 	if m.MediaType == "" {
-		return &waE2E.Message{Conversation: proto.String(text)}, nil
+		if len(m.MediaRef) == 0 {
+			return &waE2E.Message{Conversation: proto.String(text)}, nil
+		}
+		ext := &waE2E.ExtendedTextMessage{}
+		if err := proto.Unmarshal(m.MediaRef, ext); err != nil {
+			return nil, fmt.Errorf("decode archived text message: %w", err)
+		}
+		ext.Text = proto.String(text)
+		return &waE2E.Message{ExtendedTextMessage: ext}, nil
 	}
 	sub, _, err := decodeMediaRef(m.MediaType, m.MediaRef)
 	if err != nil {

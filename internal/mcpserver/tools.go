@@ -138,7 +138,8 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "edit_message",
 		Description: "Change the text, or the caption, of one of your own messages sent in the last 20 minutes. " +
-			"Everyone in the chat sees the new text, marked as edited.",
+			"Everyone in the chat sees the new text, marked as edited. A reply keeps its quote, except for " +
+			"replies archived by an older version of this server, which lose it.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
 	}, t.editMessage)
 	mcp.AddTool(s, &mcp.Tool{

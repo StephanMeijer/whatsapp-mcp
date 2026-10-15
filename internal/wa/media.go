@@ -72,10 +72,16 @@ func mediaGone(err error) bool {
 
 // mediaRef marshals a message's media sub-message, which holds what is
 // needed to download it later; nil for messages without media. The cases
-// mirror messageContent, so the ref matches the archived MediaType.
+// mirror messageContent, so the ref matches the archived MediaType. An
+// extended text message (a reply or a link preview) is kept whole, so that
+// an edit can rebuild it with its quote; plain text has no ref.
 func mediaRef(m *waE2E.Message) []byte {
 	var sub proto.Message
 	switch {
+	case m.GetConversation() != "":
+		return nil
+	case m.GetExtendedTextMessage() != nil:
+		sub = m.GetExtendedTextMessage()
 	case m.GetImageMessage() != nil:
 		sub = m.GetImageMessage()
 	case m.GetVideoMessage() != nil:

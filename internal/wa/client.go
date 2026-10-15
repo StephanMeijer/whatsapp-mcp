@@ -208,6 +208,7 @@ func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *s
 		Timestamp: resp.Timestamp.Unix(),
 		FromMe:    true,
 		Text:      text,
+		MediaRef:  mediaRef(msg),
 	}
 	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
 		// The message went out; failing to archive it shouldn't fail the send.
