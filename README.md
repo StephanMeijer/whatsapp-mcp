@@ -93,6 +93,69 @@ Publish the port on `127.0.0.1` only, as above; the container listens on all int
 Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
 container keeps the session. The other options from the table above work as environment variables.
 
+## Run as a systemd user service
+
+To keep the server running after you log out, and to start it at boot, use the unit in
+[`contrib/systemd/`](contrib/systemd). The token is read from an env file, so it is not in the unit
+or in the process arguments.
+
+```sh
+# 1. Install the binary.
+make build
+install -Dm755 bin/whatsapp-mcp ~/.local/bin/whatsapp-mcp
+
+# 2. Create the state directory. It must exist before the unit starts.
+install -d -m 700 ~/.local/state/whatsapp-mcp
+
+# 3. Create the env file with a new token (mode 600).
+install -d -m 700 ~/.config/whatsapp-mcp
+(umask 077; printf 'WHATSAPP_MCP_TOKEN=%s\n' "$(openssl rand -hex 32)" > ~/.config/whatsapp-mcp/env)
+
+# 4. Install and start the unit.
+install -Dm644 contrib/systemd/whatsapp-mcp.service ~/.config/systemd/user/whatsapp-mcp.service
+systemctl --user daemon-reload
+systemctl --user enable --now whatsapp-mcp
+
+# 5. Keep it running without a login session, and start it at boot.
+loginctl enable-linger "$USER"
+```
+
+The other options from the table above go in the env file, see
+[`whatsapp-mcp.env.example`](contrib/systemd/whatsapp-mcp.env.example). The unit sets `DATABASE_URL`
+to `~/.local/state/whatsapp-mcp/whatsapp.db`; the default relative path would not be writable under
+the unit's sandbox.
+
+**First pairing.** Follow the log and scan the QR code, or fetch it as a PNG as described under
+[Run](#run):
+
+```sh
+journalctl --user -u whatsapp-mcp -o cat -f
+
+sed -n 's/^WHATSAPP_MCP_TOKEN=/Authorization: Bearer /p' ~/.config/whatsapp-mcp/env \
+  | curl -H @- http://127.0.0.1:8080/pair > pair.png
+```
+
+The header is read from stdin, so the token is not in the curl arguments (this needs curl 7.55 or
+later).
+
+When the QR codes expire unscanned the server keeps running and logs that it needs a restart. The
+unit does not restart it for that, so run `systemctl --user restart whatsapp-mcp` to get a new code.
+
+Use the same token to [connect a client](#connect-a-client). `systemctl --user stop whatsapp-mcp`
+shuts the server down cleanly and exits with status 0.
+
+Things to know:
+
+- `~/.local/state/whatsapp-mcp/` holds the WhatsApp session and your message archive. Back it up
+  and protect it like a secret.
+- The token is kept out of `ps aux` and the unit, but the same user can still read it from the env
+  file or the process environment. The service protects against other users, not against you.
+- The sandbox options (`PrivateUsers=`, `ProtectSystem=` and the rest) need unprivileged user
+  namespaces. If your kernel forbids them, the unit fails to start; delete the hardening lines as a
+  fallback. Check what is applied with `systemd-analyze --user security whatsapp-mcp`.
+- A user manager cannot wait for the network. If the network is not up at boot, the server exits
+  and the unit retries every 10 seconds.
+
 ## Connect a client
 
 Claude Code:
@@ -157,6 +220,7 @@ internal/store       archive models, queries, per-dialect search
 internal/wa          whatsmeow client: pairing, event → archive, send
 internal/mcpserver   MCP tools
 internal/httpx       bearer auth
+contrib/systemd      user unit and example env file
 ```
 
 ## Develop
