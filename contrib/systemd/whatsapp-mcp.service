@@ -12,6 +12,9 @@
 #   - If you set WHATSAPP_MCP_MEDIA_DIR, the service only needs read access to it.
 #     ProtectHome=read-only allows that, unless the folder is outside your home directory
 #     and unreadable to you. Add it to ReadWritePaths= only if the service must write there.
+#     A folder under /tmp or /var/tmp is not visible to the service, because PrivateTmp=yes
+#     gives it its own empty ones. Use a directory elsewhere, or add the folder to
+#     BindReadOnlyPaths=.
 
 [Unit]
 Description=WhatsApp MCP server
