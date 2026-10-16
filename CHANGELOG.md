@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.2.0...v0.3.0) (2026-10-16)
+
+
+### Features
+
+* add a systemd user unit and example env file ([26b5fdf](https://github.com/StephanMeijer/whatsapp-mcp/commit/26b5fdf1c4972a11d47461acca84560dd3fe1d58))
+* add delete_message tool ([9ff6be0](https://github.com/StephanMeijer/whatsapp-mcp/commit/9ff6be039d29744e850f98ea340b29e974a4c6e0)), closes [#37](https://github.com/StephanMeijer/whatsapp-mcp/issues/37)
+* add edit_message tool ([6387a47](https://github.com/StephanMeijer/whatsapp-mcp/commit/6387a478b8f4d91b11899161f0d446a2da8d96f9)), closes [#23](https://github.com/StephanMeijer/whatsapp-mcp/issues/23)
+
+
+### Bug Fixes
+
+* keep reply refs only for own messages and drop them on edit ([98dc7b3](https://github.com/StephanMeijer/whatsapp-mcp/commit/98dc7b3914533d0b9c56f6de87b4d0750ad557f0))
+* keep the quote when editing a reply ([a014140](https://github.com/StephanMeijer/whatsapp-mcp/commit/a014140777a760f4b9dd3de4e269242cff10f81d))
+
 ## [0.2.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.1.0...v0.2.0) (2026-10-15)
 
 
