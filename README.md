@@ -131,9 +131,12 @@ the unit's sandbox.
 ```sh
 journalctl --user -u whatsapp-mcp -o cat -f
 
-TOKEN=$(sed -n 's/^WHATSAPP_MCP_TOKEN=//p' ~/.config/whatsapp-mcp/env)
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8080/pair > pair.png
+sed -n 's/^WHATSAPP_MCP_TOKEN=/Authorization: Bearer /p' ~/.config/whatsapp-mcp/env \
+  | curl -H @- http://127.0.0.1:8080/pair > pair.png
 ```
+
+The header is read from stdin, so the token is not in the curl arguments (this needs curl 7.55 or
+later).
 
 When the QR codes expire unscanned the server keeps running and logs that it needs a restart. The
 unit does not restart it for that, so run `systemctl --user restart whatsapp-mcp` to get a new code.
