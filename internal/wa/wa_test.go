@@ -5,6 +5,7 @@ package wa
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -269,7 +270,7 @@ func TestToChange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, ok := toChange(tt.e, types.JID.ToNonAD)
-			if ok != tt.ok || got != tt.want {
+			if ok != tt.ok || !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("toChange = %+v, %v; want %+v, %v", got, ok, tt.want, tt.ok)
 			}
 			// Edits and deletions must never be archived as new messages.
@@ -296,7 +297,7 @@ func TestSecretEditChange(t *testing.T) {
 
 	// Plaintext is the new content itself.
 	got, ok := secretEditChange(e, &waE2E.Message{Conversation: proto.String("mango")}, types.JID.ToNonAD)
-	if !ok || got != want {
+	if !ok || !reflect.DeepEqual(got, want) {
 		t.Errorf("plain content: %+v %v, want %+v", got, ok, want)
 	}
 
@@ -307,7 +308,7 @@ func TestSecretEditChange(t *testing.T) {
 		TimestampMS:   proto.Int64(1_700_000_050_000),
 	}}
 	want.at = 1_700_000_050
-	if got, ok := secretEditChange(e, wrapped, types.JID.ToNonAD); !ok || got != want {
+	if got, ok := secretEditChange(e, wrapped, types.JID.ToNonAD); !ok || !reflect.DeepEqual(got, want) {
 		t.Errorf("wrapped content: %+v %v, want %+v", got, ok, want)
 	}
 
@@ -339,7 +340,7 @@ func TestMediaRefRoundTrip(t *testing.T) {
 			if kind != tt.kind {
 				t.Fatalf("messageContent kind = %q, want %q", kind, tt.kind)
 			}
-			ref := mediaRef(tt.msg)
+			ref := mediaRef(tt.msg, true)
 			if len(ref) == 0 {
 				t.Fatal("no ref")
 			}
@@ -352,8 +353,15 @@ func TestMediaRefRoundTrip(t *testing.T) {
 			}
 		})
 	}
-	if ref := mediaRef(&waE2E.Message{Conversation: proto.String("text")}); ref != nil {
+	if ref := mediaRef(&waE2E.Message{Conversation: proto.String("text")}, true); ref != nil {
 		t.Errorf("text message has a ref: %v", ref)
+	}
+	ext := &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("link https://x")}}
+	if len(mediaRef(ext, true)) == 0 {
+		t.Error("own extended text message has no ref")
+	}
+	if ref := mediaRef(ext, false); ref != nil {
+		t.Errorf("incoming extended text message has a ref: %v", ref)
 	}
 	if _, _, err := decodeMediaRef("hologram", []byte{1}); err == nil {
 		t.Error("unknown kind: want error")
@@ -369,5 +377,37 @@ func TestMediaGone(t *testing.T) {
 	}
 	if mediaGone(errors.New("connection reset")) || mediaGone(nil) {
 		t.Error("transient errors must not count as gone")
+	}
+}
+
+// An edit of someone else's reply carries no ref, so the archive keeps no
+// copy of the text or the quote; the account's own edit carries the ref its
+// next edit rebuilds from.
+func TestEditChangeRefOnlyForOwnMessages(t *testing.T) {
+	chat := types.NewJID("31600000001", types.DefaultUserServer)
+	content := &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+		Text: proto.String("edited"),
+		ContextInfo: &waE2E.ContextInfo{
+			StanzaID:      proto.String("ORIG"),
+			QuotedMessage: &waE2E.Message{Conversation: proto.String("quoted secret")},
+		},
+	}}
+	for _, fromMe := range []bool{false, true} {
+		e := &events.Message{
+			Info: types.MessageInfo{
+				MessageSource: types.MessageSource{Chat: chat, Sender: chat, IsFromMe: fromMe},
+				ID:            "WRAPPER", Timestamp: time.Unix(1_700_000_000, 0),
+			},
+			Message: &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+				Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
+				Key:           &waCommon.MessageKey{ID: proto.String("ORIGINAL")},
+				EditedMessage: content,
+			}},
+			IsEdit: true,
+		}
+		got, ok := toChange(e, types.JID.ToNonAD)
+		if !ok || got.text != "edited" || (len(got.ref) != 0) != fromMe {
+			t.Errorf("fromMe=%v: change %+v, ok %v; want a ref only for own messages", fromMe, got, ok)
+		}
 	}
 }

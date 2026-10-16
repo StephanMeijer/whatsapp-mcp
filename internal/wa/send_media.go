@@ -74,7 +74,7 @@ func (c *Client) SendMedia(ctx context.Context, recipient string, f OutgoingMedi
 		FromMe:    true,
 		Text:      text,
 		MediaType: kind,
-		MediaRef:  mediaRef(msg),
+		MediaRef:  mediaRef(msg, true),
 	}
 	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
 		c.log.Error("archive sent media", "err", err, "id", resp.ID)

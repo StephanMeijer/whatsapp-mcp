@@ -159,7 +159,7 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 		FromMe:    e.Info.IsFromMe,
 		Text:      text,
 		MediaType: media,
-		MediaRef:  mediaRef(e.Message),
+		MediaRef:  mediaRef(e.Message, e.Info.IsFromMe),
 	}, true
 }
 

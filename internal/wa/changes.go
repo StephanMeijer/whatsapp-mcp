@@ -25,6 +25,7 @@ type change struct {
 	text   string // edits only
 	media  string // edits only
 	at     int64  // edits only: Unix seconds of the edit
+	ref    []byte // edits only: new media_ref, for the account's own text messages
 }
 
 // toChange recognises edits and deletions for everyone. Edits arrive
@@ -41,6 +42,9 @@ func toChange(e *events.Message, canon func(types.JID) types.JID) (change, bool)
 	case waE2E.ProtocolMessage_MESSAGE_EDIT:
 		ch.kind = changeEdit
 		ch.text, ch.media = messageContent(pm.GetEditedMessage())
+		if ch.media == "" {
+			ch.ref = mediaRef(pm.GetEditedMessage(), e.Info.IsFromMe)
+		}
 		ch.at = pm.GetTimestampMS() / 1000
 		if ch.at == 0 {
 			ch.at = e.Info.Timestamp.Unix()
@@ -92,7 +96,11 @@ func secretEditChange(e *events.Message, decrypted *waE2E.Message, canon func(ty
 	if text == "" && media == "" {
 		return change{}, false
 	}
-	return change{kind: changeEdit, chat: canon(e.Info.Chat).String(), target: target, text: text, media: media, at: at}, true
+	ch := change{kind: changeEdit, chat: canon(e.Info.Chat).String(), target: target, text: text, media: media, at: at}
+	if media == "" {
+		ch.ref = mediaRef(content, e.Info.IsFromMe)
+	}
+	return ch, true
 }
 
 // applyChange writes a change to the archive. Changes to messages that were
@@ -102,7 +110,7 @@ func (c *Client) applyChange(ctx context.Context, ch change) {
 	var err error
 	switch ch.kind {
 	case changeEdit:
-		applied, err = c.store.ApplyEdit(ctx, ch.chat, ch.target, ch.text, ch.media, ch.at)
+		applied, err = c.store.ApplyEdit(ctx, ch.chat, ch.target, ch.text, ch.media, ch.ref, ch.at)
 	case changeRevoke:
 		applied, err = c.store.MarkDeleted(ctx, ch.chat, ch.target)
 	}

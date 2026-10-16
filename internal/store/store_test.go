@@ -448,7 +448,7 @@ func TestEditsAndDeletions(t *testing.T) {
 		}
 
 		// Edit: new text is searchable, the old text is gone.
-		if !applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", 100)) {
+		if !applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", nil, 100)) {
 			t.Fatal("edit not applied")
 		}
 		if got := searchIDs("harbour"); !slices.Equal(got, []string{"e"}) {
@@ -458,13 +458,13 @@ func TestEditsAndDeletions(t *testing.T) {
 			t.Errorf("old text still found: %v", got)
 		}
 		// A late, older edit must not overwrite the newer one; a replay changes nothing.
-		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the station", "", 50)) {
+		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the station", "", nil, 50)) {
 			t.Error("older edit was applied")
 		}
-		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", 100)) {
+		if applied(s.ApplyEdit(ctx, chat, "e", "meet at the harbour", "", nil, 100)) {
 			t.Error("replayed edit reported a change")
 		}
-		if applied(s.ApplyEdit(ctx, chat, "unknown", "x", "", 100)) {
+		if applied(s.ApplyEdit(ctx, chat, "unknown", "x", "", nil, 100)) {
 			t.Error("edit of an unarchived message reported a change")
 		}
 
@@ -475,7 +475,7 @@ func TestEditsAndDeletions(t *testing.T) {
 		if applied(s.MarkDeleted(ctx, chat, "d")) {
 			t.Error("second delete reported a change")
 		}
-		if applied(s.ApplyEdit(ctx, chat, "d", "resurrected", "", 200)) {
+		if applied(s.ApplyEdit(ctx, chat, "d", "resurrected", "", nil, 200)) {
 			t.Error("edit after delete was applied")
 		}
 		listed, err := s.ListMessages(ctx, chat, time.Time{}, 0)
@@ -552,7 +552,7 @@ func TestMigrationAddsEditColumns(t *testing.T) {
 	if len(found) != 1 {
 		t.Errorf("pre-existing row not searchable: %+v", found)
 	}
-	ok, err := s.ApplyEdit(ctx, "1@s.whatsapp.net", "m1", "edited", "", 5)
+	ok, err := s.ApplyEdit(ctx, "1@s.whatsapp.net", "m1", "edited", "", nil, 5)
 	must(t, err)
 	if !ok {
 		t.Error("edit on a migrated row not applied")
@@ -616,7 +616,7 @@ func TestMediaRef(t *testing.T) {
 			withRef("old", "old caption", nil), // archived before refs existed
 			withRef("gone", "deleted", nil),
 		}))
-		_, err := s.ApplyEdit(ctx, chat, "old", "edited caption", "image", 50)
+		_, err := s.ApplyEdit(ctx, chat, "old", "edited caption", "image", nil, 50)
 		must(t, err)
 		_, err = s.MarkDeleted(ctx, chat, "gone")
 		must(t, err)
@@ -658,6 +658,42 @@ func TestMediaRef(t *testing.T) {
 		must(t, s.RawRef(ctx, chat, "new", &ref))
 		if len(ref) != 0 {
 			t.Errorf("ref kept after delete: %q", ref)
+		}
+	})
+}
+
+func TestApplyEditReplacesTextRef(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		reply := func(id string) store.Message {
+			m := msg(chat, id, 10, "pre-edit secret")
+			m.MediaRef = []byte("ref-with-pre-edit-secret")
+			return m
+		}
+		img := msg(chat, "img", 10, "caption")
+		img.MediaType, img.MediaRef = "image", []byte("ref-img")
+		must(t, s.Save(ctx, nil, []store.Message{reply("remote"), reply("own"), img}))
+
+		// A remote edit leaves no ref, so no pre-edit text survives.
+		_, err := s.ApplyEdit(ctx, chat, "remote", "new text", "", nil, 50)
+		must(t, err)
+		// An own edit swaps in the rebuilt ref.
+		_, err = s.ApplyEdit(ctx, chat, "own", "new text", "", []byte("ref-new"), 50)
+		must(t, err)
+		// A media message keeps the ref its download needs.
+		_, err = s.ApplyEdit(ctx, chat, "img", "new caption", "image", nil, 50)
+		must(t, err)
+
+		// A replay of the originals brings the pre-edit ref back.
+		must(t, s.Save(ctx, nil, []store.Message{reply("remote"), reply("own")}))
+
+		var ref []byte
+		for id, want := range map[string]string{"remote": "", "own": "ref-new", "img": "ref-img"} {
+			must(t, s.RawRef(ctx, chat, id, &ref))
+			if string(ref) != want {
+				t.Errorf("%s: ref %q, want %q", id, ref, want)
+			}
 		}
 	})
 }
