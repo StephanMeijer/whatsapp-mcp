@@ -1,0 +1,48 @@
+# systemd user unit for whatsapp-mcp. See "Run as a systemd user service" in the README.
+#
+# Before the first start:
+#   - Install the binary at ~/.local/bin/whatsapp-mcp.
+#   - Create the env file ~/.config/whatsapp-mcp/env (mode 600) with WHATSAPP_MCP_TOKEN=...
+#     See whatsapp-mcp.env.example. The token is read from there, so it is never in this
+#     unit or in the process arguments.
+#   - Create the state directory, it must exist (ReadWritePaths= fails on a missing path):
+#       install -d -m 700 ~/.local/state/whatsapp-mcp
+#     The SQLite database (session and archive) lives there and is the only place the
+#     service may write.
+#   - If you set WHATSAPP_MCP_MEDIA_DIR, the service only needs read access to it.
+#     ProtectHome=read-only allows that, unless the folder is outside your home directory
+#     and unreadable to you. Add it to ReadWritePaths= only if the service must write there.
+
+[Unit]
+Description=WhatsApp MCP server
+Documentation=https://github.com/StephanMeijer/whatsapp-mcp
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/whatsapp-mcp/env
+Environment=DATABASE_URL=sqlite://%h/.local/state/whatsapp-mcp/whatsapp.db
+ExecStart=%h/.local/bin/whatsapp-mcp
+Restart=on-failure
+RestartSec=10
+# Above the 10 s shutdown deadline in the binary.
+TimeoutStopSec=15
+UMask=0077
+
+# Hardening. The sandbox options of a user manager need unprivileged user namespaces.
+NoNewPrivileges=yes
+PrivateUsers=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.local/state/whatsapp-mcp
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=default.target
