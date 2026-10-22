@@ -184,6 +184,24 @@ func (f *fakeWA) RejectCall(_ context.Context, callID string) (store.Call, error
 	return store.Call{CallID: callID, CallerJID: "31600000001@s.whatsapp.net", Status: store.CallRejected, StartedAt: 1}, nil
 }
 
+func (f *fakeWA) SetChatState(_ context.Context, chat types.JID, fl store.ChatFlags) error {
+	show := func(v any) string {
+		switch v := v.(type) {
+		case *bool:
+			if v != nil {
+				return fmt.Sprint(*v)
+			}
+		case *int64:
+			if v != nil {
+				return fmt.Sprint(*v)
+			}
+		}
+		return "-"
+	}
+	f.sent = append(f.sent, fmt.Sprintf("state %s archived=%s pinned=%s muted=%s", chat, show(fl.Archived), show(fl.Pinned), show(fl.MutedUntil)))
+	return nil
+}
+
 func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
 	f.sent = append(f.sent, "read "+chat.String())
 	return nil
@@ -243,7 +261,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message", "set_chat_state"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

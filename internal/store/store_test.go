@@ -68,7 +68,7 @@ func TestSaveIsIdempotentAndMergesChats(t *testing.T) {
 		// An older batch (late history sync) must not move LastMessageAt back.
 		must(t, s.Save(ctx, nil, []store.Message{msg(alice, "A0", 50, "first")}))
 
-		chats, err := s.ListChats(ctx, "", 0)
+		chats, err := s.ListChats(ctx, "", store.IncludeArchived, 0)
 		must(t, err)
 		if len(chats) != 1 {
 			t.Fatalf("got %d chats, want 1: %+v", len(chats), chats)
@@ -104,7 +104,7 @@ func TestRenameChats(t *testing.T) {
 			t.Errorf("changed = %d, want 1", changed)
 		}
 
-		chats, err := s.ListChats(ctx, "", 0)
+		chats, err := s.ListChats(ctx, "", store.IncludeArchived, 0)
 		must(t, err)
 		got := []string{}
 		for _, c := range chats {
@@ -160,7 +160,7 @@ func TestMergeJIDs(t *testing.T) {
 			t.Errorf("merged = %d, want 3", n)
 		}
 
-		chats, err := s.ListChats(ctx, "", 0)
+		chats, err := s.ListChats(ctx, "", store.IncludeArchived, 0)
 		must(t, err)
 		got := map[string]store.Chat{}
 		for _, c := range chats {
@@ -285,7 +285,7 @@ func TestListChats(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(fmt.Sprintf("%q/%d", tt.query, tt.limit), func(t *testing.T) {
-				chats, err := s.ListChats(ctx, tt.query, tt.limit)
+				chats, err := s.ListChats(ctx, tt.query, store.IncludeArchived, tt.limit)
 				must(t, err)
 				got := []string{}
 				for _, c := range chats {

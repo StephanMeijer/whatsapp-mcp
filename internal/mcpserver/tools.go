@@ -38,8 +38,9 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.connectionStatus)
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_chats",
-		Description: "List chats, most recently active first, optionally filtered by name or JID.",
+		Name: "list_chats",
+		Description: "List chats, pinned first, then most recently active, optionally filtered by name or JID. " +
+			"Archived chats are left out unless archived is include or only.",
 		Annotations: readOnly,
 	}, t.listChats)
 	mcp.AddTool(s, &mcp.Tool{
@@ -179,6 +180,12 @@ func registerTools(s *mcp.Server, t *tools) {
 			"badge clears on all your devices.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
 	}, t.markRead)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "set_chat_state",
+		Description: "Archive or unarchive, pin or unpin, and mute or unmute a chat, synced to your phone. " +
+			"Archiving also unpins. mute is off, forever, or a duration such as 8h or 168h.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+	}, t.setChatState)
 }
 
 // Message is the tool-facing form of store.Message.
@@ -256,14 +263,32 @@ func (t *tools) connectionStatus(context.Context, *mcp.CallToolRequest, struct{}
 }
 
 type ListChatsIn struct {
-	Query string `json:"query,omitempty" jsonschema:"case-insensitive substring of the chat name or JID"`
-	Limit int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
+	Query    string `json:"query,omitempty" jsonschema:"case-insensitive substring of the chat name or JID"`
+	Archived string `json:"archived,omitempty" jsonschema:"exclude (default), include or only"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
 }
 
 type Chat struct {
 	JID           string `json:"jid"`
 	Name          string `json:"name,omitempty"`
 	LastMessageAt string `json:"last_message_at,omitempty" jsonschema:"RFC 3339"`
+	Archived      bool   `json:"archived,omitempty"`
+	Pinned        bool   `json:"pinned,omitempty"`
+	MutedUntil    string `json:"muted_until,omitempty" jsonschema:"RFC 3339, or forever"`
+}
+
+func toChat(c store.Chat) Chat {
+	out := Chat{JID: c.JID, Name: c.Name, Archived: c.Archived, Pinned: c.Pinned}
+	if c.LastMessageAt > 0 {
+		out.LastMessageAt = formatUnix(c.LastMessageAt)
+	}
+	switch {
+	case c.MutedUntil < 0:
+		out.MutedUntil = "forever"
+	case c.MutedUntil > 0:
+		out.MutedUntil = formatUnix(c.MutedUntil)
+	}
+	return out
 }
 
 type ListChatsOut struct {
@@ -271,16 +296,23 @@ type ListChatsOut struct {
 }
 
 func (t *tools) listChats(ctx context.Context, _ *mcp.CallToolRequest, in ListChatsIn) (*mcp.CallToolResult, ListChatsOut, error) {
-	chats, err := t.store.ListChats(ctx, in.Query, in.Limit)
+	var archived store.ArchiveFilter
+	switch in.Archived {
+	case "", "exclude":
+	case "include":
+		archived = store.IncludeArchived
+	case "only":
+		archived = store.OnlyArchived
+	default:
+		return nil, ListChatsOut{}, fmt.Errorf("archived: want exclude, include or only, not %q", in.Archived)
+	}
+	chats, err := t.store.ListChats(ctx, in.Query, archived, in.Limit)
 	if err != nil {
 		return nil, ListChatsOut{}, err
 	}
 	out := ListChatsOut{Chats: make([]Chat, len(chats))}
 	for i, c := range chats {
-		out.Chats[i] = Chat{JID: c.JID, Name: c.Name}
-		if c.LastMessageAt > 0 {
-			out.Chats[i].LastMessageAt = formatUnix(c.LastMessageAt)
-		}
+		out.Chats[i] = toChat(c)
 	}
 	return nil, out, nil
 }
@@ -1112,6 +1144,56 @@ func (t *tools) markRead(ctx context.Context, _ *mcp.CallToolRequest, in MarkRea
 		return nil, MarkReadOut{}, err
 	}
 	return nil, MarkReadOut{ChatJID: chat.String()}, nil
+}
+
+type SetChatStateIn struct {
+	ChatJID  string `json:"chat_jid" jsonschema:"the chat's JID"`
+	Archived *bool  `json:"archived,omitempty"`
+	Pinned   *bool  `json:"pinned,omitempty"`
+	Mute     string `json:"mute,omitempty" jsonschema:"off, forever, or a duration such as 8h or 168h"`
+}
+
+func (t *tools) setChatState(ctx context.Context, _ *mcp.CallToolRequest, in SetChatStateIn) (*mcp.CallToolResult, Chat, error) {
+	if in.ChatJID == "" {
+		return nil, Chat{}, errors.New("chat_jid is required")
+	}
+	f := store.ChatFlags{Archived: in.Archived, Pinned: in.Pinned}
+	switch in.Mute {
+	case "":
+	case "off":
+		f.MutedUntil = ptr(int64(0))
+	case "forever":
+		f.MutedUntil = ptr(int64(-1))
+	default:
+		d, err := time.ParseDuration(in.Mute)
+		if err != nil || d <= 0 {
+			return nil, Chat{}, fmt.Errorf("mute: want off, forever or a duration such as 8h, not %q", in.Mute)
+		}
+		f.MutedUntil = ptr(time.Now().Add(d).Unix())
+	}
+	if f.Archived == nil && f.Pinned == nil && f.MutedUntil == nil {
+		return nil, Chat{}, errors.New("set at least one of archived, pinned or mute")
+	}
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	if err != nil {
+		return nil, Chat{}, err
+	}
+	if err := t.wa.SetChatState(ctx, chat, f); err != nil {
+		return nil, Chat{}, err
+	}
+	if f.Archived != nil && *f.Archived {
+		f.Pinned = ptr(false) // WhatsApp unpins an archived chat
+	}
+	if err := t.store.SetChatFlags(ctx, chat.String(), f); err != nil {
+		return nil, Chat{}, err
+	}
+	chats, err := t.store.ChatsByJID(ctx, []string{chat.String()})
+	if err != nil {
+		return nil, Chat{}, err
+	}
+	c := chats[chat.String()]
+	c.JID = chat.String()
+	return nil, toChat(c), nil
 }
 
 // canonicalChat maps a chat JID given by a client to the archive's form, so

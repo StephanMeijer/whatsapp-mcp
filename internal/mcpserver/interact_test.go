@@ -100,6 +100,10 @@ func TestInteractErrorsSendNothing(t *testing.T) {
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "MINEGONE"}}, // yours, already deleted
 		{"delete_message", map[string]any{"chat_jid": alice, "message_id": "S1"}},       // other chat
 		{"delete_message", map[string]any{"chat_jid": alice}},
+		{"set_chat_state", map[string]any{"chat_jid": alice}},                 // nothing to set
+		{"set_chat_state", map[string]any{"chat_jid": alice, "mute": "soon"}}, // not a duration
+		{"set_chat_state", map[string]any{"chat_jid": alice, "mute": "-1h"}},  // not in the future
+		{"set_chat_state", map[string]any{"archived": true}},                  // no chat
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
 			t.Errorf("%s(%v): want tool error", c.tool, c.args)
@@ -122,6 +126,7 @@ func TestInteractRespectsAllowlist(t *testing.T) {
 		{"mark_read", map[string]any{"chat_jid": stranger}},
 		{"edit_message", map[string]any{"chat_jid": stranger, "message_id": "S2", "text": "x"}},
 		{"delete_message", map[string]any{"chat_jid": stranger, "message_id": "S2"}},
+		{"set_chat_state", map[string]any{"chat_jid": stranger, "archived": true}},
 	} {
 		if res := call(t, cs, c.tool, c.args, nil); !res.IsError {
 			t.Errorf("%s to a chat outside the allowlist: want tool error", c.tool)
