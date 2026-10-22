@@ -27,6 +27,11 @@ type WhatsApp interface {
 	CheckNumbers(ctx context.Context, phones []string) ([]wa.NumberCheck, error)
 	// GroupInfo returns a group's description, settings and members.
 	GroupInfo(ctx context.Context, group types.JID) (wa.Group, error)
+	// ContactInfo returns a person's profile: about text, business name, picture.
+	ContactInfo(ctx context.Context, jid types.JID) (wa.ContactInfo, error)
+	// ProfilePicture downloads a contact's or group's picture; wa.ErrPictureHidden
+	// or wa.ErrNoPicture when there is none to show.
+	ProfilePicture(ctx context.Context, jid types.JID, preview bool) (wa.Media, error)
 	// SendText sends a message, as a reply quoting quoted when it is set.
 	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.

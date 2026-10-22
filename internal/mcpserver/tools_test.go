@@ -52,6 +52,32 @@ type fakeWA struct {
 	groups     map[string]wa.Group
 	groupErr   error
 	groupCalls []string
+
+	// contacts are returned by ContactInfo, keyed by JID; picture by
+	// ProfilePicture. The call recorders note the JIDs asked about.
+	contacts     map[string]wa.ContactInfo
+	contactErr   error
+	contactCalls []string
+	picture      wa.Media
+	pictureErr   error
+	pictureCalls []string
+}
+
+func (f *fakeWA) ContactInfo(_ context.Context, jid types.JID) (wa.ContactInfo, error) {
+	f.contactCalls = append(f.contactCalls, jid.String())
+	if f.contactErr != nil {
+		return wa.ContactInfo{}, f.contactErr
+	}
+	c, ok := f.contacts[jid.String()]
+	if !ok {
+		return wa.ContactInfo{}, fmt.Errorf("WhatsApp has no info for %s", jid)
+	}
+	return c, nil
+}
+
+func (f *fakeWA) ProfilePicture(_ context.Context, jid types.JID, preview bool) (wa.Media, error) {
+	f.pictureCalls = append(f.pictureCalls, fmt.Sprintf("%s preview=%v", jid, preview))
+	return f.picture, f.pictureErr
 }
 
 func (f *fakeWA) GroupInfo(_ context.Context, group types.JID) (wa.Group, error) {
@@ -217,7 +243,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "delete_message", "edit_message", "fetch_older_messages", "get_media", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}
