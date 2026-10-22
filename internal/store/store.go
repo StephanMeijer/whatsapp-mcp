@@ -168,8 +168,9 @@ func (s *Store) LIDJIDs(ctx context.Context) ([]string, error) {
 }
 
 // MergeJIDs moves everything archived under each old JID to its new JID:
-// senders are rewritten, messages move to the new chat (dropping copies the
-// new chat already has), and the chat rows are merged, keeping the new chat's
+// senders and receipt participants are rewritten, messages and their
+// receipts move to the new chat (dropping copies the new chat already has),
+// and the chat rows are merged, keeping the new chat's
 // name when it has one and the later LastMessageAt. It returns how many old
 // JIDs had anything to move, so a second run returns 0.
 func (s *Store) MergeJIDs(ctx context.Context, renames map[string]string) (int, error) {
@@ -202,9 +203,18 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 	}
 	affected += res.RowsAffected
 
-	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID,
-		tx.Model(&Message{}).Select("message_id").Where("chat_jid = ?", newJID),
-	).Delete(&Message{})
+	// Receipts follow their messages, so they are handled around the message
+	// moves: those of dropped duplicates go first, the rest move with the chat.
+	copies := func() *gorm.DB {
+		return tx.Model(&Message{}).Select("message_id").Where("chat_jid = ?", newJID)
+	}
+	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Receipt{})
+	if res.Error != nil {
+		return false, res.Error
+	}
+	affected += res.RowsAffected
+
+	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Message{})
 	if res.Error != nil {
 		return false, res.Error
 	}
@@ -215,6 +225,18 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 		return false, res.Error
 	}
 	affected += res.RowsAffected
+
+	res = tx.Model(&Receipt{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)
+	if res.Error != nil {
+		return false, res.Error
+	}
+	affected += res.RowsAffected
+
+	n, err := mergeParticipant(tx, oldJID, newJID)
+	if err != nil {
+		return false, err
+	}
+	affected += n
 
 	var old Chat
 	res = tx.Where("jid = ?", oldJID).Limit(1).Find(&old)
@@ -240,6 +262,39 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 		affected++
 	}
 	return affected > 0, nil
+}
+
+// mergeParticipant renames oldJID to newJID as a receipt participant. When the
+// message already has a receipt from newJID, the two are combined, keeping
+// the later time in each column. It returns the number of rows renamed.
+func mergeParticipant(tx *gorm.DB, oldJID, newJID string) (int64, error) {
+	var rows []Receipt
+	if err := tx.Where("participant_jid = ?", oldJID).Find(&rows).Error; err != nil {
+		return 0, err
+	}
+	later := func(column string) string {
+		return fmt.Sprintf("CASE WHEN excluded.%[1]s > receipts.%[1]s THEN excluded.%[1]s ELSE receipts.%[1]s END", column)
+	}
+	for _, r := range rows {
+		moved := r
+		moved.ParticipantJID = newJID
+		err := tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "chat_jid"}, {Name: "message_id"}, {Name: "participant_jid"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"delivered_at": gorm.Expr(later("delivered_at")),
+				"read_at":      gorm.Expr(later("read_at")),
+				"played_at":    gorm.Expr(later("played_at")),
+			}),
+		}).Create(&moved).Error
+		if err != nil {
+			return 0, err
+		}
+	}
+	if len(rows) == 0 {
+		return 0, nil
+	}
+	res := tx.Where("participant_jid = ?", oldJID).Delete(&Receipt{})
+	return res.RowsAffected, res.Error
 }
 
 // ListChats returns chats ordered by most recent activity. A non-empty query
