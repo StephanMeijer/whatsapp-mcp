@@ -27,6 +27,10 @@ type Message struct {
 	MediaType string `gorm:"not null;default:''"`
 	// EditedAt is the Unix time of the last applied edit; 0 if never edited.
 	EditedAt int64 `gorm:"not null;default:0"`
+	// Status is how far one of the account's own messages got: sent,
+	// delivered, read or played, the furthest any recipient reached. It only
+	// moves forward (see RecordReceipt). Incoming messages stay at sent.
+	Status string `gorm:"not null;default:'sent'"`
 	// Deleted marks a message deleted for everyone. Its text is cleared and
 	// it is left out of every query that feeds the tools.
 	Deleted bool `gorm:"not null;default:false"`

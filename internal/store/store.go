@@ -53,7 +53,7 @@ func New(ctx context.Context, d *db.DB) (*Store, error) {
 	}
 
 	g := d.Gorm.WithContext(ctx)
-	if err := g.AutoMigrate(&Chat{}, &Message{}, &Call{}); err != nil {
+	if err := g.AutoMigrate(&Chat{}, &Message{}, &Call{}, &Receipt{}); err != nil {
 		return nil, fmt.Errorf("store: migrate: %w", err)
 	}
 	if err := s.setup(g); err != nil {
