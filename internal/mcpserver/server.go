@@ -41,6 +41,9 @@ type WhatsApp interface {
 	// EditMessage changes the text or caption of one of the account's own
 	// messages and returns it as edited.
 	EditMessage(ctx context.Context, chat types.JID, target store.Message, text string) (store.Message, error)
+	// SetChatState archives, pins or mutes a chat on WhatsApp, for each field
+	// that is set; recording it in the archive is the caller's job.
+	SetChatState(ctx context.Context, chat types.JID, f store.ChatFlags) error
 	// MarkChatRead marks a chat as read on all the account's devices.
 	MarkChatRead(ctx context.Context, chat types.JID) error
 	// Canonical maps a JID to the form the archive uses: the phone-number

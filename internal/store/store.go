@@ -253,6 +253,9 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 			target.Name = old.Name
 		}
 		target.LastMessageAt = max(target.LastMessageAt, old.LastMessageAt)
+		target.Archived = target.Archived || old.Archived
+		target.Pinned = target.Pinned || old.Pinned
+		target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
 		if err := tx.Save(&target).Error; err != nil {
 			return false, err
 		}
@@ -297,16 +300,22 @@ func mergeParticipant(tx *gorm.DB, oldJID, newJID string) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// ListChats returns chats ordered by most recent activity. A non-empty query
+// ListChats returns chats, pinned first, then by most recent activity. A non-empty query
 // filters on name or JID, case-insensitively.
-func (s *Store) ListChats(ctx context.Context, query string, limit int) ([]Chat, error) {
+func (s *Store) ListChats(ctx context.Context, query string, archived ArchiveFilter, limit int) ([]Chat, error) {
 	tx := s.db.WithContext(ctx).Model(&Chat{})
 	if query != "" {
 		pattern := "%" + escapeLike(strings.ToLower(query)) + "%"
 		tx = tx.Where(`LOWER(name) LIKE ? ESCAPE '\' OR LOWER(jid) LIKE ? ESCAPE '\'`, pattern, pattern)
 	}
+	switch archived {
+	case ExcludeArchived:
+		tx = tx.Where("archived = ?", false)
+	case OnlyArchived:
+		tx = tx.Where("archived = ?", true)
+	}
 	var chats []Chat
-	err := tx.Order("last_message_at DESC").Order("jid").Limit(clampLimit(limit)).Find(&chats).Error
+	err := tx.Order("pinned DESC").Order("last_message_at DESC").Order("jid").Limit(clampLimit(limit)).Find(&chats).Error
 	return chats, err
 }
 

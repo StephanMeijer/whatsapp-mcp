@@ -49,7 +49,7 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, react, edit_message, delete_message, mark_read and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, react, edit_message, delete_message, mark_read, set_chat_state and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
 # Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
@@ -171,7 +171,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | tool | what it does |
 |---|---|
 | `connection_status` | connected / paired / waiting for QR scan |
-| `list_chats` | chats by recent activity, optional name/JID filter |
+| `list_chats` | chats, pinned first, then by recent activity; optional name/JID filter; `archived` to include or list only archived chats |
 | `list_messages` | a chat's messages, newest first, paged with `before`; your own carry a `status` (sent, delivered, read, played) |
 | `search_messages` | full-text search over text and captions |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
@@ -192,6 +192,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `edit_message` | change the text or caption of one of your own messages, within 20 minutes of sending |
 | `delete_message` | delete one of your own messages for everyone (WhatsApp allows this only for a limited time) |
 | `mark_read` | mark a chat as read on all your devices |
+| `set_chat_state` | archive, pin or mute a chat (`mute`: off, forever or a duration), synced to your phone |
 
 ## Why a database
 

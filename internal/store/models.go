@@ -8,6 +8,11 @@ type Chat struct {
 	Name string `gorm:"not null;default:''"`
 	// LastMessageAt is a Unix timestamp in seconds, the resolution WhatsApp uses.
 	LastMessageAt int64 `gorm:"not null;default:0;index"`
+	// Archived, Pinned and MutedUntil mirror the phone's app state (see
+	// SetChatFlags). MutedUntil is Unix seconds; 0 is not muted, -1 forever.
+	Archived   bool  `gorm:"not null;default:false"`
+	Pinned     bool  `gorm:"not null;default:false"`
+	MutedUntil int64 `gorm:"not null;default:0"`
 }
 
 // Message is one archived message. Only messages with text or media are
