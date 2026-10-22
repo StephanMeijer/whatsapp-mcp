@@ -105,6 +105,12 @@ func registerTools(s *mcp.Server, t *tools) {
 			"enumeration and may ban the account.",
 		Annotations: readOnly,
 	}, t.checkNumber)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "group_info",
+		Description: "Show a group's description, settings and members with their names and admin roles. " +
+			"chat_jid must be a group JID (ending in @g.us), from list_chats.",
+		Annotations: readOnly,
+	}, t.groupInfo)
 
 	// Write tools: registered only when not read-only, and each must check
 	// its recipient with t.policy.
@@ -708,6 +714,31 @@ func (t *tools) checkNumber(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 		return nil, CheckNumberOut{}, err
 	}
 	return nil, CheckNumberOut{Numbers: checks}, nil
+}
+
+type GroupInfoIn struct {
+	ChatJID string `json:"chat_jid" jsonschema:"the group's JID, ending in @g.us"`
+}
+
+type GroupInfoOut struct {
+	Group wa.Group `json:"group"`
+}
+
+// groupInfo sends nothing, so it needs no policy.checkRecipient; the JID is
+// checked before WhatsApp is asked.
+func (t *tools) groupInfo(ctx context.Context, _ *mcp.CallToolRequest, in GroupInfoIn) (*mcp.CallToolResult, GroupInfoOut, error) {
+	if in.ChatJID == "" {
+		return nil, GroupInfoOut{}, errors.New("chat_jid is required")
+	}
+	jid, err := types.ParseJID(in.ChatJID)
+	if err != nil || jid.Server != types.GroupServer {
+		return nil, GroupInfoOut{}, fmt.Errorf("%q is not a group JID: want one ending in @g.us, from list_chats", in.ChatJID)
+	}
+	g, err := t.wa.GroupInfo(ctx, jid)
+	if err != nil {
+		return nil, GroupInfoOut{}, err
+	}
+	return nil, GroupInfoOut{Group: g}, nil
 }
 
 type SendMessageIn struct {
