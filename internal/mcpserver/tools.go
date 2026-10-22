@@ -69,6 +69,13 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.messageContext)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "message_receipts",
+		Description: "Who has received, read or played one of your messages, with times; in a group, per member. " +
+			"People who turned off read receipts only ever show as delivered. Receipts are only known for " +
+			"messages sent while this server was running.",
+		Annotations: readOnly,
+	}, t.messageReceipts)
+	mcp.AddTool(s, &mcp.Tool{
 		Name: "fetch_older_messages",
 		Description: "Ask the phone for messages older than the oldest one archived in a chat, and archive them. " +
 			"Call it again to page further back. Needs the phone to be online. status is \"fetched\" (with the " +
@@ -186,6 +193,7 @@ type Message struct {
 	Text       string `json:"text,omitempty"`
 	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document or sticker; empty for text"`
 	EditedAt   string `json:"edited_at,omitempty" jsonschema:"RFC 3339; set if the message was edited"`
+	Status     string `json:"status,omitempty" jsonschema:"your own messages only: sent, delivered, read or played, the furthest any recipient got; see message_receipts"`
 }
 
 // toMessages converts archive rows to tool output, naming senders with one
@@ -206,6 +214,9 @@ func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message 
 		}
 		if m.EditedAt > 0 {
 			out[i].EditedAt = formatUnix(m.EditedAt)
+		}
+		if m.FromMe {
+			out[i].Status = m.Status
 		}
 	}
 	return out
@@ -512,6 +523,64 @@ func (t *tools) fetchOlderMessages(ctx context.Context, _ *mcp.CallToolRequest, 
 		Fetched:         res.Fetched,
 		OldestTimestamp: formatUnix(res.Oldest.Unix()),
 	}, nil
+}
+
+type MessageReceiptsIn struct {
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
+	MessageID string `json:"message_id" jsonschema:"the id of a message you sent"`
+}
+
+type ReceiptOut struct {
+	JID         string `json:"jid"`
+	Name        string `json:"name,omitempty"`
+	DeliveredAt string `json:"delivered_at,omitempty" jsonschema:"RFC 3339"`
+	ReadAt      string `json:"read_at,omitempty" jsonschema:"RFC 3339"`
+	PlayedAt    string `json:"played_at,omitempty" jsonschema:"RFC 3339"`
+}
+
+type MessageReceiptsOut struct {
+	Status   string       `json:"status" jsonschema:"sent, delivered, read or played: the furthest any recipient got"`
+	Receipts []ReceiptOut `json:"receipts" jsonschema:"one per recipient that reported anything"`
+}
+
+func (t *tools) messageReceipts(ctx context.Context, _ *mcp.CallToolRequest, in MessageReceiptsIn) (*mcp.CallToolResult, MessageReceiptsOut, error) {
+	if in.ChatJID == "" || in.MessageID == "" {
+		return nil, MessageReceiptsOut{}, errors.New("chat_jid and message_id are required")
+	}
+	chat := t.canonicalChat(ctx, in.ChatJID)
+	m, err := t.store.MessageByID(ctx, chat, in.MessageID)
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, MessageReceiptsOut{}, fmt.Errorf("message %s not found in chat %s", in.MessageID, chat)
+	}
+	if err != nil {
+		return nil, MessageReceiptsOut{}, err
+	}
+	if !m.FromMe {
+		return nil, MessageReceiptsOut{}, errors.New("only messages you sent have receipts")
+	}
+	rs, err := t.store.Receipts(ctx, chat, in.MessageID)
+	if err != nil {
+		return nil, MessageReceiptsOut{}, err
+	}
+	from := make([]store.Message, len(rs))
+	for i, r := range rs {
+		from[i].SenderJID = r.ParticipantJID
+	}
+	names := t.senderNames(ctx, from)
+	out := MessageReceiptsOut{Status: m.Status, Receipts: make([]ReceiptOut, len(rs))}
+	for i, r := range rs {
+		out.Receipts[i] = ReceiptOut{JID: r.ParticipantJID, Name: names[r.ParticipantJID]}
+		if r.DeliveredAt > 0 {
+			out.Receipts[i].DeliveredAt = formatUnix(r.DeliveredAt)
+		}
+		if r.ReadAt > 0 {
+			out.Receipts[i].ReadAt = formatUnix(r.ReadAt)
+		}
+		if r.PlayedAt > 0 {
+			out.Receipts[i].PlayedAt = formatUnix(r.PlayedAt)
+		}
+	}
+	return nil, out, nil
 }
 
 type GetMediaIn struct {

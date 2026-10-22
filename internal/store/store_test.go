@@ -34,7 +34,7 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 		}
 		t.Cleanup(func() { _ = d.Close() })
 		// Start from empty tables so subtests don't see each other's rows.
-		if err := d.Gorm.Exec("DROP TABLE IF EXISTS messages, chats, calls").Error; err != nil {
+		if err := d.Gorm.Exec("DROP TABLE IF EXISTS messages, chats, calls, receipts").Error; err != nil {
 			t.Fatal(err)
 		}
 		s, err := store.New(context.Background(), d)
@@ -205,6 +205,59 @@ func TestMergeJIDs(t *testing.T) {
 		must(t, err)
 		if n != 0 {
 			t.Errorf("second merge = %d, want 0 (idempotent)", n)
+		}
+	})
+}
+
+func TestMergeJIDsMovesReceipts(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const (
+			me     = "0@s.whatsapp.net"
+			lidA   = "111@lid"
+			pnA    = "31600000001@s.whatsapp.net"
+			lidP   = "444@lid"
+			pnP    = "31600000004@s.whatsapp.net"
+			group  = "120363000000000000@g.us"
+			sentAt = 10
+		)
+		own := func(chat, id string) store.Message {
+			return store.Message{ChatJID: chat, MessageID: id, SenderJID: me, Timestamp: sentAt, FromMe: true, Text: id}
+		}
+		must(t, s.Save(ctx, nil, []store.Message{
+			own(pnA, "dup"), own(lidA, "dup"), own(lidA, "moved"), own(group, "g1"),
+		}))
+		rec := func(chat, id, who, st string, sec int64) {
+			t.Helper()
+			_, err := s.RecordReceipt(ctx, chat, id, who, st, time.Unix(sec, 0))
+			must(t, err)
+		}
+		rec(lidA, "dup", lidA, store.StatusRead, 50)
+		rec(lidA, "moved", lidA, store.StatusDelivered, 20)
+		rec(lidA, "moved", lidA, store.StatusRead, 30)
+		// A member seen under both names: the times are combined.
+		rec(group, "g1", lidP, store.StatusDelivered, 40)
+		rec(group, "g1", lidP, store.StatusRead, 90)
+		rec(group, "g1", pnP, store.StatusDelivered, 60)
+
+		_, err := s.MergeJIDs(ctx, map[string]string{lidA: pnA, lidP: pnP})
+		must(t, err)
+
+		rs, err := s.Receipts(ctx, pnA, "moved")
+		must(t, err)
+		if len(rs) != 1 || rs[0].ChatJID != pnA || rs[0].ParticipantJID != pnA || rs[0].DeliveredAt != 20 || rs[0].ReadAt != 30 {
+			t.Errorf("moved receipts = %+v, want one under %s", rs, pnA)
+		}
+		if rs, _ := s.Receipts(ctx, lidA, "moved"); len(rs) != 0 {
+			t.Errorf("receipts left under the old chat: %+v", rs)
+		}
+		if rs, _ := s.Receipts(ctx, pnA, "dup"); len(rs) != 0 {
+			t.Errorf("receipt of a dropped duplicate survived: %+v", rs)
+		}
+		rs, err = s.Receipts(ctx, group, "g1")
+		must(t, err)
+		if len(rs) != 1 || rs[0].ParticipantJID != pnP || rs[0].DeliveredAt != 60 || rs[0].ReadAt != 90 {
+			t.Errorf("group receipts = %+v, want one for %s with delivered 60, read 90", rs, pnP)
 		}
 	})
 }
