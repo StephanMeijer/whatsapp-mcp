@@ -25,6 +25,8 @@ type WhatsApp interface {
 	// CheckNumbers reports which of the phone numbers ("+" and digits, from
 	// wa.NormalizePhone) are on WhatsApp, one entry per number in order.
 	CheckNumbers(ctx context.Context, phones []string) ([]wa.NumberCheck, error)
+	// GroupInfo returns a group's description, settings and members.
+	GroupInfo(ctx context.Context, group types.JID) (wa.Group, error)
 	// SendText sends a message, as a reply quoting quoted when it is set.
 	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.

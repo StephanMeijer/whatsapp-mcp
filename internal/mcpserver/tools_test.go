@@ -5,6 +5,7 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"slices"
@@ -45,6 +46,24 @@ type fakeWA struct {
 	registered map[string]string
 	checkErr   error
 	checkCalls [][]string
+
+	// groups are returned by GroupInfo, keyed by JID; groupCalls records the
+	// JIDs asked about.
+	groups     map[string]wa.Group
+	groupErr   error
+	groupCalls []string
+}
+
+func (f *fakeWA) GroupInfo(_ context.Context, group types.JID) (wa.Group, error) {
+	f.groupCalls = append(f.groupCalls, group.String())
+	if f.groupErr != nil {
+		return wa.Group{}, f.groupErr
+	}
+	g, ok := f.groups[group.String()]
+	if !ok {
+		return wa.Group{}, errors.New("group info: that group does not exist")
+	}
+	return g, nil
 }
 
 func (f *fakeWA) CheckNumbers(_ context.Context, phones []string) ([]wa.NumberCheck, error) {
@@ -198,7 +217,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "delete_message", "edit_message", "fetch_older_messages", "get_media", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
+	want := []string{"check_number", "connection_status", "delete_message", "edit_message", "fetch_older_messages", "get_media", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_media", "send_message"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}
