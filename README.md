@@ -52,7 +52,8 @@ By default the client may message anyone. Two options limit that:
 # Reading and searching only: send_message, send_media, react, edit_message, delete_message, mark_read and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
-# Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking up numbers with check_number
+# Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
+# with check_number, contact_info and get_profile_picture
 # only for these chats, and always your own.
 whatsapp-mcp -allow-recipients '+31 6 1234 5678,120363000000000000@g.us'
 ```
@@ -180,6 +181,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `search_contacts` | address book lookup |
 | `check_number` | find out whether phone numbers are on WhatsApp, and get their JIDs (up to 10 per call; not for bulk lookups; with `-allow-recipients`, only allowed numbers can be looked up) |
 | `group_info` | a group's description, settings and members with names and admin roles |
+| `contact_info` | a contact's about text, business name and whether they have a profile picture |
+| `get_profile_picture` | a contact's or group's profile picture as an image (`preview` for the thumbnail) |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
 | `send_media` | send a photo, video, audio file or document (base64, or a file in `-media-dir`; up to 16 MB) |
 | `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected or missed |
