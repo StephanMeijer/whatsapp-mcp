@@ -156,10 +156,10 @@ func (c *Client) nameAfterMembers(ctx context.Context, groups []*types.GroupInfo
 		return
 	}
 	self := map[types.JID]bool{}
-	if id := c.cli.Store.ID; id != nil {
+	if id := c.device.ID; id != nil {
 		self[id.ToNonAD()] = true
 	}
-	if lid := c.cli.Store.GetLID(); !lid.IsEmpty() {
+	if lid := c.device.GetLID(); !lid.IsEmpty() {
 		self[lid.ToNonAD()] = true
 	}
 	nameOf := func(p types.GroupParticipant) (string, bool) {
