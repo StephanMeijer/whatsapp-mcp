@@ -134,11 +134,11 @@ func TestOnHistorySyncAppliesChangesAfterSave(t *testing.T) {
 	}
 }
 
-// Documents a bug: ParseWebMessage turns a plain MESSAGE_EDIT into the new
+// Documents #62: ParseWebMessage turns a plain MESSAGE_EDIT into the new
 // content under the original's ID, so it never reaches toChange, and the
 // archive keeps the old text.
 func TestOnHistorySyncAppliesPlainEdits(t *testing.T) {
-	t.Skip("history-sync MESSAGE_EDIT edits are lost; see follow-up issue")
+	t.Skip("history-sync MESSAGE_EDIT edits are lost: #62")
 	c, _, _, _ := newTestClient(t)
 	edit := &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
 		Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
