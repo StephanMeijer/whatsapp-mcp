@@ -3,3 +3,5 @@
 *.db
 *.db-shm
 *.db-wal
+# Secrets for compose.yaml.
+/.env

@@ -1,0 +1,48 @@
+# whatsapp-mcp with Postgres instead of SQLite. The WhatsApp session and the
+# message archive both live in Postgres, on the pgdata volume.
+#
+# The secrets come from a .env file next to this one, which Compose reads on
+# its own; see "Run with Docker Compose" in the README for how to create it.
+# Nothing secret is written here.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: whatsapp
+      POSTGRES_DB: whatsapp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "whatsapp", "-d", "whatsapp"]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      start_interval: 1s
+      retries: 5
+    # No ports: only whatsapp-mcp needs to reach it, over the Compose network.
+
+  whatsapp-mcp:
+    # Built from this checkout. The health check below needs a release newer
+    # than 0.4.0; until then, don't swap this for the published image.
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      WHATSAPP_MCP_TOKEN: ${WHATSAPP_MCP_TOKEN:?set WHATSAPP_MCP_TOKEN in .env}
+      # The password goes into a URL, so it must not need escaping: use hex.
+      DATABASE_URL: postgres://whatsapp:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/whatsapp?sslmode=disable
+    ports:
+      # Reachable from this machine only.
+      - "127.0.0.1:8080:8080"
+    # The health check (whatsapp-mcp healthcheck, on /healthz) comes from the image.
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  pgdata:

@@ -19,6 +19,10 @@ import (
 // and the account, so a guessable one is refused rather than warned about.
 const MinTokenLength = 32
 
+// DefaultAddr is the listen address when neither -addr nor
+// WHATSAPP_MCP_ADDR is set.
+const DefaultAddr = "127.0.0.1:8080"
+
 // Config is the runtime configuration of the server.
 type Config struct {
 	// Addr is the address the HTTP server listens on.
@@ -70,7 +74,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
 	fs.StringVar(&cfg.PublicURL, "public-url", getenv("WHATSAPP_MCP_PUBLIC_URL"), "https origin clients reach this server at through a reverse proxy, e.g. https://wa.example.com (env WHATSAPP_MCP_PUBLIC_URL)")
-	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", "127.0.0.1:8080"), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
+	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", DefaultAddr), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
 	fs.StringVar(&cfg.DatabaseURL, "database-url", envOr("DATABASE_URL", "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
 	fs.StringVar(&cfg.LogLevel, "log-level", envOr("WHATSAPP_MCP_LOG_LEVEL", "info"), "debug, info, warn or error (env WHATSAPP_MCP_LOG_LEVEL)")
 	if err := fs.Parse(args); err != nil {

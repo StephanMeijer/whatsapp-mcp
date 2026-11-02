@@ -47,5 +47,8 @@ ENV WHATSAPP_MCP_ADDR=0.0.0.0:8080 \
 
 USER nonroot
 EXPOSE 8080
+# There is no shell or curl here, so the binary probes /healthz itself.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --start-interval=2s --retries=3 \
+    CMD ["/whatsapp-mcp", "healthcheck"]
 VOLUME ["/data"]
 ENTRYPOINT ["/whatsapp-mcp"]
