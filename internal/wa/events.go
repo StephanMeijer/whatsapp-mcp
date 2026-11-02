@@ -185,6 +185,8 @@ func messageContent(m *waE2E.Message) (text, mediaType string) {
 		return firstNonEmpty(d.GetCaption(), d.GetTitle(), d.GetFileName()), "document"
 	case m.GetStickerMessage() != nil:
 		return "", "sticker"
+	case pollCreation(m) != nil:
+		return pollText(pollCreation(m)), "poll"
 	}
 	return "", ""
 }

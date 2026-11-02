@@ -172,8 +172,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 |---|---|
 | `connection_status` | connected / paired / waiting for QR scan |
 | `list_chats` | chats, pinned first, then by recent activity; optional name/JID filter; `archived` to include or list only archived chats |
-| `list_messages` | a chat's messages, newest first, paged with `before`; your own carry a `status` (sent, delivered, read, played) |
-| `search_messages` | full-text search over text and captions |
+| `list_messages` | a chat's messages, newest first, paged with `before`; your own carry a `status` (sent, delivered, read, played); a poll shows its question and options |
+| `search_messages` | full-text search over text, captions and polls |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `message_receipts` | who has received, read or played one of your messages, per recipient, with times |

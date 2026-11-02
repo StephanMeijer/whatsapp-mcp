@@ -89,7 +89,7 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_media",
 		Description: "Download the photo, sticker, video, voice note or document attached to a message " +
-			"(a message whose media_type is set). Images are returned as images you can look at. " +
+			"(a message whose media_type is set, other than poll). Images are returned as images you can look at. " +
 			"Files up to 16 MB; media WhatsApp no longer stores cannot be retrieved.",
 		Annotations: readOnly,
 	}, t.getMedia)
@@ -198,7 +198,7 @@ type Message struct {
 	Timestamp  string `json:"timestamp" jsonschema:"RFC 3339"`
 	FromMe     bool   `json:"from_me"`
 	Text       string `json:"text,omitempty"`
-	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document or sticker; empty for text"`
+	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document, sticker or poll; empty for text. A poll's text is its question followed by one '- option' line per option"`
 	EditedAt   string `json:"edited_at,omitempty" jsonschema:"RFC 3339; set if the message was edited"`
 	Status     string `json:"status,omitempty" jsonschema:"your own messages only: sent, delivered, read or played, the furthest any recipient got; see message_receipts"`
 }
@@ -617,7 +617,7 @@ func (t *tools) messageReceipts(ctx context.Context, _ *mcp.CallToolRequest, in 
 
 type GetMediaIn struct {
 	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
-	MessageID string `json:"message_id" jsonschema:"id of a message with media_type set"`
+	MessageID string `json:"message_id" jsonschema:"id of a message with media_type set (not a poll)"`
 }
 
 // getMedia returns the file as MCP content rather than structured output,

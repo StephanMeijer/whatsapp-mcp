@@ -24,7 +24,7 @@ var ErrNoMediaRef = errors.New("this media was archived before downloads were su
 
 // Media is a downloaded, decrypted media file.
 type Media struct {
-	Kind     string // image, video, audio, document or sticker
+	Kind     string // image, video, audio, document or sticker (never poll)
 	MIMEType string
 	FileName string // documents only
 	Data     []byte
@@ -41,6 +41,9 @@ type downloadable interface {
 func (c *Client) Media(ctx context.Context, m store.Message) (Media, error) {
 	if m.MediaType == "" {
 		return Media{}, errors.New("this message has no media")
+	}
+	if m.MediaType == "poll" {
+		return Media{}, errors.New("this message is a poll, which has no file; its question and options are the message text")
 	}
 	if len(m.MediaRef) == 0 {
 		return Media{}, ErrNoMediaRef
@@ -76,7 +79,9 @@ func mediaGone(err error) bool {
 // extended text message (a reply or a link preview) is kept whole only for
 // the account's own messages (fromMe), so that an edit can rebuild it with
 // its quote; for others it would only hold text and quotes that nothing
-// reads and that an edit would leave behind. Plain text has no ref.
+// reads and that an edit would leave behind. A poll's ref is the poll itself,
+// for anyone's poll, as votes name options only by a hash of their text.
+// Plain text has no ref.
 func mediaRef(m *waE2E.Message, fromMe bool) []byte {
 	var sub proto.Message
 	switch {
@@ -97,6 +102,8 @@ func mediaRef(m *waE2E.Message, fromMe bool) []byte {
 		sub = m.GetDocumentMessage()
 	case m.GetStickerMessage() != nil:
 		sub = m.GetStickerMessage()
+	case pollCreation(m) != nil:
+		sub = pollCreation(m)
 	default:
 		return nil
 	}
