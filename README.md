@@ -10,8 +10,9 @@ lets an MCP client list, search and send them.
 It is a single Go binary: no separate bridge process, no CGO.
 
 > **This gives whoever holds the token full read and send access to your WhatsApp.** The server
-> binds to localhost and refuses to start without a token. Keep it that way unless you put it
-> behind TLS and know who can reach it. Using unofficial clients may violate WhatsApp's terms.
+> binds to localhost and refuses to start without a token, or with one shorter than 32 characters.
+> Keep it that way unless you put it behind TLS and know who can reach it. Using unofficial clients
+> may violate WhatsApp's terms.
 
 ## Run
 
@@ -34,7 +35,7 @@ session without a new QR code.
 
 | flag | env | default |
 |---|---|---|
-| | `WHATSAPP_MCP_TOKEN` | *(required)* bearer token for `/mcp` and `/pair` |
+| | `WHATSAPP_MCP_TOKEN` | *(required, at least 32 characters)* bearer token for `/mcp` and `/pair` |
 | `-addr` | `WHATSAPP_MCP_ADDR` | `127.0.0.1:8080` |
 | `-database-url` | `DATABASE_URL` | `sqlite://data/whatsapp.db` |
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
