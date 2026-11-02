@@ -134,7 +134,7 @@ func TestHandlerAcceptsLargeRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h := Handler(srv)
+	h := Handler(srv, HandlerOptions{})
 	body := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},` +
 		`"clientInfo":{"name":"t","version":"0"},"padding":"` + strings.Repeat("x", 6<<20) + `"}}`
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))

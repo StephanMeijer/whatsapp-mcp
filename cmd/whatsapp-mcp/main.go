@@ -11,11 +11,13 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/skip2/go-qrcode"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/config"
@@ -69,11 +71,6 @@ func run() error {
 	}
 	defer client.Stop()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
-	mux.Handle("GET /pair", httpx.RequireBearer(cfg.AuthToken, pairHandler(client)))
 	mcpSrv, err := mcpserver.New(version, client, st, mcpserver.Options{
 		ReadOnly:        cfg.ReadOnly,
 		AllowRecipients: cfg.AllowRecipients,
@@ -83,7 +80,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	mux.Handle("/mcp", httpx.RequireBearer(cfg.AuthToken, mcpserver.Handler(mcpSrv)))
+	handler, err := routes(cfg.PublicURL, cfg.AuthToken, mcpSrv, pairHandler(client))
+	if err != nil {
+		return err
+	}
+	mcpURL := "http://" + cfg.Addr + "/mcp"
+	if cfg.PublicURL != "" {
+		mcpURL = cfg.PublicURL + "/mcp"
+	}
 
 	// Cancelled when shutdown starts, so long-lived MCP streams end instead of
 	// holding Shutdown open until its deadline.
@@ -91,13 +95,13 @@ func run() error {
 	defer cancelRequests()
 	srv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 		BaseContext:       func(net.Listener) context.Context { return baseCtx },
 	}
 	errc := make(chan error, 1)
 	go func() {
-		log.Info("serving MCP", "url", "http://"+cfg.Addr+"/mcp", "version", version,
+		log.Info("serving MCP", "url", mcpURL, "listen", cfg.Addr, "version", version,
 			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients))
 		errc <- srv.ListenAndServe()
 	}()
@@ -120,6 +124,30 @@ func run() error {
 
 // pairHandler serves the pending pairing QR code as a PNG, for hosts where
 // the terminal output isn't visible.
+// routes serves health, the pairing code and MCP. With a public URL the
+// server sits behind a reverse proxy, which passes on the public Host to a
+// loopback listener; the SDK's DNS-rebinding check would refuse that, so
+// AllowHosts takes over the check, for every endpoint, accepting the public
+// host and loopback.
+func routes(publicURL, token string, mcpSrv *mcp.Server, pair http.Handler) (http.Handler, error) {
+	behindProxy := publicURL != ""
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	mux.Handle("GET /pair", httpx.RequireBearer(token, pair))
+	mux.Handle("/mcp", httpx.RequireBearer(token,
+		mcpserver.Handler(mcpSrv, mcpserver.HandlerOptions{HostCheckedByCaller: behindProxy})))
+	if !behindProxy {
+		return mux, nil
+	}
+	public, err := url.Parse(publicURL)
+	if err != nil {
+		return nil, fmt.Errorf("public URL: %w", err)
+	}
+	return httpx.AllowHosts([]string{public.Hostname()}, mux), nil
+}
+
 func pairHandler(client *wa.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		code := client.QRCode()

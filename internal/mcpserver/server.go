@@ -102,8 +102,20 @@ func New(version string, whatsapp WhatsApp, st *store.Store, opts Options) (*mcp
 // of 4 MiB would cap files at about 3 MB.
 var maxRequestBody = int64(base64.StdEncoding.EncodedLen(wa.MaxMediaBytes)) + 1<<20
 
+// HandlerOptions configures Handler.
+type HandlerOptions struct {
+	// HostCheckedByCaller turns off the SDK's DNS-rebinding check, which
+	// refuses any non-loopback Host on a loopback listener and so also a
+	// reverse proxy that keeps the public Host. Set it only when the caller
+	// checks Host itself (see httpx.AllowHosts).
+	HostCheckedByCaller bool
+}
+
 // Handler serves s over streamable HTTP.
-func Handler(s *mcp.Server) http.Handler {
+func Handler(s *mcp.Server, opts HandlerOptions) http.Handler {
 	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s },
-		&mcp.StreamableHTTPOptions{MaxRequestBodyBytes: maxRequestBody})
+		&mcp.StreamableHTTPOptions{
+			MaxRequestBodyBytes:        maxRequestBody,
+			DisableLocalhostProtection: opts.HostCheckedByCaller,
+		})
 }
