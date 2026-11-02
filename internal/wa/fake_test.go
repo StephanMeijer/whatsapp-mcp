@@ -20,6 +20,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/storetest"
 )
 
@@ -404,4 +405,45 @@ func TestNewWiresDeviceStore(t *testing.T) {
 	if got := c.Status(); got != (Status{}) {
 		t.Errorf("unpaired Status = %+v, want all zero", got)
 	}
+}
+
+// archive saves messages straight into the test client's archive.
+func archive(t *testing.T, c *Client, msgs ...store.Message) {
+	t.Helper()
+	if err := c.store.Save(context.Background(), nil, msgs); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// archived returns one message from the test client's archive.
+func archived(t *testing.T, c *Client, chat types.JID, id string) store.Message {
+	t.Helper()
+	m, err := c.store.MessageByID(context.Background(), chat.String(), id)
+	if err != nil {
+		t.Fatalf("message %s in %s: %v", id, chat, err)
+	}
+	return m
+}
+
+// incoming is a text message from sender in chat.
+func incoming(chat, sender types.JID, id string, ts int64, text string) store.Message {
+	return store.Message{ChatJID: chat.String(), MessageID: id, SenderJID: sender.String(), Timestamp: ts, Text: text}
+}
+
+// chatNames returns the archived names of the given chats; absent chats are missing.
+func chatNames(t *testing.T, c *Client, jids ...types.JID) map[string]string {
+	t.Helper()
+	keys := make([]string, len(jids))
+	for i, j := range jids {
+		keys[i] = j.String()
+	}
+	chats, err := c.store.ChatsByJID(context.Background(), keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := map[string]string{}
+	for k, ch := range chats {
+		out[k] = ch.Name
+	}
+	return out
 }
