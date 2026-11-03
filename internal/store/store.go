@@ -255,7 +255,11 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 		target.LastMessageAt = max(target.LastMessageAt, old.LastMessageAt)
 		target.Archived = target.Archived || old.Archived
 		target.Pinned = target.Pinned || old.Pinned
-		target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
+		if target.MutedUntil < 0 || old.MutedUntil < 0 {
+			target.MutedUntil = -1 // forever beats any date
+		} else {
+			target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
+		}
 		if err := tx.Save(&target).Error; err != nil {
 			return false, err
 		}
