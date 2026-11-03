@@ -49,9 +49,9 @@ func (t *tools) messageReceipts(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if err != nil {
 		return nil, MessageReceiptsOut{}, err
 	}
-	from := make([]store.Message, len(rs))
+	from := make([]string, len(rs))
 	for i, r := range rs {
-		from[i].SenderJID = r.ParticipantJID
+		from[i] = r.ParticipantJID
 	}
 	names := t.senderNames(ctx, from)
 	out := MessageReceiptsOut{Status: m.Status, Receipts: make([]ReceiptOut, len(rs))}

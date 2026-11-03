@@ -59,10 +59,10 @@ func (t *tools) listCalls(ctx context.Context, _ *mcp.CallToolRequest, in ListCa
 
 // toCalls names callers with one contacts lookup and groups from the archive.
 func (t *tools) toCalls(ctx context.Context, calls []store.Call) []CallOut {
-	callers := make([]store.Message, len(calls))
+	callers := make([]string, len(calls))
 	var groups []string
 	for i, c := range calls {
-		callers[i] = store.Message{SenderJID: c.CallerJID}
+		callers[i] = c.CallerJID
 		if c.Group {
 			groups = append(groups, c.ChatJID)
 		}

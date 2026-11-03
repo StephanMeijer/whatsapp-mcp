@@ -198,7 +198,11 @@ type Message struct {
 // toMessages converts archive rows to tool output, naming senders with one
 // contacts lookup for the whole batch. A failed lookup only loses the names.
 func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message {
-	names := t.senderNames(ctx, msgs)
+	senders := make([]string, len(msgs))
+	for i, m := range msgs {
+		senders[i] = m.SenderJID
+	}
+	names := t.senderNames(ctx, senders)
 	out := make([]Message, len(msgs))
 	for i, m := range msgs {
 		out[i] = Message{
@@ -221,15 +225,17 @@ func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message 
 	return out
 }
 
-func (t *tools) senderNames(ctx context.Context, msgs []store.Message) map[string]string {
+// senderNames looks up contact names for sender JIDs in one call; a failed
+// lookup returns nil, so callers simply go without names.
+func (t *tools) senderNames(ctx context.Context, senders []string) map[string]string {
 	seen := map[string]bool{}
 	var jids []types.JID
-	for _, m := range msgs {
-		if seen[m.SenderJID] {
+	for _, s := range senders {
+		if seen[s] {
 			continue
 		}
-		seen[m.SenderJID] = true
-		if jid, err := types.ParseJID(m.SenderJID); err == nil {
+		seen[s] = true
+		if jid, err := types.ParseJID(s); err == nil {
 			jids = append(jids, jid)
 		}
 	}
