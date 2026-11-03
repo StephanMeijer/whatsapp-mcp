@@ -321,6 +321,24 @@ func TestListMessagesPaging(t *testing.T) {
 	})
 }
 
+// A poll is archived with its question and options as text, so a search for
+// an option finds it.
+func TestSearchFindsPollOptions(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		poll := msg("1@g.us", "poll", 100, "Where shall we eat?\n- Pizza\n- Sushi")
+		poll.MediaType = "poll"
+		must(t, s.Save(ctx, nil, []store.Message{poll, msg("1@g.us", "other", 200, "pasta")}))
+		for _, q := range []string{"sushi", "eat"} {
+			got, err := s.SearchMessages(ctx, q, "", 0)
+			must(t, err)
+			if len(got) != 1 || got[0].MessageID != "poll" || got[0].MediaType != "poll" {
+				t.Errorf("SearchMessages(%q) = %+v, want the poll", q, got)
+			}
+		}
+	})
+}
+
 func TestSearchMessages(t *testing.T) {
 	eachDialect(t, func(t *testing.T, s *store.Store) {
 		ctx := context.Background()

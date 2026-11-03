@@ -28,7 +28,9 @@ type Message struct {
 	Timestamp int64  `gorm:"not null;index:idx_messages_chat_ts,priority:2;index:idx_messages_ts"`
 	FromMe    bool   `gorm:"not null"`
 	Text      string `gorm:"not null;default:''"`
-	// MediaType is empty for plain text, otherwise image, video, audio, document or sticker.
+	// MediaType is empty for plain text, otherwise image, video, audio,
+	// document, sticker or poll. A poll's Text is its question followed by
+	// one "- option" line per option.
 	MediaType string `gorm:"not null;default:''"`
 	// EditedAt is the Unix time of the last applied edit; 0 if never edited.
 	EditedAt int64 `gorm:"not null;default:0"`
@@ -43,6 +45,8 @@ type Message struct {
 	// holding what is needed to download and decrypt the file; nil for plain
 	// text and for media archived before downloads were supported. For a
 	// reply or link preview the account sent it is the marshalled
-	// ExtendedTextMessage, which keeps the quote for edits.
+	// ExtendedTextMessage, which keeps the quote for edits. For a poll it is
+	// the marshalled PollCreationMessage, which holds the option names that
+	// votes refer to by hash.
 	MediaRef []byte
 }
