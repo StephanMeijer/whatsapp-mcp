@@ -42,6 +42,7 @@ session without a new QR code.
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
 | `-media-dir` | `WHATSAPP_MCP_MEDIA_DIR` | *(empty: off)* the only folder `send_media` may read files from |
 | `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
+| `-public-url` | `WHATSAPP_MCP_PUBLIC_URL` | *(empty)* the https address clients reach the server at through a reverse proxy, see [Remote access over TLS](#remote-access-over-tls) |
 
 `DATABASE_URL` is `sqlite://<path>` or `postgres://user:pass@host/db`.
 
@@ -157,6 +158,68 @@ Things to know:
   fallback. Check what is applied with `systemd-analyze --user security whatsapp-mcp`.
 - A user manager cannot wait for the network. If the network is not up at boot, the server exits
   and the unit retries every 10 seconds.
+
+## Remote access over TLS
+
+To use the server from another machine, keep it on `127.0.0.1` and put a TLS reverse proxy in front
+of it. Tell the server its public address with `-public-url`:
+
+```sh
+WHATSAPP_MCP_PUBLIC_URL=https://wa.example.com whatsapp-mcp
+```
+
+Without it, the server refuses `/mcp` requests that arrive on a loopback address with a `Host` that
+is not a loopback address, as protection against DNS rebinding, so a proxy on the same machine that
+passes on the public host gets `403 Forbidden`. That check covers only `/mcp`, and only connections
+to a loopback address: a proxy in another container that reaches the Docker image on `0.0.0.0:8080`
+gets through with any `Host`. With `-public-url`, the server checks the `Host` of every request on
+every endpoint: it accepts the public host and loopback addresses, and refuses every other host.
+The URL must be `https` (plain `http` only for a loopback host) and must not have a path: give the
+server its own (sub)domain. The bearer token is still required for every request.
+
+Proxy only `/mcp`. `/pair` shows the code that links a phone to the server and `/healthz` is for
+local checks; neither belongs on the internet.
+
+[Caddy](https://caddyserver.com) gets a certificate on its own and passes on the public host:
+
+```
+wa.example.com {
+	handle /mcp {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		respond 404
+	}
+}
+```
+
+nginx, in a `server` block that already has TLS set up:
+
+```nginx
+location = /mcp {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;   # the public host; the server checks it
+    proxy_buffering off;           # MCP streams responses as server-sent events
+    proxy_read_timeout 1h;
+    client_max_body_size 24m;      # send_media accepts files up to 16 MB, base64-encoded
+}
+```
+
+Clients then connect to `https://wa.example.com/mcp` with the same bearer token, for example
+`claude mcp add --transport http whatsapp https://wa.example.com/mcp --header "Authorization: Bearer …"`.
+Clients that cannot send a header of their own, such as claude.ai's custom connectors, need OAuth,
+which is not supported yet ([#14](https://github.com/StephanMeijer/whatsapp-mcp/issues/14)).
+
+Things to know:
+
+- Anyone with the token can read and send your messages, now from anywhere. Use a long random one
+  (`openssl rand -hex 32`).
+- If the proxy runs in another container and sets `Host` to the server's container name, requests are
+  refused: pass on the public host instead, as above.
+- [Tailscale Serve](https://tailscale.com/kb/1312/serve) works too, for devices on your tailnet:
+  `tailscale serve --bg http://127.0.0.1:8080`, with `-public-url https://<machine>.<tailnet>.ts.net`.
+  It forwards every path, including `/pair`, which still needs the token.
 
 ## Connect a client
 

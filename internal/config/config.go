@@ -7,6 +7,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -34,6 +36,11 @@ type Config struct {
 	AllowRecipients []string
 	// MediaDir, when set, is the only folder send_media may read files from.
 	MediaDir string
+	// PublicURL, when set, is the origin clients reach the server at through
+	// a TLS reverse proxy, such as https://wa.example.com: lowercase, without
+	// a trailing slash or path. Requests for any other host than this one or
+	// a loopback address are refused.
+	PublicURL string
 }
 
 // Load parses args (without the program name). Flags take precedence over
@@ -62,6 +69,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
 	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
+	fs.StringVar(&cfg.PublicURL, "public-url", getenv("WHATSAPP_MCP_PUBLIC_URL"), "https origin clients reach this server at through a reverse proxy, e.g. https://wa.example.com (env WHATSAPP_MCP_PUBLIC_URL)")
 	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", "127.0.0.1:8080"), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
 	fs.StringVar(&cfg.DatabaseURL, "database-url", envOr("DATABASE_URL", "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
 	fs.StringVar(&cfg.LogLevel, "log-level", envOr("WHATSAPP_MCP_LOG_LEVEL", "info"), "debug, info, warn or error (env WHATSAPP_MCP_LOG_LEVEL)")
@@ -88,10 +96,50 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 			return Config{}, fmt.Errorf("-media-dir: %s is not a directory", cfg.MediaDir)
 		}
 	}
+	if cfg.PublicURL != "" {
+		u, err := publicURL(cfg.PublicURL)
+		if err != nil {
+			return Config{}, fmt.Errorf("-public-url: %w", err)
+		}
+		cfg.PublicURL = u
+	}
 	if cfg.ReadOnly && len(cfg.AllowRecipients) > 0 {
 		return Config{}, errors.New("-allow-recipients has no effect with -read-only; set one or the other")
 	}
 	return cfg, nil
+}
+
+// publicURL validates and normalises the public origin: https, or http for a
+// loopback host (for tests and local proxies), with no path, query,
+// fragment or credentials.
+func publicURL(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	scheme := strings.ToLower(u.Scheme)
+	switch {
+	case scheme != "https" && scheme != "http", u.Host == "":
+		return "", fmt.Errorf("%q is not an absolute http(s) URL such as https://wa.example.com", raw)
+	case u.User != nil:
+		return "", fmt.Errorf("%q must not contain credentials", raw)
+	case u.RawQuery != "" || u.ForceQuery || u.Fragment != "":
+		return "", fmt.Errorf("%q must not have a query or fragment", raw)
+	case u.Path != "" && u.Path != "/":
+		return "", fmt.Errorf("%q has a path; serve the server at the root of its own (sub)domain", raw)
+	case scheme == "http" && !isLoopback(u.Hostname()):
+		return "", fmt.Errorf("%q is plain http; put the server behind a TLS reverse proxy and use https", raw)
+	}
+	return scheme + "://" + strings.ToLower(u.Host), nil
+}
+
+// isLoopback reports whether host is localhost or a loopback IP.
+func isLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // splitList splits a comma-separated list, trimming spaces and dropping empty entries.
