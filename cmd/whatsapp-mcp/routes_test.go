@@ -31,6 +31,8 @@ func TestRoutesHostCheck(t *testing.T) {
 		{"public url: token still required", "https://wa.example.com", "wa.example.com", "", "/mcp", http.StatusUnauthorized},
 		{"public url: health on loopback", "https://wa.example.com", "127.0.0.1:8080", "", "/healthz", http.StatusOK},
 		{"public url: pairing needs the token", "https://wa.example.com", "wa.example.com", "", "/pair", http.StatusUnauthorized},
+		{"public url: another host is refused on health", "https://wa.example.com", "evil.example.com", "", "/healthz", http.StatusForbidden},
+		{"public url: another host is refused on pairing", "https://wa.example.com", "evil.example.com", testToken, "/pair", http.StatusForbidden},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
