@@ -246,7 +246,7 @@ a static build on every push and pull request.
 
 - Thumbnails for sent photos and videos (recipients see a blurred placeholder until they open them)
 - Downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
-- Group metadata beyond names (participants, admins)
+- Changing group settings or membership
 - Presence (typing indicators, online status) and archiving incoming reactions
 - Answering or placing calls: only call signalling is supported, not audio or video
 
