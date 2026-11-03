@@ -30,7 +30,7 @@ var (
 // ContactInfo asks WhatsApp for a person's profile info.
 func (c *Client) ContactInfo(ctx context.Context, jid types.JID) (ContactInfo, error) {
 	if !c.cli.IsLoggedIn() {
-		return ContactInfo{}, errors.New("not logged in to WhatsApp")
+		return ContactInfo{}, errNotLoggedIn
 	}
 	jid = c.Canonical(ctx, jid)
 	infos, err := c.cli.GetUserInfo(ctx, []types.JID{jid})
@@ -62,7 +62,7 @@ func contactInfo(jid types.JID, info types.UserInfo, name string) ContactInfo {
 // IsCommunity retry when someone needs them.
 func (c *Client) ProfilePicture(ctx context.Context, jid types.JID, preview bool) (Media, error) {
 	if !c.cli.IsLoggedIn() {
-		return Media{}, errors.New("not logged in to WhatsApp")
+		return Media{}, errNotLoggedIn
 	}
 	info, err := c.cli.GetProfilePictureInfo(ctx, jid.ToNonAD(), &whatsmeow.GetProfilePictureParams{Preview: preview})
 	switch {

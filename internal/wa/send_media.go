@@ -36,10 +36,7 @@ var allowedMIME = map[string][]string{
 // SendMedia uploads a file, sends it and archives the message with its media
 // reference, so get_media can retrieve it again.
 func (c *Client) SendMedia(ctx context.Context, recipient string, f OutgoingMedia) (store.Message, error) {
-	if !c.cli.IsLoggedIn() {
-		return store.Message{}, errors.New("not logged in to WhatsApp")
-	}
-	to, err := ParseRecipient(recipient)
+	to, err := c.recipient(recipient)
 	if err != nil {
 		return store.Message{}, err
 	}
@@ -59,27 +56,7 @@ func (c *Client) SendMedia(ctx context.Context, recipient string, f OutgoingMedi
 		return store.Message{}, fmt.Errorf("upload: %w", err)
 	}
 	msg := buildMediaMessage(f.Kind, up, mime, f.Caption, f.FileName)
-	resp, err := c.cli.SendMessage(ctx, to, msg)
-	if err != nil {
-		return store.Message{}, fmt.Errorf("send: %w", err)
-	}
-	c.log.Info("sent media", "recipient", to.String(), "id", resp.ID, "kind", f.Kind, "bytes", len(f.Data))
-
-	text, kind := messageContent(msg)
-	m := store.Message{
-		ChatJID:   to.String(),
-		MessageID: resp.ID,
-		SenderJID: c.device.ID.ToNonAD().String(),
-		Timestamp: resp.Timestamp.Unix(),
-		FromMe:    true,
-		Text:      text,
-		MediaType: kind,
-		MediaRef:  mediaRef(msg, true),
-	}
-	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
-		c.log.Error("archive sent media", "err", err, "id", resp.ID)
-	}
-	return m, nil
+	return c.sendAndArchive(ctx, to, msg, "media", "kind", f.Kind, "bytes", len(f.Data))
 }
 
 // detectMIME settles the MIME type of a file to send: the hint if given,

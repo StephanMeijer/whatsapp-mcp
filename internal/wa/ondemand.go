@@ -42,7 +42,7 @@ type FetchResult struct {
 // other; this only reports how many older messages it brought in.
 func (c *Client) FetchOlder(ctx context.Context, chatJID string, count int, wait time.Duration) (FetchResult, error) {
 	if !c.cli.IsLoggedIn() {
-		return FetchResult{}, errors.New("not logged in to WhatsApp")
+		return FetchResult{}, errNotLoggedIn
 	}
 	jid, err := types.ParseJID(chatJID)
 	if err != nil {

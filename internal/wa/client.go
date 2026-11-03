@@ -27,6 +27,8 @@ import (
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
 
+var errNotLoggedIn = errors.New("not logged in to WhatsApp")
+
 // Client is a connected (or pairing) WhatsApp account.
 type Client struct {
 	cli whatsmeowClient
@@ -195,10 +197,7 @@ func (c *Client) Contacts(ctx context.Context, query string) ([]Contact, error) 
 // phone number in international format (digits, optional leading +). With
 // quoted set, the message is sent as a reply quoting that archived message.
 func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error) {
-	if !c.cli.IsLoggedIn() {
-		return store.Message{}, errors.New("not logged in to WhatsApp")
-	}
-	to, err := ParseRecipient(recipient)
+	to, err := c.recipient(recipient)
 	if err != nil {
 		return store.Message{}, err
 	}
@@ -206,13 +205,19 @@ func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *s
 	if quoted != nil {
 		msg = replyMessage(text, *quoted, c.wireSender(ctx, to, *quoted))
 	}
+	return c.sendAndArchive(ctx, to, msg, "message", "reply", quoted != nil)
+}
+
+// sendAndArchive sends msg to a chat and archives it as sent by this
+// account. logAttrs are added to the "sent <what>" log line.
+func (c *Client) sendAndArchive(ctx context.Context, to types.JID, msg *waE2E.Message, what string, logAttrs ...any) (store.Message, error) {
 	resp, err := c.cli.SendMessage(ctx, to, msg)
 	if err != nil {
 		return store.Message{}, fmt.Errorf("send: %w", err)
 	}
+	c.log.Info("sent "+what, append([]any{"recipient", to.String(), "id", resp.ID}, logAttrs...)...)
 
-	c.log.Info("sent message", "recipient", to.String(), "id", resp.ID, "reply", quoted != nil)
-
+	text, kind := messageContent(msg)
 	m := store.Message{
 		ChatJID:   to.String(),
 		MessageID: resp.ID,
@@ -220,13 +225,22 @@ func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *s
 		Timestamp: resp.Timestamp.Unix(),
 		FromMe:    true,
 		Text:      text,
+		MediaType: kind,
 		MediaRef:  mediaRef(msg, true),
 	}
 	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
 		// The message went out; failing to archive it shouldn't fail the send.
-		c.log.Error("archive sent message", "err", err, "id", resp.ID)
+		c.log.Error("archive sent "+what, "err", err, "id", resp.ID)
 	}
 	return m, nil
+}
+
+// recipient parses a recipient for sending, which needs a logged-in client.
+func (c *Client) recipient(s string) (types.JID, error) {
+	if !c.cli.IsLoggedIn() {
+		return types.JID{}, errNotLoggedIn
+	}
+	return ParseRecipient(s)
 }
 
 // ParseRecipient accepts a full JID ("31612345678@s.whatsapp.net",

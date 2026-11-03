@@ -27,7 +27,7 @@ const markReadLookback = 20
 // removes it.
 func (c *Client) React(ctx context.Context, chat types.JID, target store.Message, emoji string) error {
 	if !c.cli.IsLoggedIn() {
-		return errors.New("not logged in to WhatsApp")
+		return errNotLoggedIn
 	}
 	sender := c.wireSender(ctx, chat, target)
 	if _, err := c.cli.SendMessage(ctx, chat, c.cli.BuildReaction(chat, sender, target.MessageID, emoji)); err != nil {
@@ -41,7 +41,7 @@ func (c *Client) React(ctx context.Context, chat types.JID, target store.Message
 // marks it deleted in the archive.
 func (c *Client) DeleteMessage(ctx context.Context, chat types.JID, target store.Message) error {
 	if !c.cli.IsLoggedIn() {
-		return errors.New("not logged in to WhatsApp")
+		return errNotLoggedIn
 	}
 	if !target.FromMe {
 		return fmt.Errorf("message %s was not sent by you", target.MessageID)
@@ -63,7 +63,7 @@ func (c *Client) DeleteMessage(ctx context.Context, chat types.JID, target store
 // edited.
 func (c *Client) EditMessage(ctx context.Context, chat types.JID, target store.Message, text string) (store.Message, error) {
 	if !c.cli.IsLoggedIn() {
-		return store.Message{}, errors.New("not logged in to WhatsApp")
+		return store.Message{}, errNotLoggedIn
 	}
 	now := time.Now()
 	if err := editable(target, text, now); err != nil {
@@ -161,7 +161,7 @@ func editContent(m store.Message, text string) (*waE2E.Message, error) {
 // account's devices, clearing its unread badge.
 func (c *Client) MarkChatRead(ctx context.Context, chat types.JID) error {
 	if !c.cli.IsLoggedIn() {
-		return errors.New("not logged in to WhatsApp")
+		return errNotLoggedIn
 	}
 	incoming, err := c.store.LatestIncoming(ctx, chat.String(), markReadLookback)
 	if err != nil {

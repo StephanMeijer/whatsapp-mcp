@@ -4,7 +4,6 @@ package wa
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -36,7 +35,7 @@ type Group struct {
 // phone-number JIDs where known and named from the address book.
 func (c *Client) GroupInfo(ctx context.Context, group types.JID) (Group, error) {
 	if !c.cli.IsLoggedIn() {
-		return Group{}, errors.New("not logged in to WhatsApp")
+		return Group{}, errNotLoggedIn
 	}
 	info, err := c.cli.GetGroupInfo(ctx, group.ToNonAD())
 	if err != nil {
