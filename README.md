@@ -168,11 +168,14 @@ of it. Tell the server its public address with `-public-url`:
 WHATSAPP_MCP_PUBLIC_URL=https://wa.example.com whatsapp-mcp
 ```
 
-Without it, the server refuses requests whose `Host` is not a loopback address, as protection
-against DNS rebinding, so a proxy that passes on the public host gets `403 Forbidden`. With it, the
-server accepts the public host and loopback addresses, and refuses every other host. The URL must
-be `https` (plain `http` only for a loopback host) and must not have a path: give the server its own
-(sub)domain. The bearer token is still required for every request.
+Without it, the server refuses `/mcp` requests that arrive on a loopback address with a `Host` that
+is not a loopback address, as protection against DNS rebinding, so a proxy on the same machine that
+passes on the public host gets `403 Forbidden`. That check covers only `/mcp`, and only connections
+to a loopback address: a proxy in another container that reaches the Docker image on `0.0.0.0:8080`
+gets through with any `Host`. With `-public-url`, the server checks the `Host` of every request on
+every endpoint: it accepts the public host and loopback addresses, and refuses every other host.
+The URL must be `https` (plain `http` only for a loopback host) and must not have a path: give the
+server its own (sub)domain. The bearer token is still required for every request.
 
 Proxy only `/mcp`. `/pair` shows the code that links a phone to the server and `/healthz` is for
 local checks; neither belongs on the internet.
