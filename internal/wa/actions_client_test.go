@@ -165,9 +165,9 @@ func TestSendMedia(t *testing.T) {
 }
 
 func TestMediaTypeFor(t *testing.T) {
-	for kind, want := range map[string]whatsmeow.MediaType{
-		"image": whatsmeow.MediaImage, "video": whatsmeow.MediaVideo,
-		"audio": whatsmeow.MediaAudio, "document": whatsmeow.MediaDocument,
+	for kind, want := range map[store.MediaKind]whatsmeow.MediaType{
+		store.MediaImage: whatsmeow.MediaImage, store.MediaVideo: whatsmeow.MediaVideo,
+		store.MediaAudio: whatsmeow.MediaAudio, store.MediaDocument: whatsmeow.MediaDocument,
 	} {
 		if got := mediaTypeFor(kind); got != want {
 			t.Errorf("mediaTypeFor(%q) = %q, want %q", kind, got, want)

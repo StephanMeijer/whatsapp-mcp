@@ -19,7 +19,7 @@ import (
 
 // OutgoingMedia is a file to send.
 type OutgoingMedia struct {
-	Kind     string // image, video, audio or document
+	Kind     store.MediaKind // image, video, audio or document
 	Data     []byte
 	MIMEType string // optional; detected from Data when empty
 	Caption  string // not shown for audio
@@ -27,10 +27,10 @@ type OutgoingMedia struct {
 }
 
 // allowedMIME lists what WhatsApp accepts per kind; documents take anything.
-var allowedMIME = map[string][]string{
-	"image": {"image/jpeg", "image/png"},
-	"video": {"video/mp4"},
-	"audio": {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac"},
+var allowedMIME = map[store.MediaKind][]string{
+	store.MediaImage: {"image/jpeg", "image/png"},
+	store.MediaVideo: {"video/mp4"},
+	store.MediaAudio: {"audio/ogg", "audio/mpeg", "audio/mp4", "audio/aac"},
 }
 
 // SendMedia uploads a file, sends it and archives the message with its media
@@ -62,8 +62,8 @@ func (c *Client) SendMedia(ctx context.Context, recipient string, f OutgoingMedi
 // detectMIME settles the MIME type of a file to send: the hint if given,
 // otherwise sniffed from the content, then checked against what WhatsApp
 // accepts for the kind.
-func detectMIME(kind string, data []byte, hint string) (string, error) {
-	if _, known := allowedMIME[kind]; !known && kind != "document" {
+func detectMIME(kind store.MediaKind, data []byte, hint string) (string, error) {
+	if _, known := allowedMIME[kind]; !known && kind != store.MediaDocument {
 		return "", fmt.Errorf("kind must be image, video, audio or document, not %q", kind)
 	}
 	mime := hint
@@ -71,7 +71,7 @@ func detectMIME(kind string, data []byte, hint string) (string, error) {
 		mime = http.DetectContentType(data)
 	}
 	mime = strings.ToLower(strings.TrimSpace(strings.SplitN(mime, ";", 2)[0]))
-	if kind == "audio" {
+	if kind == store.MediaAudio {
 		// Sniffing names the containers, not their use as audio.
 		switch mime {
 		case "application/ogg":
@@ -86,13 +86,13 @@ func detectMIME(kind string, data []byte, hint string) (string, error) {
 	return mime, nil
 }
 
-func mediaTypeFor(kind string) whatsmeow.MediaType {
+func mediaTypeFor(kind store.MediaKind) whatsmeow.MediaType {
 	switch kind {
-	case "image":
+	case store.MediaImage:
 		return whatsmeow.MediaImage
-	case "video":
+	case store.MediaVideo:
 		return whatsmeow.MediaVideo
-	case "audio":
+	case store.MediaAudio:
 		return whatsmeow.MediaAudio
 	default:
 		return whatsmeow.MediaDocument
@@ -100,7 +100,7 @@ func mediaTypeFor(kind string) whatsmeow.MediaType {
 }
 
 // buildMediaMessage wraps an uploaded file in the message for its kind.
-func buildMediaMessage(kind string, up whatsmeow.UploadResponse, mime, caption, fileName string) *waE2E.Message {
+func buildMediaMessage(kind store.MediaKind, up whatsmeow.UploadResponse, mime, caption, fileName string) *waE2E.Message {
 	opt := func(s string) *string {
 		if s == "" {
 			return nil
@@ -108,19 +108,19 @@ func buildMediaMessage(kind string, up whatsmeow.UploadResponse, mime, caption, 
 		return proto.String(s)
 	}
 	switch kind {
-	case "image":
+	case store.MediaImage:
 		return &waE2E.Message{ImageMessage: &waE2E.ImageMessage{
 			URL: proto.String(up.URL), DirectPath: proto.String(up.DirectPath), MediaKey: up.MediaKey,
 			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: proto.Uint64(up.FileLength),
 			Mimetype: proto.String(mime), Caption: opt(caption),
 		}}
-	case "video":
+	case store.MediaVideo:
 		return &waE2E.Message{VideoMessage: &waE2E.VideoMessage{
 			URL: proto.String(up.URL), DirectPath: proto.String(up.DirectPath), MediaKey: up.MediaKey,
 			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: proto.Uint64(up.FileLength),
 			Mimetype: proto.String(mime), Caption: opt(caption),
 		}}
-	case "audio":
+	case store.MediaAudio:
 		return &waE2E.Message{AudioMessage: &waE2E.AudioMessage{
 			URL: proto.String(up.URL), DirectPath: proto.String(up.DirectPath), MediaKey: up.MediaKey,
 			FileEncSHA256: up.FileEncSHA256, FileSHA256: up.FileSHA256, FileLength: proto.Uint64(up.FileLength),

@@ -64,7 +64,7 @@ func TestEditable(t *testing.T) {
 	now := time.Unix(10_000, 0)
 	sent := now.Add(-time.Minute).Unix()
 	own := store.Message{MessageID: "M", FromMe: true, Timestamp: sent}
-	withRef := func(m store.Message, kind string) store.Message {
+	withRef := func(m store.Message, kind store.MediaKind) store.Message {
 		m.MediaType, m.MediaRef = kind, []byte{1}
 		return m
 	}

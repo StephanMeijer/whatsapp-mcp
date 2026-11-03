@@ -58,7 +58,7 @@ func (t *tools) sendMedia(ctx context.Context, _ *mcp.CallToolRequest, in SendMe
 		return nil, Message{}, fmt.Errorf("file is over the %d MB limit", wa.MaxMediaBytes>>20)
 	}
 	m, err := t.wa.SendMedia(ctx, to.String(), wa.OutgoingMedia{
-		Kind: in.Kind, Data: data, MIMEType: in.MIMEType, Caption: in.Caption, FileName: fileName,
+		Kind: store.MediaKind(in.Kind), Data: data, MIMEType: in.MIMEType, Caption: in.Caption, FileName: fileName,
 	})
 	if err != nil {
 		return nil, Message{}, err

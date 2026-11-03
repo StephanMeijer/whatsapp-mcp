@@ -378,7 +378,7 @@ func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Messa
 // ref is the new media_ref of a text message, whose ref (if any) holds the
 // pre-edit text and so is always replaced: pass nil unless the edit has to be
 // rebuilt later. A message with media keeps its ref, which downloads need.
-func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text, mediaType string, ref []byte, editedAt int64) (bool, error) {
+func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text string, mediaType MediaKind, ref []byte, editedAt int64) (bool, error) {
 	res := s.db.WithContext(ctx).Model(&Message{}).
 		Where("chat_jid = ? AND message_id = ? AND deleted = ? AND edited_at < ?", chatJID, messageID, false, editedAt).
 		Updates(map[string]any{

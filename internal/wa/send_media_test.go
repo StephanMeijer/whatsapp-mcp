@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow"
 )
 
@@ -17,7 +18,7 @@ var (
 
 func TestDetectMIME(t *testing.T) {
 	tests := []struct {
-		kind    string
+		kind    store.MediaKind
 		data    []byte
 		hint    string
 		want    string
@@ -35,7 +36,7 @@ func TestDetectMIME(t *testing.T) {
 		{kind: "hologram", data: jpegHeader, wantErr: true},
 	}
 	for _, tt := range tests {
-		t.Run(tt.kind+"/"+tt.want+tt.hint, func(t *testing.T) {
+		t.Run(string(tt.kind)+"/"+tt.want+tt.hint, func(t *testing.T) {
 			got, err := detectMIME(tt.kind, tt.data, tt.hint)
 			if (err != nil) != tt.wantErr || (!tt.wantErr && got != tt.want) {
 				t.Errorf("detectMIME = %q, %v; want %q, error %v", got, err, tt.want, tt.wantErr)
@@ -49,8 +50,8 @@ func TestBuildMediaMessage(t *testing.T) {
 		URL: "https://mmg/x", DirectPath: "/v/x", MediaKey: []byte("key"),
 		FileEncSHA256: []byte("enc"), FileSHA256: []byte("sha"), FileLength: 42,
 	}
-	for _, kind := range []string{"image", "video", "audio", "document"} {
-		t.Run(kind, func(t *testing.T) {
+	for _, kind := range []store.MediaKind{"image", "video", "audio", "document"} {
+		t.Run(string(kind), func(t *testing.T) {
 			msg := buildMediaMessage(kind, up, "x/y", "a caption", "notes.txt")
 			text, gotKind := messageContent(msg)
 			if gotKind != kind {

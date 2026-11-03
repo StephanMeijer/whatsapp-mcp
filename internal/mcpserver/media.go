@@ -53,9 +53,9 @@ func mediaContent(media wa.Media, m store.Message) []mcp.Content {
 	}
 	out := []mcp.Content{&mcp.TextContent{Text: desc}}
 	switch media.Kind {
-	case "image", "sticker":
+	case store.MediaImage, store.MediaSticker:
 		out = append(out, &mcp.ImageContent{Data: media.Data, MIMEType: media.MIMEType})
-	case "audio":
+	case store.MediaAudio:
 		out = append(out, &mcp.AudioContent{Data: media.Data, MIMEType: media.MIMEType})
 	default:
 		out = append(out, &mcp.EmbeddedResource{Resource: &mcp.ResourceContents{

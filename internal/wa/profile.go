@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -97,5 +98,5 @@ func fetchPicture(ctx context.Context, url string) (Media, error) {
 	if len(data) > MaxMediaBytes {
 		return Media{}, fmt.Errorf("profile picture is over the %d MB limit", MaxMediaBytes>>20)
 	}
-	return Media{Kind: "image", MIMEType: http.DetectContentType(data), Data: data}, nil
+	return Media{Kind: store.MediaImage, MIMEType: http.DetectContentType(data), Data: data}, nil
 }

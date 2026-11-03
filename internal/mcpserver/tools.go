@@ -213,7 +213,7 @@ func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message 
 			Timestamp:  formatUnix(m.Timestamp),
 			FromMe:     m.FromMe,
 			Text:       m.Text,
-			MediaType:  m.MediaType,
+			MediaType:  string(m.MediaType),
 		}
 		if m.EditedAt > 0 {
 			out[i].EditedAt = formatUnix(m.EditedAt)

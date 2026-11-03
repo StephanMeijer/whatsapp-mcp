@@ -104,8 +104,8 @@ func editable(m store.Message, text string, now time.Time) error {
 			m.MessageID, whatsmeow.EditWindow)
 	}
 	switch m.MediaType {
-	case "", "image", "video", "document":
-	case "poll":
+	case "", store.MediaImage, store.MediaVideo, store.MediaDocument:
+	case store.MediaPoll:
 		return fmt.Errorf("message %s is a poll, and polls can't be edited", m.MessageID)
 	default:
 		return fmt.Errorf("message %s is %s without a caption, so it has no text to edit", m.MessageID, articled(m.MediaType))
@@ -116,11 +116,11 @@ func editable(m store.Message, text string, now time.Time) error {
 	return nil
 }
 
-func articled(kind string) string {
-	if kind == "audio" {
+func articled(kind store.MediaKind) string {
+	if kind == store.MediaAudio {
 		return "audio"
 	}
-	return "a " + kind
+	return "a " + string(kind)
 }
 
 // editContent builds the new content for an edit of m: the text itself for
@@ -243,7 +243,7 @@ func chooseWireSender(chat, sender, own types.JID, fromMe, lidGroup bool, sender
 func replyMessage(text string, quoted store.Message, quotedSender types.JID) *waE2E.Message {
 	quotedText := quoted.Text
 	if quotedText == "" && quoted.MediaType != "" {
-		quotedText = "[" + quoted.MediaType + "]"
+		quotedText = "[" + string(quoted.MediaType) + "]"
 	}
 	return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
 		Text: proto.String(text),

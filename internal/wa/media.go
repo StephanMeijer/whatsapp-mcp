@@ -24,7 +24,7 @@ var ErrNoMediaRef = errors.New("this media was archived before downloads were su
 
 // Media is a downloaded, decrypted media file.
 type Media struct {
-	Kind     string // image, video, audio, document or sticker (never poll)
+	Kind     store.MediaKind // never poll
 	MIMEType string
 	FileName string // documents only
 	Data     []byte
@@ -42,7 +42,7 @@ func (c *Client) Media(ctx context.Context, m store.Message) (Media, error) {
 	if m.MediaType == "" {
 		return Media{}, errors.New("this message has no media")
 	}
-	if m.MediaType == "poll" {
+	if m.MediaType == store.MediaPoll {
 		return Media{}, errors.New("this message is a poll, which has no file; its question and options are the message text")
 	}
 	if len(m.MediaRef) == 0 {
@@ -115,21 +115,21 @@ func mediaRef(m *waE2E.Message, fromMe bool) []byte {
 }
 
 // decodeMediaRef restores the media sub-message saved by mediaRef.
-func decodeMediaRef(kind string, ref []byte) (downloadable, string, error) {
+func decodeMediaRef(kind store.MediaKind, ref []byte) (downloadable, string, error) {
 	var sub interface {
 		downloadable
 		proto.Message
 	}
 	switch kind {
-	case "image":
+	case store.MediaImage:
 		sub = &waE2E.ImageMessage{}
-	case "video":
+	case store.MediaVideo:
 		sub = &waE2E.VideoMessage{}
-	case "audio":
+	case store.MediaAudio:
 		sub = &waE2E.AudioMessage{}
-	case "document":
+	case store.MediaDocument:
 		sub = &waE2E.DocumentMessage{}
-	case "sticker":
+	case store.MediaSticker:
 		sub = &waE2E.StickerMessage{}
 	default:
 		return nil, "", fmt.Errorf("unknown media type %q", kind)

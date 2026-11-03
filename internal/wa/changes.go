@@ -5,6 +5,7 @@ package wa
 import (
 	"context"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -20,12 +21,12 @@ const (
 // change is an edit or a deletion for everyone of an earlier message.
 type change struct {
 	kind   changeKind
-	chat   string // canonical chat JID, as the original is archived
-	target string // ID of the edited or deleted message
-	text   string // edits only
-	media  string // edits only
-	at     int64  // edits only: Unix seconds of the edit
-	ref    []byte // edits only: new media_ref, for the account's own text messages
+	chat   string          // canonical chat JID, as the original is archived
+	target string          // ID of the edited or deleted message
+	text   string          // edits only
+	media  store.MediaKind // edits only
+	at     int64           // edits only: Unix seconds of the edit
+	ref    []byte          // edits only: new media_ref, for the account's own text messages
 }
 
 // toChange recognises edits and deletions for everyone. Edits arrive
