@@ -8,6 +8,9 @@ import (
 	"testing"
 )
 
+// testToken is a token of the minimum length.
+var testToken = strings.Repeat("t", MinTokenLength)
+
 func TestLoad(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -18,66 +21,76 @@ func TestLoad(t *testing.T) {
 	}{
 		{
 			name: "defaults",
-			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
-			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info"},
 		},
 		{
 			name: "flags beat env",
 			args: []string{"-addr", ":9000", "-read-only=false"},
-			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t", "WHATSAPP_MCP_ADDR": ":1", "WHATSAPP_MCP_READ_ONLY": "true"},
-			want: Config{Addr: ":9000", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ADDR": ":1", "WHATSAPP_MCP_READ_ONLY": "true"},
+			want: Config{Addr: ":9000", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info"},
 		},
 		{
 			name: "read-only from env",
-			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t", "WHATSAPP_MCP_READ_ONLY": "1"},
-			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info", ReadOnly: true},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_READ_ONLY": "1"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", ReadOnly: true},
 		},
 		{
 			name: "allowlist is trimmed and drops empty entries",
 			args: []string{"-allow-recipients", " +31 6 1234 5678 , ,123@g.us,"},
-			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			want: Config{
-				Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info",
+				Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info",
 				AllowRecipients: []string{"+31 6 1234 5678", "123@g.us"},
 			},
 		},
 		{
 			name:    "missing token",
-			wantErr: "WHATSAPP_MCP_TOKEN",
+			wantErr: "WHATSAPP_MCP_TOKEN must be set",
+		},
+		{
+			name:    "token one character too short",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken[1:]},
+			wantErr: "at least 32 characters",
+		},
+		{
+			name:    "trivial token",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "x"},
+			wantErr: "openssl rand -hex 32",
 		},
 		{
 			name:    "invalid read-only env",
-			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t", "WHATSAPP_MCP_READ_ONLY": "maybe"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_READ_ONLY": "maybe"},
 			wantErr: "WHATSAPP_MCP_READ_ONLY",
 		},
 		{
 			name:    "read-only with allowlist",
 			args:    []string{"-read-only", "-allow-recipients", "+31612345678"},
-			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			wantErr: "no effect",
 		},
 		{
 			name:    "media dir must exist",
 			args:    []string{"-media-dir", "/nonexistent/whatsapp-mcp-media"},
-			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			wantErr: "-media-dir",
 		},
 		{
 			name:    "media dir must be a directory",
 			args:    []string{"-media-dir", "config_test.go"},
-			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			wantErr: "not a directory",
 		},
 		{
 			name: "media dir",
 			args: []string{"-media-dir", "."},
-			env:  map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
-			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: "t", LogLevel: "info", MediaDir: "."},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", MediaDir: "."},
 		},
 		{
 			name:    "stray argument",
 			args:    []string{"serve"},
-			env:     map[string]string{"WHATSAPP_MCP_TOKEN": "t"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			wantErr: "unexpected arguments",
 		},
 	}

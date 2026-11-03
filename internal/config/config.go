@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+// MinTokenLength is the shortest auth token Load accepts: 32 characters, or
+// 128 bits of random hex. The token is all that stands between the network
+// and the account, so a guessable one is refused rather than warned about.
+const MinTokenLength = 32
+
 // Config is the runtime configuration of the server.
 type Config struct {
 	// Addr is the address the HTTP server listens on.
@@ -68,6 +73,10 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	}
 	if cfg.AuthToken == "" {
 		return Config{}, errors.New("WHATSAPP_MCP_TOKEN must be set: the server exposes your WhatsApp account")
+	}
+	if len(cfg.AuthToken) < MinTokenLength {
+		return Config{}, fmt.Errorf("WHATSAPP_MCP_TOKEN must be at least %d characters, as it gives full access to "+
+			"your WhatsApp account; generate one with: openssl rand -hex 32", MinTokenLength)
 	}
 	cfg.AllowRecipients = splitList(allow)
 	if cfg.MediaDir != "" {
