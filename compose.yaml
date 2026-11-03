@@ -16,7 +16,8 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "whatsapp", "-d", "whatsapp"]
+      # -h: over TCP, so the entrypoint's socket-only init server does not count as ready.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "whatsapp", "-d", "whatsapp"]
       interval: 10s
       timeout: 5s
       start_period: 30s
