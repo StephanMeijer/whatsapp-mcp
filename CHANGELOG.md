@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.3.0...v0.4.0) (2026-11-03)
+
+
+### ⚠ BREAKING CHANGES
+
+* the server no longer starts with a WHATSAPP_MCP_TOKEN shorter than 32 characters. Replace a short token with one from `openssl rand -hex 32` and update it in your MCP client.
+
+### Features
+
+* archive polls ([c1bd2a6](https://github.com/StephanMeijer/whatsapp-mcp/commit/c1bd2a60bc647070a8caf9ccc4a7fa425650fc3f))
+* archive, pin and mute chats ([d4f357a](https://github.com/StephanMeijer/whatsapp-mcp/commit/d4f357ab6fdf07c9460124f8997192a56e708a02))
+* archive, pin and mute chats ([a428cb6](https://github.com/StephanMeijer/whatsapp-mcp/commit/a428cb6584b3996d7fdaca6f57e6ed082d92aa25))
+* track delivered, read and played receipts for sent messages ([75ef68d](https://github.com/StephanMeijer/whatsapp-mcp/commit/75ef68d3f47dc6426fcfad44026f046c016a680a))
+* track delivered, read and played receipts for sent messages ([ad622b2](https://github.com/StephanMeijer/whatsapp-mcp/commit/ad622b2663cc6d0c1420685da06e4a7482f4f9d1))
+
+
+### Bug Fixes
+
+* keep muted-forever chats muted when merging [@lid](https://github.com/lid) JIDs ([96fbea1](https://github.com/StephanMeijer/whatsapp-mcp/commit/96fbea10f95d285ed7c0961ecc936703ebe6188b))
+* move receipts when merging [@lid](https://github.com/lid) JIDs into phone numbers ([e517ee7](https://github.com/StephanMeijer/whatsapp-mcp/commit/e517ee747dfb1e6b511ad73186a8c381410886a0))
+* refuse auth tokens shorter than 32 characters ([80d4d1f](https://github.com/StephanMeijer/whatsapp-mcp/commit/80d4d1fd78f9b982ed6c9aefe1dfa3474a2e6b49))
+
 ## [0.3.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.2.0...v0.3.0) (2026-10-22)
 
 
