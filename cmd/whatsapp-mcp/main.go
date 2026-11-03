@@ -122,8 +122,6 @@ func run() error {
 	return nil
 }
 
-// pairHandler serves the pending pairing QR code as a PNG, for hosts where
-// the terminal output isn't visible.
 // routes serves health, the pairing code and MCP. With a public URL the
 // server sits behind a reverse proxy, which passes on the public Host to a
 // loopback listener; the SDK's DNS-rebinding check would refuse that, so
@@ -148,6 +146,8 @@ func routes(publicURL, token string, mcpSrv *mcp.Server, pair http.Handler) (htt
 	return httpx.AllowHosts([]string{public.Hostname()}, mux), nil
 }
 
+// pairHandler serves the pending pairing QR code as a PNG, for hosts where
+// the terminal output isn't visible.
 func pairHandler(client *wa.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		code := client.QRCode()
