@@ -211,7 +211,7 @@ func (c *Client) MarkChatRead(ctx context.Context, chat types.JID) error {
 // groups using LID addressing identify participants by LID.
 func (c *Client) wireSender(ctx context.Context, chat types.JID, m store.Message) types.JID {
 	var own types.JID
-	if id := c.cli.Store.ID; id != nil {
+	if id := c.device.ID; id != nil {
 		own = id.ToNonAD()
 	}
 	sender, _ := types.ParseJID(m.SenderJID)
@@ -220,7 +220,7 @@ func (c *Client) wireSender(ctx context.Context, chat types.JID, m store.Message
 	if !m.FromMe && chat.Server == types.GroupServer {
 		lidGroup = c.groupModes.isLID(ctx, c, chat)
 		if lidGroup && sender.Server == types.DefaultUserServer {
-			if lid, err := c.cli.Store.LIDs.GetLIDForPN(ctx, sender); err == nil {
+			if lid, err := c.device.LIDs.GetLIDForPN(ctx, sender); err == nil {
 				senderLID = lid
 			}
 		}

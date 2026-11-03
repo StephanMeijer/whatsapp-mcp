@@ -20,7 +20,7 @@ func (c *Client) Canonical(ctx context.Context, jid types.JID) types.JID {
 	if jid.Server != types.HiddenUserServer {
 		return jid
 	}
-	pn, err := c.cli.Store.LIDs.GetPNForLID(ctx, jid)
+	pn, err := c.device.LIDs.GetPNForLID(ctx, jid)
 	if err != nil {
 		c.log.Debug("look up phone number for LID", "lid", jid.String(), "err", err)
 		return jid
@@ -99,7 +99,7 @@ func (c *Client) mergeLIDChats(ctx context.Context) {
 // canonicalContacts returns the address book keyed by canonical JID, with an
 // @lid entry and the phone-number entry for the same person merged.
 func (c *Client) canonicalContacts(ctx context.Context) (map[types.JID]types.ContactInfo, error) {
-	all, err := c.cli.Store.Contacts.GetAllContacts(ctx)
+	all, err := c.device.Contacts.GetAllContacts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -148,22 +148,22 @@ func mergeContacts(all map[types.JID]types.ContactInfo, canon func(types.JID) ty
 // gets its own push name. JIDs without any known name are absent from the
 // result. The address book is loaded once per call.
 func (c *Client) Names(ctx context.Context, jids []types.JID) (map[types.JID]string, error) {
-	all, err := c.cli.Store.Contacts.GetAllContacts(ctx)
+	all, err := c.device.Contacts.GetAllContacts(ctx)
 	if err != nil {
 		return nil, err
 	}
 	var self types.JID
-	if id := c.cli.Store.ID; id != nil {
+	if id := c.device.ID; id != nil {
 		self = id.ToNonAD()
 	}
 	lidFor := func(pn types.JID) types.JID {
-		lid, err := c.cli.Store.LIDs.GetLIDForPN(ctx, pn)
+		lid, err := c.device.LIDs.GetLIDForPN(ctx, pn)
 		if err != nil {
 			return types.JID{}
 		}
 		return lid
 	}
-	return resolveNames(all, jids, self, c.cli.Store.PushName, lidFor), nil
+	return resolveNames(all, jids, self, c.device.PushName, lidFor), nil
 }
 
 // resolveNames is the lookup behind Names. lidFor is only consulted for

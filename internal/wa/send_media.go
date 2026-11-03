@@ -69,7 +69,7 @@ func (c *Client) SendMedia(ctx context.Context, recipient string, f OutgoingMedi
 	m := store.Message{
 		ChatJID:   to.String(),
 		MessageID: resp.ID,
-		SenderJID: c.cli.Store.ID.ToNonAD().String(),
+		SenderJID: c.device.ID.ToNonAD().String(),
 		Timestamp: resp.Timestamp.Unix(),
 		FromMe:    true,
 		Text:      text,

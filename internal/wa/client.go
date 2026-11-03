@@ -19,6 +19,7 @@ import (
 	"github.com/mdp/qrterminal/v3"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	wastore "go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
@@ -28,9 +29,12 @@ import (
 
 // Client is a connected (or pairing) WhatsApp account.
 type Client struct {
-	cli   *whatsmeow.Client
-	store *store.Store
-	log   *slog.Logger
+	cli whatsmeowClient
+	// device is the same *Device as the whatsmeow client's Store, which
+	// whatsmeow updates in place (own JID on pairing, LID, push name).
+	device *wastore.Device
+	store  *store.Store
+	log    *slog.Logger
 	// qrOut receives a terminal rendering of each pairing code.
 	qrOut io.Writer
 
@@ -75,21 +79,29 @@ func New(ctx context.Context, sqlDB *sql.DB, dialect string, st *store.Store, lo
 		return nil, fmt.Errorf("load device: %w", err)
 	}
 
-	c := &Client{
-		cli:        whatsmeow.NewClient(device, waLogger.Sub("client")),
+	cli := whatsmeow.NewClient(device, waLogger.Sub("client"))
+	c := newClient(cli, device, st, log, qrOut)
+	cli.AddEventHandler(c.handleEvent)
+	return c, nil
+}
+
+// newClient builds a Client around cli, whose Store must be device. New uses
+// it with a real whatsmeow client, tests with a fake.
+func newClient(cli whatsmeowClient, device *wastore.Device, st *store.Store, log *slog.Logger, qrOut io.Writer) *Client {
+	return &Client{
+		cli:        cli,
+		device:     device,
 		store:      st,
 		log:        log,
 		qrOut:      qrOut,
 		fetchLimit: rateLimit{interval: fetchInterval},
 	}
-	c.cli.AddEventHandler(c.handleEvent)
-	return c, nil
 }
 
 // Start connects. An unpaired device starts the QR pairing flow: codes are
 // printed to qrOut and available from QRCode until pairing completes.
 func (c *Client) Start(ctx context.Context) error {
-	if c.cli.Store.ID != nil {
+	if c.device.ID != nil {
 		return c.cli.ConnectContext(ctx)
 	}
 
@@ -114,7 +126,7 @@ func (c *Client) watchPairing(qrChan <-chan whatsmeow.QRChannelItem) {
 			qrterminal.GenerateHalfBlock(item.Code, qrterminal.L, c.qrOut)
 		case whatsmeow.QRChannelSuccess.Event:
 			c.setQR("")
-			c.log.Info("paired", "jid", c.cli.Store.ID.String())
+			c.log.Info("paired", "jid", c.device.ID.String())
 		case whatsmeow.QRChannelEventError:
 			c.setQR("")
 			c.log.Error("pairing failed", "err", item.Error)
@@ -148,7 +160,7 @@ func (c *Client) Status() Status {
 		LoggedIn:  c.cli.IsLoggedIn(),
 		Pairing:   c.QRCode() != "",
 	}
-	if id := c.cli.Store.ID; id != nil {
+	if id := c.device.ID; id != nil {
 		s.JID = id.ToNonAD().String()
 	}
 	return s
@@ -204,7 +216,7 @@ func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *s
 	m := store.Message{
 		ChatJID:   to.String(),
 		MessageID: resp.ID,
-		SenderJID: c.cli.Store.ID.ToNonAD().String(),
+		SenderJID: c.device.ID.ToNonAD().String(),
 		Timestamp: resp.Timestamp.Unix(),
 		FromMe:    true,
 		Text:      text,
