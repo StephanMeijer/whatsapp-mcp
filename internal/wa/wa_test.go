@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow"
 
 	"go.mau.fi/whatsmeow/proto/waCommon"
@@ -20,9 +21,10 @@ import (
 
 func TestMessageContent(t *testing.T) {
 	tests := []struct {
-		name      string
-		msg       *waE2E.Message
-		text, typ string
+		name string
+		msg  *waE2E.Message
+		text string
+		typ  store.MediaKind
 	}{
 		{"conversation", &waE2E.Message{Conversation: proto.String("hi")}, "hi", ""},
 		{"extended text", &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String("link https://x")}}, "link https://x", ""},
@@ -324,7 +326,7 @@ func TestSecretEditChange(t *testing.T) {
 func TestMediaRefRoundTrip(t *testing.T) {
 	key := []byte("0123456789abcdef0123456789abcdef")
 	tests := []struct {
-		kind     string
+		kind     store.MediaKind
 		msg      *waE2E.Message
 		fileName string
 	}{
@@ -335,7 +337,7 @@ func TestMediaRefRoundTrip(t *testing.T) {
 		{"sticker", &waE2E.Message{StickerMessage: &waE2E.StickerMessage{DirectPath: proto.String("/v/stk"), MediaKey: key, Mimetype: proto.String("image/webp")}}, ""},
 	}
 	for _, tt := range tests {
-		t.Run(tt.kind, func(t *testing.T) {
+		t.Run(string(tt.kind), func(t *testing.T) {
 			_, kind := messageContent(tt.msg)
 			if kind != tt.kind {
 				t.Fatalf("messageContent kind = %q, want %q", kind, tt.kind)

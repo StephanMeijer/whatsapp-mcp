@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
@@ -30,7 +31,7 @@ var (
 // ContactInfo asks WhatsApp for a person's profile info.
 func (c *Client) ContactInfo(ctx context.Context, jid types.JID) (ContactInfo, error) {
 	if !c.cli.IsLoggedIn() {
-		return ContactInfo{}, errors.New("not logged in to WhatsApp")
+		return ContactInfo{}, errNotLoggedIn
 	}
 	jid = c.Canonical(ctx, jid)
 	infos, err := c.cli.GetUserInfo(ctx, []types.JID{jid})
@@ -62,7 +63,7 @@ func contactInfo(jid types.JID, info types.UserInfo, name string) ContactInfo {
 // IsCommunity retry when someone needs them.
 func (c *Client) ProfilePicture(ctx context.Context, jid types.JID, preview bool) (Media, error) {
 	if !c.cli.IsLoggedIn() {
-		return Media{}, errors.New("not logged in to WhatsApp")
+		return Media{}, errNotLoggedIn
 	}
 	info, err := c.cli.GetProfilePictureInfo(ctx, jid.ToNonAD(), &whatsmeow.GetProfilePictureParams{Preview: preview})
 	switch {
@@ -97,5 +98,5 @@ func fetchPicture(ctx context.Context, url string) (Media, error) {
 	if len(data) > MaxMediaBytes {
 		return Media{}, fmt.Errorf("profile picture is over the %d MB limit", MaxMediaBytes>>20)
 	}
-	return Media{Kind: "image", MIMEType: http.DetectContentType(data), Data: data}, nil
+	return Media{Kind: store.MediaImage, MIMEType: http.DetectContentType(data), Data: data}, nil
 }

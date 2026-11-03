@@ -4,7 +4,6 @@ package wa
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -109,7 +108,7 @@ func (c *Client) onCallEvent(evt any) {
 // RejectCall declines a call that is still ringing.
 func (c *Client) RejectCall(ctx context.Context, callID string) (store.Call, error) {
 	if !c.cli.IsLoggedIn() {
-		return store.Call{}, errors.New("not logged in to WhatsApp")
+		return store.Call{}, errNotLoggedIn
 	}
 	call, err := c.store.CallByID(ctx, callID)
 	if err != nil {

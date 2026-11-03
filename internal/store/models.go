@@ -15,6 +15,18 @@ type Chat struct {
 	MutedUntil int64 `gorm:"not null;default:0"`
 }
 
+// MediaKind is the kind of media a message carries.
+type MediaKind string
+
+const (
+	MediaImage    MediaKind = "image"
+	MediaVideo    MediaKind = "video"
+	MediaAudio    MediaKind = "audio"
+	MediaDocument MediaKind = "document"
+	MediaSticker  MediaKind = "sticker"
+	MediaPoll     MediaKind = "poll"
+)
+
 // Message is one archived message. Only messages with text or media are
 // stored; reactions, receipts and protocol messages are not.
 type Message struct {
@@ -31,7 +43,7 @@ type Message struct {
 	// MediaType is empty for plain text, otherwise image, video, audio,
 	// document, sticker or poll. A poll's Text is its question followed by
 	// one "- option" line per option.
-	MediaType string `gorm:"not null;default:''"`
+	MediaType MediaKind `gorm:"not null;default:''"`
 	// EditedAt is the Unix time of the last applied edit; 0 if never edited.
 	EditedAt int64 `gorm:"not null;default:0"`
 	// Status is how far one of the account's own messages got: sent,

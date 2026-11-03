@@ -4,7 +4,6 @@ package wa
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -61,7 +60,7 @@ func NormalizePhone(s string) (string, error) {
 // come from NormalizePhone. The result has one entry per phone, in order.
 func (c *Client) CheckNumbers(ctx context.Context, phones []string) ([]NumberCheck, error) {
 	if !c.cli.IsLoggedIn() {
-		return nil, errors.New("not logged in to WhatsApp")
+		return nil, errNotLoggedIn
 	}
 	resp, err := c.cli.IsOnWhatsApp(ctx, phones)
 	if err != nil {

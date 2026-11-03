@@ -168,25 +168,25 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 }
 
 // messageContent extracts the searchable text and the media kind.
-func messageContent(m *waE2E.Message) (text, mediaType string) {
+func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 	switch {
 	case m.GetConversation() != "":
 		return m.GetConversation(), ""
 	case m.GetExtendedTextMessage() != nil:
 		return m.GetExtendedTextMessage().GetText(), ""
 	case m.GetImageMessage() != nil:
-		return m.GetImageMessage().GetCaption(), "image"
+		return m.GetImageMessage().GetCaption(), store.MediaImage
 	case m.GetVideoMessage() != nil:
-		return m.GetVideoMessage().GetCaption(), "video"
+		return m.GetVideoMessage().GetCaption(), store.MediaVideo
 	case m.GetAudioMessage() != nil:
-		return "", "audio"
+		return "", store.MediaAudio
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
-		return firstNonEmpty(d.GetCaption(), d.GetTitle(), d.GetFileName()), "document"
+		return firstNonEmpty(d.GetCaption(), d.GetTitle(), d.GetFileName()), store.MediaDocument
 	case m.GetStickerMessage() != nil:
-		return "", "sticker"
+		return "", store.MediaSticker
 	case pollCreation(m) != nil:
-		return pollText(pollCreation(m)), "poll"
+		return pollText(pollCreation(m)), store.MediaPoll
 	}
 	return "", ""
 }

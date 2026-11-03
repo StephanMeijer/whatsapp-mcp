@@ -4,7 +4,6 @@ package wa
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -68,7 +67,7 @@ func (c *Client) onChatState(evt any) {
 // that is set; the phone follows. The caller records the result.
 func (c *Client) SetChatState(ctx context.Context, chat types.JID, f store.ChatFlags) error {
 	if !c.cli.IsLoggedIn() {
-		return errors.New("not logged in to WhatsApp")
+		return errNotLoggedIn
 	}
 	chat = chat.ToNonAD()
 	if f.Archived != nil {
