@@ -4,6 +4,8 @@ package wa
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"sort"
 
 	"go.mau.fi/whatsmeow/types"
@@ -110,10 +112,7 @@ func (c *Client) canonicalContacts(ctx context.Context) (map[types.JID]types.Con
 // the same JID, fields from the phone-number entry win and empty fields are
 // filled from the other.
 func mergeContacts(all map[types.JID]types.ContactInfo, canon func(types.JID) types.JID) map[types.JID]types.ContactInfo {
-	keys := make([]types.JID, 0, len(all))
-	for jid := range all {
-		keys = append(keys, jid)
-	}
+	keys := slices.Collect(maps.Keys(all))
 	// Phone-number (and other non-LID) entries first, so they take precedence.
 	sort.Slice(keys, func(i, j int) bool {
 		li, lj := keys[i].Server == types.HiddenUserServer, keys[j].Server == types.HiddenUserServer
