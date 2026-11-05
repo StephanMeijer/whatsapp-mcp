@@ -94,15 +94,7 @@ func (s *Store) UpdateCall(ctx context.Context, callID string, ev CallEvent, at 
 
 // CallByID returns one call, or ErrNotFound.
 func (s *Store) CallByID(ctx context.Context, callID string) (Call, error) {
-	var c Call
-	res := s.db.WithContext(ctx).Where("call_id = ?", callID).Limit(1).Find(&c)
-	if res.Error != nil {
-		return Call{}, res.Error
-	}
-	if res.RowsAffected == 0 {
-		return Call{}, ErrNotFound
-	}
-	return c, nil
+	return one[Call](s.db.WithContext(ctx).Where("call_id = ?", callID))
 }
 
 // ListCalls returns calls started at or after since, newest first.

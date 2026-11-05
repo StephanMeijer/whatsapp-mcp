@@ -444,16 +444,21 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 // MessageByID returns one archived message. Deleted messages count as not
 // found, since nothing should be done with them.
 func (s *Store) MessageByID(ctx context.Context, chatJID, messageID string) (Message, error) {
-	var m Message
-	res := s.db.WithContext(ctx).
-		Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).Limit(1).Find(&m)
+	return one[Message](s.db.WithContext(ctx).
+		Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false))
+}
+
+// one returns the first row tx selects, or ErrNotFound when it selects none.
+func one[T any](tx *gorm.DB) (T, error) {
+	var v, zero T
+	res := tx.Limit(1).Find(&v)
 	if res.Error != nil {
-		return Message{}, res.Error
+		return zero, res.Error
 	}
 	if res.RowsAffected == 0 {
-		return Message{}, ErrNotFound
+		return zero, ErrNotFound
 	}
-	return m, nil
+	return v, nil
 }
 
 // LatestIncoming returns up to limit of the newest messages others sent in a
@@ -470,16 +475,8 @@ func (s *Store) LatestIncoming(ctx context.Context, chatJID string, limit int) (
 // for asking the phone for older history. It returns ErrNotFound for a chat
 // without messages.
 func (s *Store) OldestMessage(ctx context.Context, chatJID string) (Message, error) {
-	var m Message
-	res := s.db.WithContext(ctx).Where("chat_jid = ?", chatJID).
-		Order("timestamp ASC").Order("seq ASC").Limit(1).Find(&m)
-	if res.Error != nil {
-		return Message{}, res.Error
-	}
-	if res.RowsAffected == 0 {
-		return Message{}, ErrNotFound
-	}
-	return m, nil
+	return one[Message](s.db.WithContext(ctx).Where("chat_jid = ?", chatJID).
+		Order("timestamp ASC").Order("seq ASC"))
 }
 
 // CountBefore counts a chat's messages sent strictly before ts (Unix seconds).
