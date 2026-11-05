@@ -5,6 +5,7 @@
 package wa
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"errors"
@@ -272,7 +273,7 @@ func ParseRecipient(s string) (types.JID, error) {
 
 // contactName is the name the user saved for a contact, or the business name.
 func contactName(info types.ContactInfo) string {
-	return firstNonEmpty(info.FullName, info.FirstName, info.BusinessName)
+	return cmp.Or(info.FullName, info.FirstName, info.BusinessName)
 }
 
 // syncChatNames names direct chats after the matching contact: the saved
@@ -286,7 +287,7 @@ func (c *Client) syncChatNames(ctx context.Context) {
 	}
 	names := make(map[string]string, len(contacts))
 	for jid, info := range contacts {
-		names[jid.String()] = firstNonEmpty(contactName(info), info.PushName)
+		names[jid.String()] = cmp.Or(contactName(info), info.PushName)
 	}
 	changed, err := c.store.RenameChats(ctx, names)
 	if err != nil {
@@ -296,13 +297,4 @@ func (c *Client) syncChatNames(ctx context.Context) {
 	if changed > 0 {
 		c.log.Info("named chats from contacts", "chats", changed)
 	}
-}
-
-func firstNonEmpty(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
 }
