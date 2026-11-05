@@ -73,31 +73,38 @@ func (c *Client) nameGroupIfNeeded(group types.JID) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 		defer cancel()
-		chats, err := c.store.ChatsByJID(ctx, []string{jid})
-		if err != nil || chats[jid].Name != "" {
-			return
-		}
-		info, err := c.cli.GetGroupInfo(ctx, group.ToNonAD())
-		if err != nil {
-			c.log.Debug("look up group name", "err", err, "group", jid)
-			return
-		}
-		infos := []*types.GroupInfo{info}
-		// A nameless community subgroup is named after its community.
-		if info.Name == "" && !info.LinkedParentJID.IsEmpty() {
-			if parent, err := c.cli.GetGroupInfo(ctx, info.LinkedParentJID); err == nil {
-				infos = append(infos, parent)
-			}
-		}
-		names := groupNames(infos)
-		c.nameAfterMembers(ctx, infos[:1], names)
-		if names[jid] == "" {
-			return
-		}
-		if _, err := c.store.RenameChats(ctx, map[string]string{jid: names[jid]}); err != nil {
-			c.log.Error("name group", "err", err, "group", jid)
-		}
+		c.lookupGroupName(ctx, group)
 	}()
+}
+
+// lookupGroupName names an archived group chat that has no name yet, from
+// WhatsApp's group info: its own name, its community's, or its members'.
+func (c *Client) lookupGroupName(ctx context.Context, group types.JID) {
+	jid := group.ToNonAD().String()
+	chats, err := c.store.ChatsByJID(ctx, []string{jid})
+	if err != nil || chats[jid].Name != "" {
+		return
+	}
+	info, err := c.cli.GetGroupInfo(ctx, group.ToNonAD())
+	if err != nil {
+		c.log.Debug("look up group name", "err", err, "group", jid)
+		return
+	}
+	infos := []*types.GroupInfo{info}
+	// A nameless community subgroup is named after its community.
+	if info.Name == "" && !info.LinkedParentJID.IsEmpty() {
+		if parent, err := c.cli.GetGroupInfo(ctx, info.LinkedParentJID); err == nil {
+			infos = append(infos, parent)
+		}
+	}
+	names := groupNames(infos)
+	c.nameAfterMembers(ctx, infos[:1], names)
+	if names[jid] == "" {
+		return
+	}
+	if _, err := c.store.RenameChats(ctx, map[string]string{jid: names[jid]}); err != nil {
+		c.log.Error("name group", "err", err, "group", jid)
+	}
 }
 
 // groupNames maps group JIDs to their names, skipping groups without one.
