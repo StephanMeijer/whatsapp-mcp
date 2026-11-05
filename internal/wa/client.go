@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -182,11 +182,8 @@ func (c *Client) Contacts(ctx context.Context, query string) ([]Contact, error) 
 			out = append(out, ct)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Name != out[j].Name {
-			return out[i].Name < out[j].Name
-		}
-		return out[i].JID < out[j].JID
+	slices.SortFunc(out, func(a, b Contact) int {
+		return cmp.Or(cmp.Compare(a.Name, b.Name), cmp.Compare(a.JID, b.JID))
 	})
 	return out, nil
 }
