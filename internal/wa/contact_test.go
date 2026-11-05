@@ -22,6 +22,10 @@ func TestVCardPhones(t *testing.T) {
 	if got, want := vcardPhones(phoneVCard), []string{"+31 6 12345678", "+31 20 1234567"}; !slices.Equal(got, want) {
 		t.Errorf("vcardPhones = %q, want %q", got, want)
 	}
+	// A dot in a parameter must not be taken for a group prefix.
+	if got, want := vcardPhones("TEL;X-ABLabel=St. Mary's:+44 20 7946 0000"), []string{"+44 20 7946 0000"}; !slices.Equal(got, want) {
+		t.Errorf("vcardPhones with a dotted parameter = %q, want %q", got, want)
+	}
 	if got := vcardPhones("BEGIN:VCARD\nFN:No Number\nEND:VCARD"); got != nil {
 		t.Errorf("vcardPhones without TEL = %q", got)
 	}

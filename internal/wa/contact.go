@@ -21,11 +21,12 @@ func vcardPhones(vcard string) []string {
 		if !ok {
 			continue
 		}
-		// A property may be grouped, as in "item1.TEL;waid=...".
-		if _, after, grouped := strings.Cut(prop, "."); grouped {
-			prop = after
-		}
+		// Parameters may hold dots, so drop them before the group, as in
+		// "item1.TEL;waid=...".
 		name, _, _ := strings.Cut(prop, ";")
+		if i := strings.LastIndexByte(name, '.'); i >= 0 {
+			name = name[i+1:]
+		}
 		if strings.EqualFold(name, "TEL") && strings.TrimSpace(value) != "" {
 			phones = append(phones, strings.TrimSpace(value))
 		}
