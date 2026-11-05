@@ -54,11 +54,5 @@ func (c *Client) onReceipt(e *events.Receipt) {
 // isSelf reports whether jid is the account, by phone number or LID.
 func (c *Client) isSelf(jid types.JID) bool {
 	jid = jid.ToNonAD()
-	if id := c.device.ID; id != nil && id.ToNonAD() == jid {
-		return true
-	}
-	if lid := c.device.GetLID(); !lid.IsEmpty() && lid.ToNonAD() == jid {
-		return true
-	}
-	return false
+	return !jid.IsEmpty() && (jid == c.device.GetJID().ToNonAD() || jid == c.device.GetLID().ToNonAD())
 }

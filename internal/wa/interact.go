@@ -210,10 +210,7 @@ func (c *Client) MarkChatRead(ctx context.Context, chat types.JID) error {
 // archived message. The archive keeps senders under their phone number, but
 // groups using LID addressing identify participants by LID.
 func (c *Client) wireSender(ctx context.Context, chat types.JID, m store.Message) types.JID {
-	var own types.JID
-	if id := c.device.ID; id != nil {
-		own = id.ToNonAD()
-	}
+	own := c.device.GetJID().ToNonAD()
 	sender, _ := types.ParseJID(m.SenderJID)
 	var senderLID types.JID
 	lidGroup := false

@@ -157,15 +157,12 @@ func (c *Client) Stop() { c.cli.Disconnect() }
 
 // Status reports the connection state.
 func (c *Client) Status() Status {
-	s := Status{
+	return Status{
 		Connected: c.cli.IsConnected(),
 		LoggedIn:  c.cli.IsLoggedIn(),
 		Pairing:   c.QRCode() != "",
+		JID:       c.device.GetJID().ToNonAD().String(),
 	}
-	if id := c.device.ID; id != nil {
-		s.JID = id.ToNonAD().String()
-	}
-	return s
 }
 
 // Contacts returns address-book entries whose name, push name or JID contains
