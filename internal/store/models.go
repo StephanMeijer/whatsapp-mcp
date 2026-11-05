@@ -26,6 +26,7 @@ const (
 	MediaSticker  MediaKind = "sticker"
 	MediaPoll     MediaKind = "poll"
 	MediaLocation MediaKind = "location"
+	MediaContact  MediaKind = "contact"
 )
 
 // Message is one archived message. Only messages with text or media are
@@ -42,9 +43,10 @@ type Message struct {
 	FromMe    bool   `gorm:"not null"`
 	Text      string `gorm:"not null;default:''"`
 	// MediaType is empty for plain text, otherwise image, video, audio,
-	// document, sticker, poll or location. A poll's Text is its question
-	// followed by one "- option" line per option; a location's is its name
-	// and address, then its coordinates and a map link.
+	// document, sticker, poll, location or contact. A poll's Text is its
+	// question followed by one "- option" line per option; a location's is
+	// its name and address, then its coordinates and a map link; a contact's
+	// is one "Name: +number, ..." line per contact card.
 	MediaType MediaKind `gorm:"not null;default:''"`
 	// EditedAt is the Unix time of the last applied edit; 0 if never edited.
 	EditedAt int64 `gorm:"not null;default:0"`

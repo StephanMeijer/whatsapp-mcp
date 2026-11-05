@@ -47,6 +47,8 @@ func (c *Client) Media(ctx context.Context, m store.Message) (Media, error) {
 		return Media{}, errors.New("this message is a poll, which has no file; its question and options are the message text")
 	case store.MediaLocation:
 		return Media{}, errors.New("this message is a location, which has no file; its place and coordinates are the message text")
+	case store.MediaContact:
+		return Media{}, errors.New("this message is a contact card, which has no file; its names and numbers are the message text")
 	}
 	if len(m.MediaRef) == 0 {
 		return Media{}, ErrNoMediaRef

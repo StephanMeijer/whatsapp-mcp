@@ -192,5 +192,8 @@ func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 	if text, ok := locationContent(m); ok {
 		return text, store.MediaLocation
 	}
+	if text, ok := contactContent(m); ok {
+		return text, store.MediaContact
+	}
 	return "", ""
 }

@@ -104,7 +104,7 @@ func editable(m store.Message, text string, now time.Time) error {
 	}
 	switch m.MediaType {
 	case "", store.MediaImage, store.MediaVideo, store.MediaDocument:
-	case store.MediaPoll, store.MediaLocation:
+	case store.MediaPoll, store.MediaLocation, store.MediaContact:
 		return fmt.Errorf("message %s is a %s, and %ss can't be edited", m.MessageID, m.MediaType, m.MediaType)
 	default:
 		return fmt.Errorf("message %s is %s without a caption, so it has no text to edit", m.MessageID, articled(m.MediaType))
