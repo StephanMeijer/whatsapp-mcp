@@ -155,16 +155,9 @@ func (c *Client) nameAfterMembers(ctx context.Context, groups []*types.GroupInfo
 		c.log.Warn("name groups after members: look up names", "err", err)
 		return
 	}
-	self := map[types.JID]bool{}
-	if id := c.device.ID; id != nil {
-		self[id.ToNonAD()] = true
-	}
-	if lid := c.device.GetLID(); !lid.IsEmpty() {
-		self[lid.ToNonAD()] = true
-	}
 	nameOf := func(p types.GroupParticipant) (string, bool) {
 		jid := c.Canonical(ctx, participantJID(p))
-		if self[jid] || self[p.JID.ToNonAD()] || self[p.LID.ToNonAD()] {
+		if c.isSelf(jid) || c.isSelf(p.JID) || c.isSelf(p.LID) {
 			return "", false
 		}
 		if n := known[jid]; n != "" {

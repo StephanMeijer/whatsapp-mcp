@@ -176,3 +176,23 @@ func TestReconcileNamesGroups(t *testing.T) {
 		t.Errorf("group names = %v, want %v", got, want)
 	}
 }
+
+// A device that has not learned its LID yet must not mistake every member
+// without a LID for the account.
+func TestReconcileNamesGroupsWithoutOwnLID(t *testing.T) {
+	c, fake, _, contacts := newTestClient(t)
+	addressBook(contacts)
+	c.device.LID = types.JID{}
+	ctx := context.Background()
+	if err := c.store.Save(ctx, []store.Chat{{JID: testGroup.String()}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	fake.joined = []*types.GroupInfo{{JID: testGroup, Participants: []types.GroupParticipant{
+		{JID: alicePN},
+		{JID: ownJID.ToNonAD()},
+	}}}
+	c.reconcile(ctx, true)
+	if got := chatNames(t, c, testGroup)[testGroup.String()]; got != "Alice Saved" {
+		t.Errorf("group named %q, want %q", got, "Alice Saved")
+	}
+}

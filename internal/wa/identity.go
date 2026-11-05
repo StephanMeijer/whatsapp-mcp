@@ -152,10 +152,7 @@ func (c *Client) Names(ctx context.Context, jids []types.JID) (map[types.JID]str
 	if err != nil {
 		return nil, err
 	}
-	var self types.JID
-	if id := c.device.ID; id != nil {
-		self = id.ToNonAD()
-	}
+	self := c.device.GetJID().ToNonAD()
 	lidFor := func(pn types.JID) types.JID {
 		lid, err := c.device.LIDs.GetLIDForPN(ctx, pn)
 		if err != nil {
