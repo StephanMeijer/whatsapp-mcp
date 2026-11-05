@@ -19,7 +19,7 @@ test:
 test-postgres:
 	docker run -d --rm --name whatsapp-mcp-test-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=wa \
 		-p 127.0.0.1:55432:5432 postgres:17-alpine >/dev/null
-	until docker exec whatsapp-mcp-test-pg pg_isready -U postgres -d wa >/dev/null 2>&1; do sleep 1; done
+	until docker exec whatsapp-mcp-test-pg pg_isready -h 127.0.0.1 -U postgres -d wa >/dev/null 2>&1; do sleep 1; done
 	TEST_POSTGRES_URL='$(PG_URL)' go test -count=1 ./internal/store/...; \
 		status=$$?; docker stop whatsapp-mcp-test-pg >/dev/null; exit $$status
 
