@@ -3,7 +3,9 @@
 package db
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -52,5 +54,32 @@ func TestOpenSQLiteEnablesForeignKeys(t *testing.T) {
 	}
 	if fk != 1 {
 		t.Errorf("foreign_keys = %d, want 1 (whatsmeow requires it)", fk)
+	}
+}
+
+func TestOpenErrors(t *testing.T) {
+	notADir := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(notADir, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, url, want string
+	}{
+		{"unparsable URL", "sqlite://%zz", "parse database URL"},
+		{"sqlite directory cannot be created", "sqlite://" + filepath.Join(notADir, "wa.db"), "create database directory"},
+		// Port 1 on loopback refuses at once, so this fails fast without a server.
+		{"postgres unreachable", "postgres://u:p@127.0.0.1:1/wa?sslmode=disable&connect_timeout=5", "open postgres database"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			d, err := Open(tt.url)
+			if err == nil {
+				d.Close()
+				t.Fatalf("Open(%q): want error", tt.url)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("Open(%q) = %v; want error containing %q", tt.url, err, tt.want)
+			}
+		})
 	}
 }
