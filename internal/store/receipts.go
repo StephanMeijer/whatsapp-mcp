@@ -51,14 +51,15 @@ type Receipt struct {
 // kept, so replayed or out-of-order receipts change nothing. It reports
 // whether the message's status moved.
 func (s *Store) RecordReceipt(ctx context.Context, chatJID, messageID, participant, status string, at time.Time) (bool, error) {
+	r := Receipt{ChatJID: chatJID, MessageID: messageID, ParticipantJID: participant}
 	var column string
 	switch status {
 	case StatusDelivered:
-		column = "delivered_at"
+		column, r.DeliveredAt = "delivered_at", at.Unix()
 	case StatusRead:
-		column = "read_at"
+		column, r.ReadAt = "read_at", at.Unix()
 	case StatusPlayed:
-		column = "played_at"
+		column, r.PlayedAt = "played_at", at.Unix()
 	default:
 		return false, fmt.Errorf("receipt status %q is not delivered, read or played", status)
 	}
@@ -68,15 +69,6 @@ func (s *Store) RecordReceipt(ctx context.Context, chatJID, messageID, participa
 		if err := tx.Model(&Message{}).Where("chat_jid = ? AND message_id = ? AND from_me = ?", chatJID, messageID, true).
 			Count(&n).Error; err != nil || n == 0 {
 			return err
-		}
-		r := Receipt{ChatJID: chatJID, MessageID: messageID, ParticipantJID: participant}
-		switch column {
-		case "delivered_at":
-			r.DeliveredAt = at.Unix()
-		case "read_at":
-			r.ReadAt = at.Unix()
-		case "played_at":
-			r.PlayedAt = at.Unix()
 		}
 		keep := fmt.Sprintf("CASE WHEN receipts.%s = 0 THEN excluded.%s ELSE receipts.%s END", column, column, column)
 		if err := tx.Clauses(clause.OnConflict{
