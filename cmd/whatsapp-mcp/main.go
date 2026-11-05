@@ -148,7 +148,7 @@ func routes(publicURL, token string, mcpSrv *mcp.Server, pair http.Handler) (htt
 
 // pairHandler serves the pending pairing QR code as a PNG, for hosts where
 // the terminal output isn't visible.
-func pairHandler(client *wa.Client) http.Handler {
+func pairHandler(client interface{ QRCode() string }) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		code := client.QRCode()
 		if code == "" {
