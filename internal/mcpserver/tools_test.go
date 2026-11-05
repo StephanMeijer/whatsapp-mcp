@@ -64,6 +64,10 @@ type fakeWA struct {
 
 	// unpaired makes Status report no own JID, as before pairing.
 	unpaired bool
+
+	// writeErr makes every call that sends something to WhatsApp fail
+	// before it is recorded in sent.
+	writeErr error
 }
 
 func (f *fakeWA) ContactInfo(_ context.Context, jid types.JID) (wa.ContactInfo, error) {
@@ -148,6 +152,9 @@ func (f *fakeWA) Contacts(context.Context, string) ([]wa.Contact, error) {
 }
 
 func (f *fakeWA) SendText(_ context.Context, recipient, text string, quoted *store.Message) (store.Message, error) {
+	if f.writeErr != nil {
+		return store.Message{}, f.writeErr
+	}
 	entry := recipient + ": " + text
 	if quoted != nil {
 		entry += " (reply to " + quoted.MessageID + ")"
@@ -157,17 +164,26 @@ func (f *fakeWA) SendText(_ context.Context, recipient, text string, quoted *sto
 }
 
 func (f *fakeWA) React(_ context.Context, chat types.JID, target store.Message, emoji string) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	f.sent = append(f.sent, fmt.Sprintf("react %s/%s %q", chat, target.MessageID, emoji))
 	return nil
 }
 
 func (f *fakeWA) EditMessage(_ context.Context, chat types.JID, target store.Message, text string) (store.Message, error) {
+	if f.writeErr != nil {
+		return store.Message{}, f.writeErr
+	}
 	f.sent = append(f.sent, fmt.Sprintf("edit %s/%s %q", chat, target.MessageID, text))
 	target.Text, target.EditedAt = text, 1_700_000_000
 	return target, nil
 }
 
 func (f *fakeWA) DeleteMessage(_ context.Context, chat types.JID, target store.Message) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	f.sent = append(f.sent, fmt.Sprintf("delete %s/%s", chat, target.MessageID))
 	return nil
 }
@@ -180,17 +196,26 @@ func (f *fakeWA) Media(_ context.Context, m store.Message) (wa.Media, error) {
 }
 
 func (f *fakeWA) SendMedia(_ context.Context, recipient string, m wa.OutgoingMedia) (store.Message, error) {
+	if f.writeErr != nil {
+		return store.Message{}, f.writeErr
+	}
 	f.sent = append(f.sent, fmt.Sprintf("media %s %s %q %d bytes %q", recipient, m.Kind, m.FileName, len(m.Data), m.Caption))
 	f.lastMedia = m.Data
 	return store.Message{ChatJID: recipient, MessageID: "MEDIA1", Timestamp: 1_700_000_000, FromMe: true, MediaType: m.Kind, Text: m.Caption}, nil
 }
 
 func (f *fakeWA) RejectCall(_ context.Context, callID string) (store.Call, error) {
+	if f.writeErr != nil {
+		return store.Call{}, f.writeErr
+	}
 	f.sent = append(f.sent, "reject "+callID)
 	return store.Call{CallID: callID, CallerJID: "31600000001@s.whatsapp.net", Status: store.CallRejected, StartedAt: 1}, nil
 }
 
 func (f *fakeWA) SetChatState(_ context.Context, chat types.JID, fl store.ChatFlags) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	show := func(v any) string {
 		switch v := v.(type) {
 		case *bool:
@@ -209,6 +234,9 @@ func (f *fakeWA) SetChatState(_ context.Context, chat types.JID, fl store.ChatFl
 }
 
 func (f *fakeWA) MarkChatRead(_ context.Context, chat types.JID) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
 	f.sent = append(f.sent, "read "+chat.String())
 	return nil
 }
