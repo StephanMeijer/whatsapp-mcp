@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"go.mau.fi/whatsmeow/proto/waVnameCert"
 	"go.mau.fi/whatsmeow/types"
@@ -34,6 +35,8 @@ func TestFetchPicture(t *testing.T) {
 		switch r.URL.Path {
 		case "/pic.jpg":
 			w.Write(jpeg)
+		case "/slow":
+			<-r.Context().Done()
 		case "/huge":
 			w.Write(bytes.Repeat([]byte("x"), MaxMediaBytes+1))
 		default:
@@ -54,5 +57,11 @@ func TestFetchPicture(t *testing.T) {
 	}
 	if _, err := fetchPicture(context.Background(), srv.URL+"/missing"); err == nil || !strings.Contains(err.Error(), "404") {
 		t.Errorf("missing picture: err = %v, want HTTP 404", err)
+	}
+
+	defer func(c *http.Client) { pictureClient = c }(pictureClient)
+	pictureClient = &http.Client{Timeout: 50 * time.Millisecond}
+	if _, err := fetchPicture(context.Background(), srv.URL+"/slow"); err == nil || !strings.Contains(err.Error(), "Timeout") {
+		t.Errorf("stalled picture: err = %v, want a timeout", err)
 	}
 }
