@@ -26,7 +26,7 @@ func (t *tools) contactInfo(ctx context.Context, _ *mcp.CallToolRequest, in Cont
 	if in.JID == "" {
 		return nil, ContactInfoOut{}, errors.New("jid is required")
 	}
-	jid, err := t.policy.checkRecipient(ctx, t.wa, in.JID, t.wa.Status().JID)
+	jid, err := t.policy.checkRecipient(ctx, t.wa, in.JID)
 	if err != nil {
 		return nil, ContactInfoOut{}, err
 	}
@@ -46,7 +46,7 @@ func (t *tools) getProfilePicture(ctx context.Context, _ *mcp.CallToolRequest, i
 	if in.JID == "" {
 		return nil, nil, errors.New("jid is required")
 	}
-	jid, err := t.policy.checkRecipient(ctx, t.wa, in.JID, t.wa.Status().JID)
+	jid, err := t.policy.checkRecipient(ctx, t.wa, in.JID)
 	if err != nil {
 		return nil, nil, err
 	}

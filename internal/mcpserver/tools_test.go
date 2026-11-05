@@ -61,6 +61,9 @@ type fakeWA struct {
 	picture      wa.Media
 	pictureErr   error
 	pictureCalls []string
+
+	// unpaired makes Status report no own JID, as before pairing.
+	unpaired bool
 }
 
 func (f *fakeWA) ContactInfo(_ context.Context, jid types.JID) (wa.ContactInfo, error) {
@@ -134,6 +137,9 @@ func (f *fakeWA) Canonical(_ context.Context, jid types.JID) types.JID {
 }
 
 func (f *fakeWA) Status() wa.Status {
+	if f.unpaired {
+		return wa.Status{}
+	}
 	return wa.Status{Connected: true, LoggedIn: true, JID: "31600000000@s.whatsapp.net"}
 }
 

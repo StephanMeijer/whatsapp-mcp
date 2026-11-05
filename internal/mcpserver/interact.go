@@ -37,7 +37,7 @@ func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (
 	if len(in.Emoji) > maxEmojiLen || strings.ContainsAny(in.Emoji, " \t\n") {
 		return nil, ReactOut{}, errors.New("emoji must be a single emoji (or empty to remove)")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
 	if err != nil {
 		return nil, ReactOut{}, err
 	}
@@ -77,7 +77,7 @@ func (t *tools) editMessage(ctx context.Context, _ *mcp.CallToolRequest, in Edit
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
 	if err != nil {
 		return nil, Message{}, err
 	}
@@ -107,7 +107,7 @@ func (t *tools) deleteMessage(ctx context.Context, _ *mcp.CallToolRequest, in De
 	if in.ChatJID == "" || in.MessageID == "" {
 		return nil, DeleteMessageOut{}, errors.New("chat_jid and message_id are required")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
 	if err != nil {
 		return nil, DeleteMessageOut{}, err
 	}
@@ -133,7 +133,7 @@ func (t *tools) markRead(ctx context.Context, _ *mcp.CallToolRequest, in MarkRea
 	if in.ChatJID == "" {
 		return nil, MarkReadOut{}, errors.New("chat_jid is required")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
 	if err != nil {
 		return nil, MarkReadOut{}, err
 	}

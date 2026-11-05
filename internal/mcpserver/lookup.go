@@ -61,7 +61,7 @@ func (t *tools) checkNumber(ctx context.Context, _ *mcp.CallToolRequest, in Chec
 		if err != nil {
 			return nil, CheckNumberOut{}, err
 		}
-		if _, err := t.policy.checkRecipient(ctx, t.wa, n, t.wa.Status().JID); err != nil {
+		if _, err := t.policy.checkRecipient(ctx, t.wa, n); err != nil {
 			return nil, CheckNumberOut{}, err
 		}
 		if !slices.Contains(phones, n) {

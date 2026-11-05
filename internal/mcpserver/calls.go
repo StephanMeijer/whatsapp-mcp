@@ -103,7 +103,7 @@ func (t *tools) rejectCall(ctx context.Context, _ *mcp.CallToolRequest, in Rejec
 	if err != nil {
 		return nil, CallOut{}, err
 	}
-	if _, err := t.policy.checkRecipient(ctx, t.wa, call.CallerJID, t.wa.Status().JID); err != nil {
+	if _, err := t.policy.checkRecipient(ctx, t.wa, call.CallerJID); err != nil {
 		return nil, CallOut{}, err
 	}
 	rejected, err := t.wa.RejectCall(ctx, in.CallID)

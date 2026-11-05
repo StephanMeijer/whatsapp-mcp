@@ -126,7 +126,7 @@ func (t *tools) sendMessage(ctx context.Context, _ *mcp.CallToolRequest, in Send
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	to, err := t.policy.checkRecipient(ctx, t.wa, in.Recipient, t.wa.Status().JID)
+	to, err := t.policy.checkRecipient(ctx, t.wa, in.Recipient)
 	if err != nil {
 		return nil, Message{}, err
 	}

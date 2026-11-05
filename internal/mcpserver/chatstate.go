@@ -41,7 +41,7 @@ func (t *tools) setChatState(ctx context.Context, _ *mcp.CallToolRequest, in Set
 	if f.Archived == nil && f.Pinned == nil && f.MutedUntil == nil {
 		return nil, Chat{}, errors.New("set at least one of archived, pinned or mute")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID, t.wa.Status().JID)
+	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
 	if err != nil {
 		return nil, Chat{}, err
 	}
