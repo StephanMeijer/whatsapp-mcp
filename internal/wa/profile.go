@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow"
@@ -22,6 +23,10 @@ type ContactInfo struct {
 	BusinessName string `json:"business_name,omitempty" jsonschema:"the verified business name, if it is a business account"`
 	HasPicture   bool   `json:"has_picture"`
 }
+
+// pictureClient bounds the CDN download so a stalled connection cannot hold
+// the tool call until the client gives up.
+var pictureClient = &http.Client{Timeout: 30 * time.Second}
 
 var (
 	ErrPictureHidden = errors.New("this profile picture is hidden from you")
@@ -83,7 +88,7 @@ func fetchPicture(ctx context.Context, url string) (Media, error) {
 	if err != nil {
 		return Media{}, fmt.Errorf("profile picture: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := pictureClient.Do(req)
 	if err != nil {
 		return Media{}, fmt.Errorf("download profile picture: %w", err)
 	}
