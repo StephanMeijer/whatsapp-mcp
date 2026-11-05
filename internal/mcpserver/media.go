@@ -16,7 +16,7 @@ import (
 
 type GetMediaIn struct {
 	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
-	MessageID string `json:"message_id" jsonschema:"id of a message with media_type set (not a poll)"`
+	MessageID string `json:"message_id" jsonschema:"id of a message with media_type set (not a poll or location)"`
 }
 
 // getMedia returns the file as MCP content rather than structured output,

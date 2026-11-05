@@ -81,7 +81,7 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "get_media",
 		Description: "Download the photo, sticker, video, voice note or document attached to a message " +
-			"(a message whose media_type is set, other than poll). Images are returned as images you can look at. " +
+			"(a message whose media_type is set, other than poll or location). Images are returned as images you can look at. " +
 			"Files up to 16 MB; media WhatsApp no longer stores cannot be retrieved.",
 		Annotations: readOnly,
 	}, t.getMedia)
@@ -143,6 +143,11 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.sendMedia)
 	mcp.AddTool(s, &mcp.Tool{
+		Name:        "send_location",
+		Description: "Send a location pin, with an optional place name and address, delivered immediately.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
+	}, t.sendLocation)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "reject_call",
 		Description: "Decline an incoming call that is still ringing; the caller sees it as declined.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
@@ -190,7 +195,7 @@ type Message struct {
 	Timestamp  string `json:"timestamp" jsonschema:"RFC 3339"`
 	FromMe     bool   `json:"from_me"`
 	Text       string `json:"text,omitempty"`
-	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document, sticker or poll; empty for text. A poll's text is its question followed by one '- option' line per option"`
+	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document, sticker, poll or location; empty for text. A poll's text is its question followed by one '- option' line per option; a location's is its name and address, then its coordinates and a map link"`
 	EditedAt   string `json:"edited_at,omitempty" jsonschema:"RFC 3339; set if the message was edited"`
 	Status     string `json:"status,omitempty" jsonschema:"your own messages only: sent, delivered, read or played, the furthest any recipient got; see message_receipts"`
 }

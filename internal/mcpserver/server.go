@@ -55,6 +55,8 @@ type WhatsApp interface {
 	Media(ctx context.Context, m store.Message) (wa.Media, error)
 	// SendMedia uploads and sends a file.
 	SendMedia(ctx context.Context, recipient string, f wa.OutgoingMedia) (store.Message, error)
+	// SendLocation sends a location pin.
+	SendLocation(ctx context.Context, recipient string, lat, lon float64, name, address string) (store.Message, error)
 	// RejectCall declines a call that is still ringing.
 	RejectCall(ctx context.Context, callID string) (store.Call, error)
 	// FetchOlder asks the phone for messages older than the archive has.

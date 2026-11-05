@@ -42,8 +42,11 @@ func (c *Client) Media(ctx context.Context, m store.Message) (Media, error) {
 	if m.MediaType == "" {
 		return Media{}, errors.New("this message has no media")
 	}
-	if m.MediaType == store.MediaPoll {
+	switch m.MediaType {
+	case store.MediaPoll:
 		return Media{}, errors.New("this message is a poll, which has no file; its question and options are the message text")
+	case store.MediaLocation:
+		return Media{}, errors.New("this message is a location, which has no file; its place and coordinates are the message text")
 	}
 	if len(m.MediaRef) == 0 {
 		return Media{}, ErrNoMediaRef
