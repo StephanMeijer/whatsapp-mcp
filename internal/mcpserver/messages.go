@@ -105,10 +105,7 @@ type SearchMessagesIn struct {
 }
 
 func (t *tools) searchMessages(ctx context.Context, _ *mcp.CallToolRequest, in SearchMessagesIn) (*mcp.CallToolResult, MessagesOut, error) {
-	chat := in.ChatJID
-	if chat != "" {
-		chat = t.canonicalChat(ctx, chat)
-	}
+	chat := t.canonicalChat(ctx, in.ChatJID)
 	msgs, err := t.store.SearchMessages(ctx, in.Query, chat, in.Limit)
 	if err != nil {
 		return nil, MessagesOut{}, err
