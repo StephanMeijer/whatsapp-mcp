@@ -3,8 +3,6 @@
 package wa
 
 import (
-	"sync"
-	"sync/atomic"
 	"testing"
 
 	"go.mau.fi/whatsmeow/types"
@@ -71,33 +69,6 @@ func TestRenameFromGroupInfo(t *testing.T) {
 		if _, _, ok := renameFromGroupInfo(e); ok {
 			t.Errorf("not a rename, but ok: %+v", e)
 		}
-	}
-}
-
-func TestGroupLookupsOncePerGroup(t *testing.T) {
-	var g groupLookups
-	if !g.shouldLookup("a") || g.shouldLookup("a") {
-		t.Error("want true once, then false")
-	}
-	if !g.shouldLookup("b") {
-		t.Error("other groups are independent")
-	}
-
-	var c groupLookups
-	var trues atomic.Int32
-	var wg sync.WaitGroup
-	for range 50 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			if c.shouldLookup("same") {
-				trues.Add(1)
-			}
-		}()
-	}
-	wg.Wait()
-	if n := trues.Load(); n != 1 {
-		t.Errorf("concurrent lookups allowed %d times, want 1", n)
 	}
 }
 

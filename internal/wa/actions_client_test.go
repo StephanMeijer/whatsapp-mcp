@@ -269,7 +269,7 @@ func TestOnMessage(t *testing.T) {
 	}
 	// In a group, the chat is not named after the sender. The group-name
 	// lookup is marked done first, so no background lookup starts.
-	c.groupLookups.shouldLookup(testGroup.String())
+	c.groupLookups.Store(testGroup.String(), struct{}{})
 	c.onMessage(liveMessage(testGroup, alicePN, "G1", false, "Alice P", text("all")))
 	archived(t, c, testGroup, "G1")
 	if got := chatNames(t, c, testGroup)[testGroup.String()]; got != "" {
