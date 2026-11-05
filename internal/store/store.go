@@ -409,19 +409,15 @@ var ErrNotFound = errors.New("not found")
 // the index of the message itself in that slice. Order matches ListMessages:
 // by timestamp, then archive sequence for messages in the same second.
 func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, before, after int) ([]Message, int, error) {
+	target, err := s.MessageByID(ctx, chatJID, messageID)
+	if err != nil {
+		return nil, 0, err
+	}
 	db := s.db.WithContext(ctx)
-	var target Message
-	res := db.Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).Limit(1).Find(&target)
-	if res.Error != nil {
-		return nil, 0, res.Error
-	}
-	if res.RowsAffected == 0 {
-		return nil, 0, ErrNotFound
-	}
 
 	var prev, next []Message
 	if before > 0 {
-		err := db.Where("chat_jid = ? AND deleted = ? AND (timestamp < ? OR (timestamp = ? AND seq < ?))",
+		err = db.Where("chat_jid = ? AND deleted = ? AND (timestamp < ? OR (timestamp = ? AND seq < ?))",
 			chatJID, false, target.Timestamp, target.Timestamp, target.Seq).
 			Order("timestamp DESC").Order("seq DESC").Limit(before).Find(&prev).Error
 		if err != nil {
@@ -430,7 +426,7 @@ func (s *Store) MessageContext(ctx context.Context, chatJID, messageID string, b
 		slices.Reverse(prev)
 	}
 	if after > 0 {
-		err := db.Where("chat_jid = ? AND deleted = ? AND (timestamp > ? OR (timestamp = ? AND seq > ?))",
+		err = db.Where("chat_jid = ? AND deleted = ? AND (timestamp > ? OR (timestamp = ? AND seq > ?))",
 			chatJID, false, target.Timestamp, target.Timestamp, target.Seq).
 			Order("timestamp ASC").Order("seq ASC").Limit(after).Find(&next).Error
 		if err != nil {
