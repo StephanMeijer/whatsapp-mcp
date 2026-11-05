@@ -10,7 +10,6 @@ import (
 	"go.mau.fi/whatsmeow/appstate"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
@@ -22,12 +21,12 @@ func chatFlagsFor(evt any) (types.JID, store.ChatFlags, bool) {
 		if e.Action == nil {
 			break
 		}
-		return e.JID, store.ChatFlags{Archived: proto.Bool(e.Action.GetArchived())}, true
+		return e.JID, store.ChatFlags{Archived: new(e.Action.GetArchived())}, true
 	case *events.Pin:
 		if e.Action == nil {
 			break
 		}
-		return e.JID, store.ChatFlags{Pinned: proto.Bool(e.Action.GetPinned())}, true
+		return e.JID, store.ChatFlags{Pinned: new(e.Action.GetPinned())}, true
 	case *events.Mute:
 		if e.Action == nil {
 			break
@@ -84,7 +83,7 @@ func (c *Client) SetChatState(ctx context.Context, chat types.JID, f store.ChatF
 	if f.MutedUntil != nil {
 		var end *int64
 		if *f.MutedUntil > 0 {
-			end = proto.Int64(*f.MutedUntil * 1000)
+			end = new(*f.MutedUntil * 1000)
 		}
 		if err := c.cli.SendAppState(ctx, appstate.BuildMuteAbs(chat, *f.MutedUntil != 0, end)); err != nil {
 			return fmt.Errorf("mute chat: %w", err)

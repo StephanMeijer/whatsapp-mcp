@@ -25,10 +25,10 @@ func chatStateStore(t *testing.T) *store.Store {
 	}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: ptr(true)}); err != nil {
+	if err := st.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: new(true)}); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.SetChatFlags(ctx, carol, store.ChatFlags{Archived: ptr(true), MutedUntil: ptr(int64(-1))}); err != nil {
+	if err := st.SetChatFlags(ctx, carol, store.ChatFlags{Archived: new(true), MutedUntil: new(int64(-1))}); err != nil {
 		t.Fatal(err)
 	}
 	return st
