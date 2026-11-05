@@ -31,17 +31,10 @@ type ReactOut struct {
 const maxEmojiLen = 32
 
 func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (*mcp.CallToolResult, ReactOut, error) {
-	if in.ChatJID == "" || in.MessageID == "" {
-		return nil, ReactOut{}, errors.New("chat_jid and message_id are required")
-	}
 	if len(in.Emoji) > maxEmojiLen || strings.ContainsAny(in.Emoji, " \t\n") {
 		return nil, ReactOut{}, errors.New("emoji must be a single emoji (or empty to remove)")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
-	if err != nil {
-		return nil, ReactOut{}, err
-	}
-	target, err := t.archivedMessage(ctx, chat, in.MessageID)
+	chat, target, err := t.chatTarget(ctx, in.ChatJID, in.MessageID)
 	if err != nil {
 		return nil, ReactOut{}, err
 	}
@@ -51,17 +44,31 @@ func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (
 	return nil, ReactOut{ChatJID: chat.String(), MessageID: in.MessageID, Removed: in.Emoji == ""}, nil
 }
 
-// ownMessage looks up an archived message the account sent itself, for a
-// tool that may only act on those; verb says what the tool does with it.
-func (t *tools) ownMessage(ctx context.Context, chat types.JID, id, verb string) (store.Message, error) {
-	m, err := t.archivedMessage(ctx, chat, id)
+// chatTarget resolves the chat and archived message a write tool acts on,
+// checking the chat against the recipient policy.
+func (t *tools) chatTarget(ctx context.Context, chatJID, messageID string) (types.JID, store.Message, error) {
+	if chatJID == "" || messageID == "" {
+		return types.JID{}, store.Message{}, errors.New("chat_jid and message_id are required")
+	}
+	chat, err := t.policy.checkRecipient(ctx, t.wa, chatJID)
 	if err != nil {
-		return store.Message{}, err
+		return types.JID{}, store.Message{}, err
+	}
+	m, err := t.archivedMessage(ctx, chat, messageID)
+	return chat, m, err
+}
+
+// ownMessage is chatTarget for a tool that may only act on the account's
+// own messages; verb says what the tool does with it.
+func (t *tools) ownMessage(ctx context.Context, chatJID, messageID, verb string) (types.JID, store.Message, error) {
+	chat, m, err := t.chatTarget(ctx, chatJID, messageID)
+	if err != nil {
+		return types.JID{}, store.Message{}, err
 	}
 	if !m.FromMe {
-		return store.Message{}, fmt.Errorf("message %s was not sent by you; only your own messages can be %s", id, verb)
+		return types.JID{}, store.Message{}, fmt.Errorf("message %s was not sent by you; only your own messages can be %s", messageID, verb)
 	}
-	return m, nil
+	return chat, m, nil
 }
 
 type EditMessageIn struct {
@@ -71,17 +78,10 @@ type EditMessageIn struct {
 }
 
 func (t *tools) editMessage(ctx context.Context, _ *mcp.CallToolRequest, in EditMessageIn) (*mcp.CallToolResult, Message, error) {
-	if in.ChatJID == "" || in.MessageID == "" {
-		return nil, Message{}, errors.New("chat_jid and message_id are required")
-	}
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
-	if err != nil {
-		return nil, Message{}, err
-	}
-	target, err := t.ownMessage(ctx, chat, in.MessageID, "edited")
+	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "edited")
 	if err != nil {
 		return nil, Message{}, err
 	}
@@ -104,14 +104,7 @@ type DeleteMessageOut struct {
 }
 
 func (t *tools) deleteMessage(ctx context.Context, _ *mcp.CallToolRequest, in DeleteMessageIn) (*mcp.CallToolResult, DeleteMessageOut, error) {
-	if in.ChatJID == "" || in.MessageID == "" {
-		return nil, DeleteMessageOut{}, errors.New("chat_jid and message_id are required")
-	}
-	chat, err := t.policy.checkRecipient(ctx, t.wa, in.ChatJID)
-	if err != nil {
-		return nil, DeleteMessageOut{}, err
-	}
-	target, err := t.ownMessage(ctx, chat, in.MessageID, "deleted")
+	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "deleted")
 	if err != nil {
 		return nil, DeleteMessageOut{}, err
 	}
