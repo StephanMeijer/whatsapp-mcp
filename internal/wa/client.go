@@ -47,7 +47,7 @@ type Client struct {
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
-	groupModes groupModes // per-group addressing mode, for message keys
+	groupModes sync.Map // types.JID -> bool: whether the group uses LID addressing
 
 	groupLookups groupLookups // groups whose missing name was looked up this run
 }

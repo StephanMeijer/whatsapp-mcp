@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"go.mau.fi/whatsmeow"
@@ -218,7 +217,7 @@ func (c *Client) wireSender(ctx context.Context, chat types.JID, m store.Message
 	var senderLID types.JID
 	lidGroup := false
 	if !m.FromMe && chat.Server == types.GroupServer {
-		lidGroup = c.groupModes.isLID(ctx, c, chat)
+		lidGroup = c.isLIDGroup(ctx, chat)
 		if lidGroup && sender.Server == types.DefaultUserServer {
 			if lid, err := c.device.LIDs.GetLIDForPN(ctx, sender); err == nil {
 				senderLID = lid
@@ -255,29 +254,17 @@ func replyMessage(text string, quoted store.Message, quotedSender types.JID) *wa
 	}}
 }
 
-// groupModes caches each group's addressing mode for this run.
-type groupModes struct {
-	mu   sync.Mutex
-	lids map[types.JID]bool
-}
-
-func (g *groupModes) isLID(ctx context.Context, c *Client, group types.JID) bool {
-	g.mu.Lock()
-	lid, known := g.lids[group]
-	g.mu.Unlock()
-	if known {
-		return lid
+// isLIDGroup reports whether a group uses LID addressing, cached for this
+// run. Lookup failures are not cached, so the next call tries again.
+func (c *Client) isLIDGroup(ctx context.Context, group types.JID) bool {
+	if lid, ok := c.groupModes.Load(group); ok {
+		return lid.(bool)
 	}
 	info, err := c.cli.GetGroupInfo(ctx, group)
 	if err != nil {
-		return false // not cached: try again next time
+		return false
 	}
-	lid = info.AddressingMode == types.AddressingModeLID
-	g.mu.Lock()
-	if g.lids == nil {
-		g.lids = map[types.JID]bool{}
-	}
-	g.lids[group] = lid
-	g.mu.Unlock()
+	lid := info.AddressingMode == types.AddressingModeLID
+	c.groupModes.Store(group, lid)
 	return lid
 }
