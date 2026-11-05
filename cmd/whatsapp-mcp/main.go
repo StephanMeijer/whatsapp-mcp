@@ -32,6 +32,16 @@ import (
 var version = "dev"
 
 func main() {
+	// "whatsapp-mcp healthcheck" probes a running server, for the container
+	// health check. It reads only WHATSAPP_MCP_ADDR, which the image sets,
+	// and needs no token.
+	if len(os.Args) == 2 && os.Args[1] == "healthcheck" {
+		if err := healthcheck(os.Getenv("WHATSAPP_MCP_ADDR")); err != nil {
+			fmt.Fprintln(os.Stderr, "whatsapp-mcp: healthcheck:", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "whatsapp-mcp:", err)
 		os.Exit(1)

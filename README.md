@@ -69,7 +69,8 @@ recipient.
 
 - `/mcp`: MCP streamable HTTP (bearer auth)
 - `GET /pair`: the pending pairing QR code as PNG, 404 when there is none (bearer auth)
-- `GET /healthz`: liveness, no auth
+- `GET /healthz`: liveness, no auth. `whatsapp-mcp healthcheck` probes it, for container health
+  checks; it reads `WHATSAPP_MCP_ADDR` and needs no token
 
 ## Run with Docker
 
@@ -95,6 +96,42 @@ docker logs -f whatsapp-mcp            # scan the QR code shown here on first st
 Publish the port on `127.0.0.1` only, as above; the container listens on all interfaces internally.
 Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
 container keeps the session. The other options from the table above work as environment variables.
+
+## Run with Docker Compose and Postgres
+
+[`compose.yaml`](compose.yaml) runs the server against Postgres instead of SQLite. It builds the
+image from this checkout. The WhatsApp session and the message archive both live in Postgres, on
+the `pgdata` volume.
+
+```sh
+# 1. Create .env next to compose.yaml with a token and a database password (mode 600).
+#    Use hex for the password: it goes into a URL unescaped.
+(umask 077; printf 'WHATSAPP_MCP_TOKEN=%s\nPOSTGRES_PASSWORD=%s\n' \
+  "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > .env)
+
+# 2. Build and start; returns once both services are healthy.
+docker compose up -d --build --wait
+
+# 3. Pair: scan the QR code in the log, or fetch it as a PNG.
+docker compose logs -f whatsapp-mcp
+sed -n 's/^WHATSAPP_MCP_TOKEN=/Authorization: Bearer /p' .env \
+  | curl -H @- http://127.0.0.1:8080/pair > pair.png
+```
+
+Connect a client as under [Connect a client](#connect-a-client), with the token from `.env`.
+`docker compose down` and `up` again keeps the session and the archive; `docker compose down -v`
+deletes them.
+
+Things to know:
+
+- `.env` is ignored by Git and never sent to a Docker build. Compose passes both secrets to the
+  containers as environment variables, so anyone who can run `docker inspect` on this machine can
+  read them.
+- Postgres is not published on any host port; only the server reaches it, over the Compose network.
+- The server's port is published on `127.0.0.1` only, as with `docker run` above.
+- If the QR codes expire unscanned, run `docker compose restart whatsapp-mcp` for a new one.
+- The other options from [Configuration](#configuration) go in the `environment` section of
+  `whatsapp-mcp`; for example `WHATSAPP_MCP_READ_ONLY: "true"`.
 
 ## Run as a systemd user service
 
@@ -283,7 +320,7 @@ Postgres.
 ## Layout
 
 ```
-cmd/whatsapp-mcp     wiring, HTTP server, /pair
+cmd/whatsapp-mcp     wiring, HTTP server, /pair, healthcheck
 internal/config      flags and environment
 internal/db          DATABASE_URL → GORM + *sql.DB
 internal/store       archive models, queries, per-dialect search
@@ -291,6 +328,7 @@ internal/wa          whatsmeow client: pairing, event → archive, send
 internal/mcpserver   MCP tools
 internal/httpx       bearer auth
 contrib/systemd      user unit and example env file
+compose.yaml         Docker Compose with Postgres
 ```
 
 ## Develop
