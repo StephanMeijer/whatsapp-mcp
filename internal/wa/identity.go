@@ -3,6 +3,7 @@
 package wa
 
 import (
+	"cmp"
 	"context"
 	"sort"
 
@@ -133,11 +134,11 @@ func mergeContacts(all map[types.JID]types.ContactInfo, canon func(types.JID) ty
 			continue
 		}
 		existing.Found = existing.Found || info.Found
-		existing.FirstName = firstNonEmpty(existing.FirstName, info.FirstName)
-		existing.FullName = firstNonEmpty(existing.FullName, info.FullName)
-		existing.PushName = firstNonEmpty(existing.PushName, info.PushName)
-		existing.BusinessName = firstNonEmpty(existing.BusinessName, info.BusinessName)
-		existing.RedactedPhone = firstNonEmpty(existing.RedactedPhone, info.RedactedPhone)
+		existing.FirstName = cmp.Or(existing.FirstName, info.FirstName)
+		existing.FullName = cmp.Or(existing.FullName, info.FullName)
+		existing.PushName = cmp.Or(existing.PushName, info.PushName)
+		existing.BusinessName = cmp.Or(existing.BusinessName, info.BusinessName)
+		existing.RedactedPhone = cmp.Or(existing.RedactedPhone, info.RedactedPhone)
 		out[key] = existing
 	}
 	return out
@@ -170,7 +171,7 @@ func resolveNames(all map[types.JID]types.ContactInfo, jids []types.JID, self ty
 	lidFor func(types.JID) types.JID,
 ) map[types.JID]string {
 	nameOf := func(info types.ContactInfo) string {
-		return firstNonEmpty(contactName(info), info.PushName)
+		return cmp.Or(contactName(info), info.PushName)
 	}
 	out := make(map[types.JID]string, len(jids))
 	for _, jid := range jids {
@@ -179,7 +180,7 @@ func resolveNames(all map[types.JID]types.ContactInfo, jids []types.JID, self ty
 		}
 		name := ""
 		if !self.IsEmpty() && jid.ToNonAD() == self {
-			name = firstNonEmpty(nameOf(all[jid]), ownName)
+			name = cmp.Or(nameOf(all[jid]), ownName)
 		} else {
 			name = nameOf(all[jid])
 		}

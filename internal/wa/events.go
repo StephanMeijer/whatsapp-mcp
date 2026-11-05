@@ -3,6 +3,7 @@
 package wa
 
 import (
+	"cmp"
 	"context"
 	"time"
 
@@ -100,7 +101,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 				archiveJID = pn.ToNonAD()
 			}
 		}
-		chat := store.Chat{JID: archiveJID.String(), Name: firstNonEmpty(conv.GetName(), conv.GetDisplayName())}
+		chat := store.Chat{JID: archiveJID.String(), Name: cmp.Or(conv.GetName(), conv.GetDisplayName())}
 		var msgs []store.Message
 		var changes []change
 		for _, hm := range conv.GetMessages() {
@@ -182,7 +183,7 @@ func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 		return "", store.MediaAudio
 	case m.GetDocumentMessage() != nil:
 		d := m.GetDocumentMessage()
-		return firstNonEmpty(d.GetCaption(), d.GetTitle(), d.GetFileName()), store.MediaDocument
+		return cmp.Or(d.GetCaption(), d.GetTitle(), d.GetFileName()), store.MediaDocument
 	case m.GetStickerMessage() != nil:
 		return "", store.MediaSticker
 	case pollCreation(m) != nil:
