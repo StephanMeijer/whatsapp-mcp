@@ -203,6 +203,14 @@ func (f *fakeWA) SendLocation(_ context.Context, recipient string, lat, lon floa
 	return store.Message{ChatJID: recipient, MessageID: "LOC1", Timestamp: 1_700_000_000, FromMe: true, MediaType: store.MediaLocation}, nil
 }
 
+func (f *fakeWA) SendContact(_ context.Context, recipient, name, phone string) (store.Message, error) {
+	if f.writeErr != nil {
+		return store.Message{}, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("contact %s %q %s", recipient, name, phone))
+	return store.Message{ChatJID: recipient, MessageID: "CARD1", Timestamp: 1_700_000_000, FromMe: true, MediaType: store.MediaContact}, nil
+}
+
 func (f *fakeWA) SendMedia(_ context.Context, recipient string, m wa.OutgoingMedia) (store.Message, error) {
 	if f.writeErr != nil {
 		return store.Message{}, f.writeErr
@@ -303,7 +311,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_location", "send_media", "send_message", "set_chat_state"}
+	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_contact", "send_location", "send_media", "send_message", "set_chat_state"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}
