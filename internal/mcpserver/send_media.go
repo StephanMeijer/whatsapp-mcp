@@ -31,7 +31,7 @@ func (t *tools) sendMedia(ctx context.Context, _ *mcp.CallToolRequest, in SendMe
 	if in.Kind == "" {
 		return nil, Message{}, errors.New("kind is required: image, video, audio or document")
 	}
-	to, err := t.policy.checkRecipient(ctx, t.wa, in.Recipient, t.wa.Status().JID)
+	to, err := t.policy.checkRecipient(ctx, t.wa, in.Recipient)
 	if err != nil {
 		return nil, Message{}, err
 	}

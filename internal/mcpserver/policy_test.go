@@ -148,3 +148,37 @@ func TestInvalidAllowedRecipient(t *testing.T) {
 		t.Errorf("New with invalid allowlist entry: err = %v, want error naming it", err)
 	}
 }
+
+func TestAllowRecipientsOwnAccount(t *testing.T) {
+	// fakeWA's own JID is 31600000000@s.whatsapp.net; 900@lid is its LID.
+	tests := []struct {
+		name      string
+		allow     []string
+		unpaired  bool
+		recipient string
+		wantSent  string // empty: must be refused
+	}{
+		{"own number while paired", []string{"+31600000001"}, false, "+31600000000", "31600000000@s.whatsapp.net"},
+		{"own LID while paired", []string{"+31600000001"}, false, "900@lid", "31600000000@s.whatsapp.net"},
+		{"own device JID while paired", []string{"+31600000001"}, false, "31600000000:7@s.whatsapp.net", "31600000000@s.whatsapp.net"},
+		{"own number before pairing is not special", []string{"+31600000001"}, true, "+31600000000", ""},
+		{"no allowlist allows anyone", nil, false, "+31600000002", "31600000002@s.whatsapp.net"},
+		{"no allowlist allows anyone before pairing", nil, true, "+31600000002", "31600000002@s.whatsapp.net"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			fake := &fakeWA{unpaired: tt.unpaired, lids: map[string]string{"900@lid": "31600000000@s.whatsapp.net"}}
+			cs := connect(t, fake, storetest.New(t), Options{AllowRecipients: tt.allow})
+			res := call(t, cs, "send_message", map[string]any{"recipient": tt.recipient, "text": "hi"}, nil)
+			if tt.wantSent == "" {
+				if !res.IsError || len(fake.sent) != 0 {
+					t.Fatalf("want refusal, got error=%v sent=%v", res.IsError, fake.sent)
+				}
+				return
+			}
+			if want := []string{tt.wantSent + ": hi"}; res.IsError || !slices.Equal(fake.sent, want) {
+				t.Errorf("error=%v sent=%v, want %v", res.IsError, fake.sent, want)
+			}
+		})
+	}
+}

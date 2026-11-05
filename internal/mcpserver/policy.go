@@ -53,14 +53,16 @@ func newPolicy(opts Options) (*policy, error) {
 
 // checkRecipient parses recipient, canonicalises it (an @lid becomes the
 // phone-number JID when known) and reports whether write tools may target
-// it. self is the account's own JID ("" when not paired).
-func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient, self string) (types.JID, error) {
-	parsed, err := parseRecipient(recipient)
+// it. The account's own JID is always allowed once paired.
+func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient string) (types.JID, error) {
+	parsed, err := wa.ParseRecipient(recipient)
 	if err != nil {
 		return types.JID{}, err
 	}
 	jid := w.Canonical(ctx, parsed)
-	if p.allowed == nil || p.isAllowed(ctx, w, jid) || isSelf(ctx, w, jid, self) {
+	// Status().JID is already the canonical phone-number JID, "" before pairing.
+	self := w.Status().JID
+	if p.allowed == nil || p.isAllowed(ctx, w, jid) || (self != "" && jid.String() == self) {
 		return jid, nil
 	}
 	p.log.Warn("refused write to recipient not in the allowlist", "recipient", jid.String())
@@ -74,18 +76,4 @@ func (p *policy) isAllowed(ctx context.Context, w WhatsApp, jid types.JID) bool 
 		}
 	}
 	return false
-}
-
-func isSelf(ctx context.Context, w WhatsApp, jid types.JID, self string) bool {
-	if self == "" {
-		return false
-	}
-	own, err := types.ParseJID(self)
-	return err == nil && w.Canonical(ctx, own) == jid
-}
-
-// parseRecipient is wa.ParseRecipient without the device part.
-func parseRecipient(s string) (types.JID, error) {
-	jid, err := wa.ParseRecipient(s)
-	return jid.ToNonAD(), err
 }
