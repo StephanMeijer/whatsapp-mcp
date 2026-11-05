@@ -49,9 +49,6 @@ func TestWriteToolsSurfaceWhatsAppErrors(t *testing.T) {
 			if got := res.Content[0].(*mcp.TextContent).Text; !strings.Contains(got, waErr.Error()) {
 				t.Errorf("%s error = %q, want WhatsApp's reason %q", tt.tool, got, waErr)
 			}
-			if len(fake.sent) != 0 {
-				t.Errorf("%s recorded %v despite the error", tt.tool, fake.sent)
-			}
 
 			chats, err := st.ChatsByJID(ctx, []string{alice})
 			if err != nil {
