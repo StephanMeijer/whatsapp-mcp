@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -67,7 +66,7 @@ func (c *Client) onJoinedGroup(e *events.JoinedGroup) {
 // event loop, since it may make a network request.
 func (c *Client) nameGroupIfNeeded(group types.JID) {
 	jid := group.ToNonAD().String()
-	if !c.groupLookups.shouldLookup(jid) {
+	if _, done := c.groupLookups.LoadOrStore(jid, struct{}{}); done {
 		return
 	}
 	go func() {
@@ -232,24 +231,4 @@ func renameFromGroupInfo(e *events.GroupInfo) (jid, name string, ok bool) {
 		return "", "", false
 	}
 	return e.JID.ToNonAD().String(), e.Name.Name, true
-}
-
-// groupLookups remembers which groups have had their name looked up.
-type groupLookups struct {
-	mu   sync.Mutex
-	done map[string]bool
-}
-
-// shouldLookup reports true the first time it sees jid, false afterwards.
-func (g *groupLookups) shouldLookup(jid string) bool {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.done[jid] {
-		return false
-	}
-	if g.done == nil {
-		g.done = map[string]bool{}
-	}
-	g.done[jid] = true
-	return true
 }
