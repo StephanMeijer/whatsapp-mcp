@@ -88,8 +88,8 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "list_calls",
 		Description: "Incoming calls, newest first: who called, audio or video, when, and whether it is still " +
-			"ringing, was answered (on one of your devices), rejected or missed. Use it to find a ringing call " +
-			"to reject. For answered calls the end time is not known: WhatsApp only tells the device that took the call.",
+			"ringing, was answered (on one of your devices), rejected, missed or ended (answered, then hung up). " +
+			"Use it to find a ringing call to reject. For calls still marked answered the end time is not known: WhatsApp only tells the device that took the call.",
 		Annotations: readOnly,
 	}, t.listCalls)
 	mcp.AddTool(s, &mcp.Tool{

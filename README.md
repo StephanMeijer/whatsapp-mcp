@@ -287,7 +287,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `get_profile_picture` | a contact's or group's profile picture as an image (`preview` for the thumbnail) |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
 | `send_media` | send a photo, video, audio file or document (base64, or a file in `-media-dir`; up to 16 MB) |
-| `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected or missed |
+| `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected, missed or ended |
 | `reject_call` | decline a call that is still ringing |
 | `react` | react to a message with an emoji (empty removes it) |
 | `edit_message` | change the text or caption of one of your own messages, within 20 minutes of sending |

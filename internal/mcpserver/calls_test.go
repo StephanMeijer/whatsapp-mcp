@@ -24,12 +24,19 @@ func callStore(t *testing.T) *store.Store {
 		{CallID: "RING", CallerJID: alice, CreatorWire: alice, ChatJID: alice, StartedAt: 300},
 		{CallID: "GROUP", CallerJID: alice, CreatorWire: alice, ChatJID: grp, Group: true, Video: true, StartedAt: 200},
 		{CallID: "OLD", CallerJID: stranger, CreatorWire: stranger, ChatJID: stranger, StartedAt: 100},
+		{CallID: "TAKEN", CallerJID: alice, CreatorWire: alice, ChatJID: alice, StartedAt: 50},
 	} {
 		if err := st.RecordCallOffer(ctx, c); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := st.UpdateCall(ctx, "OLD", store.CallEventTerminated, time.Unix(110, 0), "timeout"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateCall(ctx, "TAKEN", store.CallEventAnswered, time.Unix(55, 0), ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.UpdateCall(ctx, "TAKEN", store.CallEventTerminated, time.Unix(90, 0), ""); err != nil {
 		t.Fatal(err)
 	}
 	return st
@@ -44,10 +51,10 @@ func TestListCalls(t *testing.T) {
 	for _, c := range out.Calls {
 		ids = append(ids, c.CallID)
 	}
-	if !slices.Equal(ids, []string{"RING", "GROUP", "OLD"}) {
+	if !slices.Equal(ids, []string{"RING", "GROUP", "OLD", "TAKEN"}) {
 		t.Fatalf("calls = %v, want newest first", ids)
 	}
-	ring, group, old := out.Calls[0], out.Calls[1], out.Calls[2]
+	ring, group, old, taken := out.Calls[0], out.Calls[1], out.Calls[2], out.Calls[3]
 	if ring.Status != store.CallRinging || ring.CallerName != "Alice" || ring.Group {
 		t.Errorf("ringing call = %+v", ring)
 	}
@@ -56,6 +63,9 @@ func TestListCalls(t *testing.T) {
 	}
 	if old.Status != store.CallMissed || old.EndedAt == "" || old.CallerName != "" {
 		t.Errorf("missed call = %+v", old)
+	}
+	if taken.Status != store.CallEnded || taken.EndedAt == "" {
+		t.Errorf("ended call = %+v", taken)
 	}
 	if fake.namesCalls != 1 {
 		t.Errorf("Names calls = %d, want 1", fake.namesCalls)

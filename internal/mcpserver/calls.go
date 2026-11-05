@@ -26,7 +26,7 @@ type CallOut struct {
 	Group      bool   `json:"group"`
 	StartedAt  string `json:"started_at" jsonschema:"RFC 3339"`
 	EndedAt    string `json:"ended_at,omitempty" jsonschema:"RFC 3339"`
-	Status     string `json:"status" jsonschema:"ringing, answered, rejected or missed"`
+	Status     string `json:"status" jsonschema:"ringing, answered, rejected, missed or ended (answered, then hung up)"`
 }
 
 type ListCallsIn struct {
