@@ -4,6 +4,7 @@
 package config
 
 import (
+	"cmp"
 	"errors"
 	"flag"
 	"fmt"
@@ -51,13 +52,6 @@ type Config struct {
 // environment variables, which take precedence over defaults. The auth token
 // is read from the environment only, so it never shows up in a process list.
 func Load(args []string, getenv func(string) string) (Config, error) {
-	envOr := func(key, def string) string {
-		if v := getenv(key); v != "" {
-			return v
-		}
-		return def
-	}
-
 	readOnlyDefault := false
 	if v := getenv("WHATSAPP_MCP_READ_ONLY"); v != "" {
 		b, err := strconv.ParseBool(v)
@@ -74,9 +68,9 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
 	fs.StringVar(&cfg.PublicURL, "public-url", getenv("WHATSAPP_MCP_PUBLIC_URL"), "https origin clients reach this server at through a reverse proxy, e.g. https://wa.example.com (env WHATSAPP_MCP_PUBLIC_URL)")
-	fs.StringVar(&cfg.Addr, "addr", envOr("WHATSAPP_MCP_ADDR", DefaultAddr), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
-	fs.StringVar(&cfg.DatabaseURL, "database-url", envOr("DATABASE_URL", "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
-	fs.StringVar(&cfg.LogLevel, "log-level", envOr("WHATSAPP_MCP_LOG_LEVEL", "info"), "debug, info, warn or error (env WHATSAPP_MCP_LOG_LEVEL)")
+	fs.StringVar(&cfg.Addr, "addr", cmp.Or(getenv("WHATSAPP_MCP_ADDR"), DefaultAddr), "HTTP listen address (env WHATSAPP_MCP_ADDR)")
+	fs.StringVar(&cfg.DatabaseURL, "database-url", cmp.Or(getenv("DATABASE_URL"), "sqlite://data/whatsapp.db"), "sqlite://path or postgres://… (env DATABASE_URL)")
+	fs.StringVar(&cfg.LogLevel, "log-level", cmp.Or(getenv("WHATSAPP_MCP_LOG_LEVEL"), "info"), "debug, info, warn or error (env WHATSAPP_MCP_LOG_LEVEL)")
 	if err := fs.Parse(args); err != nil {
 		return Config{}, err
 	}
