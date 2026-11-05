@@ -262,7 +262,8 @@ func (t *tools) connectionStatus(context.Context, *mcp.CallToolRequest, struct{}
 
 // canonicalChat maps a chat JID given by a client to the archive's form, so
 // an @lid reference finds a chat archived under the phone number. Input that
-// isn't a JID is passed through; it simply won't match anything.
+// isn't a JID is passed through; it simply won't match anything. "" stays
+// "", meaning no chat filter.
 func (t *tools) canonicalChat(ctx context.Context, chatJID string) string {
 	jid, err := types.ParseJID(chatJID)
 	if err != nil {

@@ -58,10 +58,7 @@ func (t *tools) recentMessages(ctx context.Context, _ *mcp.CallToolRequest, in R
 	if limit <= 0 {
 		limit = recentDefaultLimit
 	}
-	chat := in.ChatJID
-	if chat != "" {
-		chat = t.canonicalChat(ctx, chat)
-	}
+	chat := t.canonicalChat(ctx, in.ChatJID)
 
 	msgs, truncated, err := t.store.RecentMessages(ctx, store.RecentQuery{
 		Since: since, Until: until, ChatJID: chat, IncludeFromMe: in.IncludeFromMe, Limit: limit,
