@@ -121,3 +121,29 @@ func TestSetChatState(t *testing.T) {
 		t.Errorf("list_chats after pin = %+v, want alice first and pinned", chats.Chats)
 	}
 }
+
+func TestParseMute(t *testing.T) {
+	now := time.Unix(1_000_000, 0)
+	for _, tc := range []struct {
+		in      string
+		want    *int64
+		wantErr bool
+	}{
+		{in: "", want: nil},
+		{in: "off", want: new(int64(0))},
+		{in: "forever", want: new(int64(-1))},
+		{in: "8h", want: new(now.Add(8 * time.Hour).Unix())},
+		{in: "-1h", wantErr: true},
+		{in: "0s", wantErr: true},
+		{in: "soon", wantErr: true},
+	} {
+		got, err := parseMute(tc.in, now)
+		if (err != nil) != tc.wantErr {
+			t.Errorf("parseMute(%q) error = %v, want error %v", tc.in, err, tc.wantErr)
+			continue
+		}
+		if (got == nil) != (tc.want == nil) || (got != nil && *got != *tc.want) {
+			t.Errorf("parseMute(%q) = %v, want %v", tc.in, got, tc.want)
+		}
+	}
+}

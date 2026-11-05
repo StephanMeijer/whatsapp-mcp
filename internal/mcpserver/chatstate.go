@@ -20,24 +20,33 @@ type SetChatStateIn struct {
 	Mute     string `json:"mute,omitempty" jsonschema:"off, forever, or a duration such as 8h or 168h"`
 }
 
+// parseMute turns set_chat_state's mute argument into store.ChatFlags'
+// MutedUntil: nil to leave it, 0 for off, -1 for forever, else Unix seconds.
+func parseMute(s string, now time.Time) (*int64, error) {
+	switch s {
+	case "":
+		return nil, nil
+	case "off":
+		return new(int64(0)), nil
+	case "forever":
+		return new(int64(-1)), nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return nil, fmt.Errorf("mute: want off, forever or a duration such as 8h, not %q", s)
+	}
+	return new(now.Add(d).Unix()), nil
+}
+
 func (t *tools) setChatState(ctx context.Context, _ *mcp.CallToolRequest, in SetChatStateIn) (*mcp.CallToolResult, Chat, error) {
 	if in.ChatJID == "" {
 		return nil, Chat{}, errors.New("chat_jid is required")
 	}
-	f := store.ChatFlags{Archived: in.Archived, Pinned: in.Pinned}
-	switch in.Mute {
-	case "":
-	case "off":
-		f.MutedUntil = new(int64(0))
-	case "forever":
-		f.MutedUntil = new(int64(-1))
-	default:
-		d, err := time.ParseDuration(in.Mute)
-		if err != nil || d <= 0 {
-			return nil, Chat{}, fmt.Errorf("mute: want off, forever or a duration such as 8h, not %q", in.Mute)
-		}
-		f.MutedUntil = new(time.Now().Add(d).Unix())
+	mutedUntil, err := parseMute(in.Mute, time.Now())
+	if err != nil {
+		return nil, Chat{}, err
 	}
+	f := store.ChatFlags{Archived: in.Archived, Pinned: in.Pinned, MutedUntil: mutedUntil}
 	if f.Archived == nil && f.Pinned == nil && f.MutedUntil == nil {
 		return nil, Chat{}, errors.New("set at least one of archived, pinned or mute")
 	}
