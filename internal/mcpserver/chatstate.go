@@ -28,15 +28,15 @@ func (t *tools) setChatState(ctx context.Context, _ *mcp.CallToolRequest, in Set
 	switch in.Mute {
 	case "":
 	case "off":
-		f.MutedUntil = ptr(int64(0))
+		f.MutedUntil = new(int64(0))
 	case "forever":
-		f.MutedUntil = ptr(int64(-1))
+		f.MutedUntil = new(int64(-1))
 	default:
 		d, err := time.ParseDuration(in.Mute)
 		if err != nil || d <= 0 {
 			return nil, Chat{}, fmt.Errorf("mute: want off, forever or a duration such as 8h, not %q", in.Mute)
 		}
-		f.MutedUntil = ptr(time.Now().Add(d).Unix())
+		f.MutedUntil = new(time.Now().Add(d).Unix())
 	}
 	if f.Archived == nil && f.Pinned == nil && f.MutedUntil == nil {
 		return nil, Chat{}, errors.New("set at least one of archived, pinned or mute")
@@ -49,7 +49,7 @@ func (t *tools) setChatState(ctx context.Context, _ *mcp.CallToolRequest, in Set
 		return nil, Chat{}, err
 	}
 	if f.Archived != nil && *f.Archived {
-		f.Pinned = ptr(false) // WhatsApp unpins an archived chat
+		f.Pinned = new(false) // WhatsApp unpins an archived chat
 	}
 	if err := t.store.SetChatFlags(ctx, chat.String(), f); err != nil {
 		return nil, Chat{}, err

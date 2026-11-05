@@ -133,50 +133,50 @@ func registerTools(s *mcp.Server, t *tools) {
 		Name: "send_message",
 		Description: "Send a text message. This is delivered immediately and cannot be undone. " +
 			"Set reply_to to a message id in the same chat to send it as a reply quoting that message.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true)},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.sendMessage)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "send_media",
 		Description: "Send a photo, video, audio file or document, delivered immediately. Pass the file as " +
 			"base64 in data, or as path to a file in the server's media folder if one is configured. " +
 			"Up to 16 MB. Images must be JPEG or PNG, video MP4, audio OGG, MP3, M4A or AAC.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true)},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.sendMedia)
 	mcp.AddTool(s, &mcp.Tool{
 		Name:        "reject_call",
 		Description: "Decline an incoming call that is still ringing; the caller sees it as declined.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true)},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.rejectCall)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "react",
 		Description: "React to a message with an emoji, visible to everyone in the chat. " +
 			"An empty emoji removes your reaction.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.react)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "edit_message",
 		Description: "Change the text, or the caption, of one of your own messages sent in the last 20 minutes. " +
 			"Everyone in the chat sees the new text, marked as edited. A reply keeps its quote, except for " +
 			"replies archived by an older version of this server, which lose it.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.editMessage)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "delete_message",
 		Description: "Delete one of your own messages for everyone in the chat. This cannot be undone. " +
 			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), DestructiveHint: ptr(true)},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
 	}, t.deleteMessage)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "mark_read",
 		Description: "Mark a chat as read: senders of its latest messages see blue ticks, and the unread " +
 			"badge clears on all your devices.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.markRead)
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "set_chat_state",
 		Description: "Archive or unarchive, pin or unpin, and mute or unmute a chat, synced to your phone. " +
 			"Archiving also unpins. mute is off, forever, or a duration such as 8h or 168h.",
-		Annotations: &mcp.ToolAnnotations{OpenWorldHint: ptr(true), IdempotentHint: true},
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.setChatState)
 }
 
@@ -271,5 +271,3 @@ func (t *tools) canonicalChat(ctx context.Context, chatJID string) string {
 	}
 	return t.wa.Canonical(ctx, jid).String()
 }
-
-func ptr[T any](v T) *T { return &v }

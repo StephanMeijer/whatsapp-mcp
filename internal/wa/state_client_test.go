@@ -89,10 +89,10 @@ func TestSetChatState(t *testing.T) {
 		flags store.ChatFlags
 		want  []string
 	}{
-		{"archiving unpins, so no pin is sent", store.ChatFlags{Archived: proto.Bool(true), Pinned: proto.Bool(true)}, []string{"archive"}},
-		{"pin", store.ChatFlags{Pinned: proto.Bool(true)}, []string{"pin_v1"}},
-		{"unarchive and pin", store.ChatFlags{Archived: proto.Bool(false), Pinned: proto.Bool(true)}, []string{"archive", "pin_v1"}},
-		{"mute until", store.ChatFlags{MutedUntil: proto.Int64(1_700_000_000)}, []string{"mute"}},
+		{"archiving unpins, so no pin is sent", store.ChatFlags{Archived: new(true), Pinned: new(true)}, []string{"archive"}},
+		{"pin", store.ChatFlags{Pinned: new(true)}, []string{"pin_v1"}},
+		{"unarchive and pin", store.ChatFlags{Archived: new(false), Pinned: new(true)}, []string{"archive", "pin_v1"}},
+		{"mute until", store.ChatFlags{MutedUntil: new(int64(1_700_000_000))}, []string{"mute"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -107,14 +107,14 @@ func TestSetChatState(t *testing.T) {
 	}
 
 	c, fake, _, _ := newTestClient(t)
-	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{MutedUntil: proto.Int64(1_700_000_000)}); err != nil {
+	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{MutedUntil: new(int64(1_700_000_000))}); err != nil {
 		t.Fatal(err)
 	}
 	mute := fake.patches[0].Mutations[0].Value.GetMuteAction()
 	if !mute.GetMuted() || mute.GetMuteEndTimestamp() != 1_700_000_000_000 {
 		t.Errorf("mute action = %v, want muted until 1700000000000 ms", mute)
 	}
-	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{MutedUntil: proto.Int64(0)}); err != nil {
+	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{MutedUntil: new(int64(0))}); err != nil {
 		t.Fatal(err)
 	}
 	if fake.patches[1].Mutations[0].Value.GetMuteAction().GetMuted() {
@@ -123,13 +123,13 @@ func TestSetChatState(t *testing.T) {
 
 	c, fake, _, _ = newTestClient(t)
 	fake.appStateErrAt = 1
-	err := c.SetChatState(ctx, alicePN, store.ChatFlags{Archived: proto.Bool(false), Pinned: proto.Bool(true)})
+	err := c.SetChatState(ctx, alicePN, store.ChatFlags{Archived: new(false), Pinned: new(true)})
 	if err == nil || !strings.Contains(err.Error(), "archive chat:") || len(fake.patches) != 1 {
 		t.Errorf("err = %v after %d patches; want the archive error and no pin", err, len(fake.patches))
 	}
 
 	fake.loggedIn = false
-	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{Pinned: proto.Bool(true)}); err == nil || len(fake.patches) != 1 {
+	if err := c.SetChatState(ctx, alicePN, store.ChatFlags{Pinned: new(true)}); err == nil || len(fake.patches) != 1 {
 		t.Errorf("logged out: err %v, %d patches", err, len(fake.patches))
 	}
 }

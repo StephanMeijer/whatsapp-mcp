@@ -10,8 +10,6 @@ import (
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
 
-func ptr[T any](v T) *T { return &v }
-
 func TestChatFlags(t *testing.T) {
 	eachDialect(t, func(t *testing.T, s *store.Store) {
 		ctx := context.Background()
@@ -32,8 +30,8 @@ func TestChatFlags(t *testing.T) {
 		}
 
 		// Flags on a chat the archive has never seen create it.
-		must(t, s.SetChatFlags(ctx, carol, store.ChatFlags{Archived: ptr(true), MutedUntil: ptr(int64(-1))}))
-		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: ptr(true)}))
+		must(t, s.SetChatFlags(ctx, carol, store.ChatFlags{Archived: new(true), MutedUntil: new(int64(-1))}))
+		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: new(true)}))
 		must(t, s.SetChatFlags(ctx, alice, store.ChatFlags{})) // nothing to do
 
 		// A later message keeps the flags.
@@ -59,15 +57,15 @@ func TestChatFlags(t *testing.T) {
 		}
 
 		// Unarchiving and unpinning.
-		must(t, s.SetChatFlags(ctx, carol, store.ChatFlags{Archived: ptr(false), MutedUntil: ptr(int64(0))}))
-		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: ptr(false)}))
+		must(t, s.SetChatFlags(ctx, carol, store.ChatFlags{Archived: new(false), MutedUntil: new(int64(0))}))
+		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{Pinned: new(false)}))
 		if got := jids(store.ExcludeArchived); !slices.Equal(got, []string{carol, alice, bob}) {
 			t.Errorf("after reset = %v", got)
 		}
 
 		// Merging an @lid chat keeps flags from either side.
 		const lid = "111@lid"
-		must(t, s.SetChatFlags(ctx, lid, store.ChatFlags{Archived: ptr(true)}))
+		must(t, s.SetChatFlags(ctx, lid, store.ChatFlags{Archived: new(true)}))
 		if _, err := s.MergeJIDs(ctx, map[string]string{lid: alice}); err != nil {
 			t.Fatal(err)
 		}
