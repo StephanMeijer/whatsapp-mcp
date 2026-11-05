@@ -51,7 +51,7 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, react, edit_message, delete_message, mark_read, set_chat_state and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, send_location, react, edit_message, delete_message, mark_read, set_chat_state and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
 # Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
@@ -273,8 +273,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 |---|---|
 | `connection_status` | connected / paired / waiting for QR scan |
 | `list_chats` | chats, pinned first, then by recent activity; optional name/JID filter; `archived` to include or list only archived chats |
-| `list_messages` | a chat's messages, newest first, paged with `before`; your own carry a `status` (sent, delivered, read, played); a poll shows its question and options |
-| `search_messages` | full-text search over text, captions and polls |
+| `list_messages` | a chat's messages, newest first, paged with `before`; your own carry a `status` (sent, delivered, read, played); a poll shows its question and options, a location its place, coordinates and a map link |
+| `search_messages` | full-text search over text, captions, polls and location names |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `message_receipts` | who has received, read or played one of your messages, per recipient, with times |
@@ -287,6 +287,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `get_profile_picture` | a contact's or group's profile picture as an image (`preview` for the thumbnail) |
 | `send_message` | send a text to a JID or phone number, optionally as a reply (`reply_to`) |
 | `send_media` | send a photo, video, audio file or document (base64, or a file in `-media-dir`; up to 16 MB) |
+| `send_location` | send a location pin, with an optional place name and address |
 | `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected, missed or ended |
 | `reject_call` | decline a call that is still ringing |
 | `react` | react to a message with an emoji (empty removes it) |

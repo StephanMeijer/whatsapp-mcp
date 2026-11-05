@@ -189,5 +189,8 @@ func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 	case pollCreation(m) != nil:
 		return pollText(pollCreation(m)), store.MediaPoll
 	}
+	if text, ok := locationContent(m); ok {
+		return text, store.MediaLocation
+	}
 	return "", ""
 }
