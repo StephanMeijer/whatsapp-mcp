@@ -90,6 +90,25 @@ func TestHandleEventRoutes(t *testing.T) {
 			},
 		},
 		{
+			name: "call notice; call accepted then terminated",
+			evts: []any{
+				&events.CallOfferNotice{BasicCallMeta: types.BasicCallMeta{From: alicePN, CallID: "C2", Timestamp: at}},
+				&events.CallOffer{BasicCallMeta: types.BasicCallMeta{From: alicePN, CallID: "C3", Timestamp: at}},
+				&events.CallAccept{BasicCallMeta: types.BasicCallMeta{From: alicePN, CallID: "C3", Timestamp: at}},
+				&events.CallTerminate{BasicCallMeta: types.BasicCallMeta{From: alicePN, CallID: "C3", Timestamp: at.Add(time.Minute)}},
+			},
+			check: func(t *testing.T, c *Client) {
+				if got, err := c.store.CallByID(ctx, "C2"); err != nil || got.Status != store.CallRinging {
+					t.Errorf("C2 = %+v, err %v; want ringing", got, err)
+				}
+				// Ended, not missed, only if the accept got through before the terminate.
+				got, err := c.store.CallByID(ctx, "C3")
+				if err != nil || got.Status != store.CallEnded || got.EndedAt != at.Add(time.Minute).Unix() {
+					t.Errorf("C3 = %+v, err %v; want ended a minute in", got, err)
+				}
+			},
+		},
+		{
 			name: "joined group, then renamed",
 			evts: []any{
 				&events.JoinedGroup{GroupInfo: types.GroupInfo{JID: testGroup, GroupName: types.GroupName{Name: "Family"}}},
