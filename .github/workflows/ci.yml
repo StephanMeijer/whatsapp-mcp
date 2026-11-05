@@ -52,7 +52,7 @@ jobs:
           POSTGRES_DB: wa
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U postgres -d wa"
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres -d wa"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 15
