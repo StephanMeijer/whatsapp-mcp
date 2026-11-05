@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.4.0...v0.5.0) (2026-11-05)
+
+
+### Features
+
+* add a Docker Compose setup with Postgres ([18930fb](https://github.com/StephanMeijer/whatsapp-mcp/commit/18930fb1dde48ded2f6f2c549beb89300d140e1c))
+
+
+### Bug Fixes
+
+* make the postgres health check use TCP ([cbfa529](https://github.com/StephanMeijer/whatsapp-mcp/commit/cbfa529deadc6127b25f4a9b00db12d6d88307f4))
+
 ## [0.4.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.3.0...v0.4.0) (2026-11-03)
 
 
