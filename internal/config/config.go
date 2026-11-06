@@ -8,11 +8,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/StephanMeijer/whatsapp-mcp/internal/httpx"
 )
 
 // MinTokenLength is the shortest auth token Load accepts: 32 characters, or
@@ -125,19 +126,10 @@ func publicURL(raw string) (string, error) {
 		return "", fmt.Errorf("%q must not have a query or fragment", raw)
 	case u.Path != "" && u.Path != "/":
 		return "", fmt.Errorf("%q has a path; serve the server at the root of its own (sub)domain", raw)
-	case scheme == "http" && !isLoopback(u.Hostname()):
+	case scheme == "http" && !httpx.IsLoopback(u.Hostname()):
 		return "", fmt.Errorf("%q is plain http; put the server behind a TLS reverse proxy and use https", raw)
 	}
 	return scheme + "://" + strings.ToLower(u.Host), nil
-}
-
-// isLoopback reports whether host is localhost or a loopback IP.
-func isLoopback(host string) bool {
-	if strings.EqualFold(host, "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 // splitList splits a comma-separated list, trimming spaces and dropping empty entries.
