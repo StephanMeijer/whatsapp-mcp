@@ -159,7 +159,7 @@ func (s *Store) RenameChats(ctx context.Context, names map[string]string) (int64
 }
 
 // LIDJIDs returns the distinct @lid JIDs used anywhere MergeJIDs renames
-// one: as chat, sender, poll voter, caller or receipt participant. They are
+// one: as chat, sender, poll chat, poll voter, caller or receipt participant. They are
 // the candidates for merging once their phone number is known.
 func (s *Store) LIDJIDs(ctx context.Context) ([]string, error) {
 	var jids []string
@@ -167,6 +167,8 @@ func (s *Store) LIDJIDs(ctx context.Context) ([]string, error) {
 		`SELECT jid FROM chats WHERE jid LIKE '%@lid'
 		 UNION
 		 SELECT DISTINCT sender_jid FROM messages WHERE sender_jid LIKE '%@lid'
+		 UNION
+		 SELECT DISTINCT chat_jid FROM poll_votes WHERE chat_jid LIKE '%@lid'
 		 UNION
 		 SELECT DISTINCT voter_jid FROM poll_votes WHERE voter_jid LIKE '%@lid'
 		 UNION
