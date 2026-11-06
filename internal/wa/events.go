@@ -93,13 +93,20 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			c.log.Warn("history sync: bad chat JID", "jid", conv.GetID(), "err", err)
 			continue
 		}
-		archiveJID := canon(chatJID)
 		// The conversation may carry the phone number itself even when the
-		// mapping store doesn't know it yet.
-		if archiveJID.Server == types.HiddenUserServer {
-			if pn, err := types.ParseJID(conv.GetPnJID()); err == nil && pn.Server == types.DefaultUserServer {
-				archiveJID = pn.ToNonAD()
+		// mapping store doesn't know it yet. Store it before canon caches the
+		// LID, so the conversation's senders, later live messages and the
+		// reconcile pass all resolve to the number too.
+		pn, err := types.ParseJID(conv.GetPnJID())
+		hasPN := err == nil && pn.Server == types.DefaultUserServer
+		if hasPN && chatJID.Server == types.HiddenUserServer && c.Canonical(syncCtx, chatJID) == chatJID.ToNonAD() {
+			if err := c.device.LIDs.PutLIDMapping(syncCtx, chatJID.ToNonAD(), pn.ToNonAD()); err != nil {
+				c.log.Warn("history sync: store LID mapping", "lid", chatJID.String(), "pn", pn.ToNonAD().String(), "err", err)
 			}
+		}
+		archiveJID := canon(chatJID)
+		if archiveJID.Server == types.HiddenUserServer && hasPN {
+			archiveJID = pn.ToNonAD()
 		}
 		chat := store.Chat{JID: archiveJID.String(), Name: cmp.Or(conv.GetName(), conv.GetDisplayName())}
 		var msgs []store.Message

@@ -351,6 +351,20 @@ func (m *memLIDs) GetPNForLID(_ context.Context, lid types.JID) (types.JID, erro
 	return types.JID{User: pn, Device: lid.Device, Server: types.DefaultUserServer}, nil
 }
 
+// PutLIDMapping refuses JIDs on the wrong server, as sqlstore does.
+func (m *memLIDs) PutLIDMapping(_ context.Context, lid, pn types.JID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.err != nil {
+		return m.err
+	}
+	if lid.Server != types.HiddenUserServer || pn.Server != types.DefaultUserServer {
+		return fmt.Errorf("invalid PutLIDMapping call %s/%s", lid, pn)
+	}
+	m.pnByLID[lid.User] = pn.User
+	return nil
+}
+
 func (m *memLIDs) GetLIDForPN(_ context.Context, pn types.JID) (types.JID, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
