@@ -1,5 +1,71 @@
 # Changelog
 
+## [0.6.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.5.0...v0.6.0) (2026-11-06)
+
+
+### Features
+
+* add create_group and leave_group behind -enable-group-admin ([d7b22da](https://github.com/StephanMeijer/whatsapp-mcp/commit/d7b22da8c02266e26bd076bcccb9d7532987938a))
+* add forward_message to forward archived messages ([7ca7a3b](https://github.com/StephanMeijer/whatsapp-mcp/commit/7ca7a3b807cd4d84ac355176f8ee15738e4604e9))
+* add post_status to post status updates ([edd5bb3](https://github.com/StephanMeijer/whatsapp-mcp/commit/edd5bb3c8926f3608ba72edb33f23bc3efba1af6))
+* add send_poll to send polls ([881397e](https://github.com/StephanMeijer/whatsapp-mcp/commit/881397e1a41c9688c63978837e537d54ddc001c7))
+* add set_group_info and group_invite_link ([05ba56e](https://github.com/StephanMeijer/whatsapp-mcp/commit/05ba56e595a65bcfb1d9a497b984d84593be9f23))
+* add update_group_members to add, remove, promote and demote ([84cae4e](https://github.com/StephanMeijer/whatsapp-mcp/commit/84cae4e792c670107bc118c066a3a0ccf67fa4f4))
+* archive contact cards and send them with send_contact ([db3bb84](https://github.com/StephanMeijer/whatsapp-mcp/commit/db3bb84afdae9a01f73ef3aff2eb9a70924b0576))
+* archive shared locations and send them with send_location ([597a81b](https://github.com/StephanMeijer/whatsapp-mcp/commit/597a81ba8fa8c1c49e984b28331f8f044629b607))
+* optionally expire archived messages from disappearing chats ([1e823a0](https://github.com/StephanMeijer/whatsapp-mcp/commit/1e823a018c6cffea8d2a687312c80bc291394b36))
+* record forwarded messages and show them in message results ([244e4cf](https://github.com/StephanMeijer/whatsapp-mcp/commit/244e4cfd8f144bc6a2f5591e503b16fc6d485e65))
+* separate status updates from chats and add list_status_updates ([a5fa047](https://github.com/StephanMeijer/whatsapp-mcp/commit/a5fa04791787508c80f0dc976d02822a066aaaf2))
+* show and set each chat's disappearing-message timer ([dc1f28c](https://github.com/StephanMeijer/whatsapp-mcp/commit/dc1f28c44d093f7e02820f55a109ea44e84961ad))
+* track poll votes and add poll_results ([22aace2](https://github.com/StephanMeijer/whatsapp-mcp/commit/22aace2b535304227476c9eaeaef76bbf007e088))
+
+
+### Bug Fixes
+
+* **build:** wait for Postgres on TCP in test-postgres ([ac19bc6](https://github.com/StephanMeijer/whatsapp-mcp/commit/ac19bc6541b89c669eb068d0db55295bf968c9cf))
+* **ci:** check Postgres readiness over TCP in the test job ([a77b453](https://github.com/StephanMeijer/whatsapp-mcp/commit/a77b4539c3cb29053bfbc13070785ee3905613f6))
+* **cli:** exit 0 after printing usage for -h ([67f4712](https://github.com/StephanMeijer/whatsapp-mcp/commit/67f47128e6852d2fca272f76beba8b90ea95f026))
+* **docker:** mount a tmpfs on /tmp for media downloads ([d3d8255](https://github.com/StephanMeijer/whatsapp-mcp/commit/d3d82559750709d41b6907c00424c2fbe7097b58))
+* **mcpserver:** let delete_message take back your own status under post_status's rule ([0046a44](https://github.com/StephanMeijer/whatsapp-mcp/commit/0046a44b5d8f02adeb8a56cedf7703e432b4d127))
+* **mcpserver:** log refused post_status calls ([cc6a314](https://github.com/StephanMeijer/whatsapp-mcp/commit/cc6a31401deb31e29bbcd1115b4498107827df8f))
+* **mcpserver:** refuse status@broadcast in every write tool but post_status ([9bc5c5a](https://github.com/StephanMeijer/whatsapp-mcp/commit/9bc5c5a770914e263f3a610eb0fde0869e6d351a))
+* never expire a message kept in the chat ([db14422](https://github.com/StephanMeijer/whatsapp-mcp/commit/db14422a4248484d4c4c7018e4fb1b9f217fcb57))
+* put whatsmeow's IQ errors for group changes in plain words ([fc8cbb7](https://github.com/StephanMeijer/whatsapp-mcp/commit/fc8cbb775338d91c980e8a915802031b63ee5f79))
+* report a created group even when whatsmeow errors parsing it ([1d8907b](https://github.com/StephanMeijer/whatsapp-mcp/commit/1d8907be4bf8269aaec94c53ca8f0da9ae9bc50a))
+* report unhealthy when WhatsApp is logged out or pairing ended ([64ebb57](https://github.com/StephanMeijer/whatsapp-mcp/commit/64ebb5798841d2b3abed0271d261d88fd31e98c9))
+* report update_group_members results as ok, not added ([c406f90](https://github.com/StephanMeijer/whatsapp-mcp/commit/c406f90bb57d350f82f849bc45a6623cca9b83d3))
+* **store:** accept a revoked message as the list_messages page cursor ([a14187a](https://github.com/StephanMeijer/whatsapp-mcp/commit/a14187ab532ffc0469ab8ca5703d87a8783583cf))
+* **store:** drop receipts and poll votes of deleted and expired messages ([e1ae9ee](https://github.com/StephanMeijer/whatsapp-mcp/commit/e1ae9ee88bba1b9ef8f3295ba29284c83a670b35))
+* **store:** drop receipts and votes left by earlier deletions on open ([aa4cbed](https://github.com/StephanMeijer/whatsapp-mcp/commit/aa4cbed2426d1190f22abbc373dfa8eee61ae792))
+* **store:** list LIDs seen only as a poll's chat ([faadc1c](https://github.com/StephanMeijer/whatsapp-mcp/commit/faadc1caddb3294993562072b86c88e7e8da947f))
+* **store:** match list_chats query in Go so non-ASCII names fold case ([26a51e4](https://github.com/StephanMeijer/whatsapp-mcp/commit/26a51e4baec3166b2142340de8820d8b201ee6bb))
+* **store:** merge LIDs seen only in calls or receipts ([cb9bb40](https://github.com/StephanMeijer/whatsapp-mcp/commit/cb9bb40b5648fdf5b70ff7b15babe0cdee560a44))
+* **store:** merge LIDs that only voted in polls ([c19bc89](https://github.com/StephanMeijer/whatsapp-mcp/commit/c19bc89d55d5a3bba54ba659c368137af9f93189))
+* **store:** move calls when merging a LID into its phone JID ([373908f](https://github.com/StephanMeijer/whatsapp-mcp/commit/373908f1e14b87b30f08978538f55c50e1ab45c4))
+* **store:** page list_messages by before_id so same-second messages are kept ([31d0a72](https://github.com/StephanMeijer/whatsapp-mcp/commit/31d0a72c724da757aff561dd4bb70db11f608773))
+* **wa:** apply message edits delivered by history sync ([6318b1a](https://github.com/StephanMeijer/whatsapp-mcp/commit/6318b1aaf728c15737d71687160ccf1c2c83e7e4))
+* **wa:** bound media downloads by bytes received, not the sender's FileLength ([c6b9a9f](https://github.com/StephanMeijer/whatsapp-mcp/commit/c6b9a9fc45d7af0e6bfb67f7f26bc3e9438280bd))
+* **wa:** cancel background work on Stop so shutdown stays bounded ([c40dc27](https://github.com/StephanMeijer/whatsapp-mcp/commit/c40dc27e9a2d80cdd366b4a55adb675b4cd46c60))
+* **wa:** don't add group chats from a live timer change ([9ec65bf](https://github.com/StephanMeijer/whatsapp-mcp/commit/9ec65bf8088a21da45f96a4041fb9e3c3cf6d167))
+* **wa:** forward a file's own caption, not its archived text ([73ba7ef](https://github.com/StephanMeijer/whatsapp-mcp/commit/73ba7ef3e43fd15e166a7f18b72f0955c3ab0851))
+* **wa:** forward an edited message's current caption ([06a1f7d](https://github.com/StephanMeijer/whatsapp-mcp/commit/06a1f7d63a1bf712e1ffbfebee6e914e5dbb5c59))
+* **wa:** give messages sent to a disappearing chat its timer ([453b939](https://github.com/StephanMeijer/whatsapp-mcp/commit/453b9391552324229ec51954d7d57aa1fdf54a06))
+* **wa:** keep the voice-note flag when forwarding audio ([b3caf05](https://github.com/StephanMeijer/whatsapp-mcp/commit/b3caf058c7320f6aa7af76cd6f16cdb05c35c690))
+* **wa:** log and count history-sync messages ParseWebMessage rejects ([fa5068a](https://github.com/StephanMeijer/whatsapp-mcp/commit/fa5068af9b68222e5712fe709f95bb94ec8b52cb))
+* **wa:** map a history-sync conversation's [@lid](https://github.com/lid) to its PnJID number ([ba42ade](https://github.com/StephanMeijer/whatsapp-mcp/commit/ba42ade4c678a3b0b1441d0922b0ba5bd29eb6b0))
+* **wa:** parse phone-number recipients with NormalizePhone ([9760840](https://github.com/StephanMeijer/whatsapp-mcp/commit/97608407c1727d1081db3ce061844c5e7f85867e))
+* **wa:** read vCard phone numbers whose parameters contain a dot ([dd87264](https://github.com/StephanMeijer/whatsapp-mcp/commit/dd872642e171990a81a4f02e5f8601c29a751039))
+* **wa:** rely on IsGroup to keep status updates from naming the status chat ([ef8609f](https://github.com/StephanMeijer/whatsapp-mcp/commit/ef8609f0199190dc5e7540cf0272a2eb16159b50))
+* **wa:** set the groups flag before the reconcile request flag ([52a0605](https://github.com/StephanMeijer/whatsapp-mcp/commit/52a0605622d9d4107b0c7d234bf3be86b344ba4b))
+* **wa:** skip history group votes that name no voter ([580d71f](https://github.com/StephanMeijer/whatsapp-mcp/commit/580d71f193bc2123fce808235c3a18d035371ce9))
+* **wa:** time out stalled profile-picture downloads ([11a5b6d](https://github.com/StephanMeijer/whatsapp-mcp/commit/11a5b6d34db8c0ab319b66edc10517c4f80af2e3))
+
+
+### Performance
+
+* **store:** index messages.sender_jid for LID merges ([cc74097](https://github.com/StephanMeijer/whatsapp-mcp/commit/cc7409763e32766315ab3584d3307caebec9e5ae))
+* **wa:** coalesce reconcile passes into one worker that Stop waits for ([c2b075d](https://github.com/StephanMeijer/whatsapp-mcp/commit/c2b075d5a657b94d5338e4144a12a2617c070800))
+
 ## [0.5.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.4.0...v0.5.0) (2026-11-05)
 
 
