@@ -62,7 +62,23 @@ func New(ctx context.Context, d *db.DB) (*Store, error) {
 	if err := s.setup(g); err != nil {
 		return nil, fmt.Errorf("store: set up search: %w", err)
 	}
+	if err := dropRowsOfDeleted(g); err != nil {
+		return nil, fmt.Errorf("store: drop receipts and votes of deleted messages: %w", err)
+	}
 	return &Store{db: d.Gorm, search: s}, nil
+}
+
+// dropRowsOfDeleted removes receipts and poll votes of deleted messages.
+// Deletions now take them along, but archives from before that kept them;
+// once those are gone this finds nothing, so it is safe on every start.
+func dropRowsOfDeleted(tx *gorm.DB) error {
+	deleted := func() *gorm.DB {
+		return tx.Model(&Message{}).Select("chat_jid, message_id").Where("deleted = ?", true)
+	}
+	if err := tx.Where("(chat_jid, message_id) IN (?)", deleted()).Delete(&Receipt{}).Error; err != nil {
+		return err
+	}
+	return tx.Where("(chat_jid, poll_id) IN (?)", deleted()).Delete(&PollVote{}).Error
 }
 
 // Save records chats and messages. Messages already stored are left alone, so

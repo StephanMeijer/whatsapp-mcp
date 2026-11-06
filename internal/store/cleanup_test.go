@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/db"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 )
 
@@ -90,6 +91,23 @@ func TestExpiringMessagesDropsTheirReceiptsAndVotes(t *testing.T) {
 		}
 		if r, v := leftovers(t, s, "kept"); r != 1 || v != 1 {
 			t.Errorf("message without a timer has %d receipts and %d votes, want 1 and 1", r, v)
+		}
+	})
+}
+
+func TestOpeningTheStoreDropsReceiptsAndVotesOfEarlierDeletions(t *testing.T) {
+	eachDB(t, func(t *testing.T, d *db.DB) {
+		ctx := context.Background()
+		s := openStore(t, d)
+		seedWithReceiptsAndVotes(t, s)
+		must(t, s.MarkDeletedKeepingRows(ctx, cleanupGroup, "gone"))
+
+		s = openStore(t, d)
+		if r, v := leftovers(t, s, "gone"); r != 0 || v != 0 {
+			t.Errorf("deleted message keeps %d receipts and %d votes, want none", r, v)
+		}
+		if r, v := leftovers(t, s, "kept"); r != 1 || v != 1 {
+			t.Errorf("other message has %d receipts and %d votes, want 1 and 1", r, v)
 		}
 	})
 }
