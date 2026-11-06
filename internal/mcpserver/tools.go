@@ -167,6 +167,12 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.forwardMessage)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "send_poll",
+		Description: "Send a poll with 2 to 12 options, delivered immediately. People choose one option, or any " +
+			"number with multiple set. See the answers with poll_results.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
+	}, t.sendPoll)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "reject_call",
 		Description: "Decline an incoming call that is still ringing; the caller sees it as declined.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},

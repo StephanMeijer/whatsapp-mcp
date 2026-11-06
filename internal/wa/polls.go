@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"strings"
 
 	"go.mau.fi/whatsmeow"
@@ -164,4 +165,38 @@ func TallyPoll(m store.Message, votes []store.PollVote) (PollResult, error) {
 		}
 	}
 	return res, nil
+}
+
+// maxPollOptions is the most options WhatsApp lets a poll have.
+const maxPollOptions = 12
+
+// SendPoll sends a poll and archives it. With multiple set, people may
+// choose any number of options; otherwise one.
+func (c *Client) SendPoll(ctx context.Context, recipient, question string, options []string, multiple bool) (store.Message, error) {
+	question = strings.TrimSpace(question)
+	if question == "" {
+		return store.Message{}, errors.New("the poll's question is required")
+	}
+	if len(options) < 2 || len(options) > maxPollOptions {
+		return store.Message{}, fmt.Errorf("a poll needs 2 to %d options, not %d", maxPollOptions, len(options))
+	}
+	opts := make([]string, len(options))
+	seen := make(map[string]bool, len(options))
+	for i, o := range options {
+		o = strings.TrimSpace(o)
+		// Votes name options by the hash of their text, so duplicates can't be told apart.
+		if o == "" || seen[o] {
+			return store.Message{}, fmt.Errorf("option %d is empty or repeats another", i+1)
+		}
+		seen[o], opts[i] = true, o
+	}
+	to, err := c.recipient(recipient)
+	if err != nil {
+		return store.Message{}, err
+	}
+	selectable := 1
+	if multiple {
+		selectable = 0 // WhatsApp's "any number"
+	}
+	return c.sendAndArchive(ctx, to, c.cli.BuildPollCreation(question, opts, selectable), "poll", "options", len(opts))
 }
