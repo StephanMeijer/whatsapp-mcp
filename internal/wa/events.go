@@ -119,7 +119,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 				c.log.Debug("history sync: skip message", "chat", conv.GetID(), "id", hm.GetMessage().GetKey().GetID(), "err", err)
 				continue
 			}
-			if ch, ok := c.changeFor(syncCtx, evt, canon); ok {
+			if ch, ok := c.changeFor(syncCtx, historyEvent(evt), canon); ok {
 				ch.chat = chat.JID
 				changes = append(changes, ch)
 				continue
@@ -152,6 +152,19 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 	}
 	c.log.Info("history sync archived", "type", e.Data.GetSyncType().String(),
 		"conversations", len(convs), "messages", saved, "skipped", skipped)
+}
+
+// historyEvent undoes ParseWebMessage's rewrite of a MESSAGE_EDIT protocol
+// message into the edited content under the original's ID, so changeFor
+// sees a history-sync edit the way live events show it. Other events are
+// returned as they are.
+func historyEvent(evt *events.Message) *events.Message {
+	raw := (&events.Message{RawMessage: evt.RawMessage, SourceWebMsg: evt.SourceWebMsg, Info: evt.Info}).UnwrapRaw()
+	if raw.Message.GetProtocolMessage().GetType() != waE2E.ProtocolMessage_MESSAGE_EDIT {
+		return evt
+	}
+	raw.Info.ID = evt.SourceWebMsg.GetKey().GetID()
+	return raw
 }
 
 // toMessage converts a whatsmeow message event into an archive row, storing
