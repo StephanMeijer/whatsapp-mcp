@@ -239,7 +239,8 @@ func (c *Client) recipient(s string) (types.JID, error) {
 }
 
 // ParseRecipient accepts a full JID ("31612345678@s.whatsapp.net",
-// "123-456@g.us") or a phone number ("+31 6 1234 5678").
+// "123-456@g.us") or an international phone number ("+31 6 1234 5678"),
+// read by the same rules as NormalizePhone.
 func ParseRecipient(s string) (types.JID, error) {
 	s = strings.TrimSpace(s)
 	if strings.Contains(s, "@") {
@@ -249,20 +250,11 @@ func ParseRecipient(s string) (types.JID, error) {
 		}
 		return jid, nil
 	}
-	digits := strings.Map(func(r rune) rune {
-		switch {
-		case r >= '0' && r <= '9':
-			return r
-		case r == '+' || r == ' ' || r == '-' || r == '(' || r == ')':
-			return -1
-		default:
-			return 'x'
-		}
-	}, s)
-	if digits == "" || strings.Contains(digits, "x") {
-		return types.JID{}, fmt.Errorf("invalid recipient %q: want a JID or an international phone number", s)
+	phone, err := NormalizePhone(s)
+	if err != nil {
+		return types.JID{}, err
 	}
-	return types.NewJID(digits, types.DefaultUserServer), nil
+	return types.NewJID(strings.TrimPrefix(phone, "+"), types.DefaultUserServer), nil
 }
 
 // contactName is the name the user saved for a contact, or the business name.
