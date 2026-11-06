@@ -4,9 +4,11 @@ package wa
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
@@ -16,8 +18,8 @@ import (
 )
 
 // TestHandleEventRoutes checks that each event whatsmeow delivers reaches
-// the archive. Events whose handling starts background work (history sync,
-// connect, messages in groups) are left to the handler tests.
+// the archive, waiting for the background work some of them start. Group
+// messages are left to the handler tests.
 func TestHandleEventRoutes(t *testing.T) {
 	ctx := context.Background()
 	at := time.Unix(200, 0)
@@ -121,6 +123,40 @@ func TestHandleEventRoutes(t *testing.T) {
 			},
 		},
 		{
+			name: "history sync reconciles chats but not groups",
+			setup: func(t *testing.T, c *Client) {
+				addressBook(c.device.Contacts.(*memContacts))
+				c.cli.(*fakeWA).joined = []*types.GroupInfo{{JID: testGroup, GroupName: types.GroupName{Name: "Family"}}}
+				if err := c.store.Save(ctx, []store.Chat{{JID: alicePN.String()}, {JID: testGroup.String()}}, nil); err != nil {
+					t.Fatal(err)
+				}
+			},
+			evts: []any{&events.HistorySync{Data: &waHistorySync.HistorySync{}}},
+			check: func(t *testing.T, c *Client) {
+				want := map[string]string{alicePN.String(): "Alice Saved", testGroup.String(): ""}
+				if got := chatNames(t, c, alicePN, testGroup); !reflect.DeepEqual(got, want) {
+					t.Errorf("names = %v, want %v", got, want)
+				}
+			},
+		},
+		{
+			name: "connected reconciles chats and groups",
+			setup: func(t *testing.T, c *Client) {
+				addressBook(c.device.Contacts.(*memContacts))
+				c.cli.(*fakeWA).joined = []*types.GroupInfo{{JID: testGroup, GroupName: types.GroupName{Name: "Family"}}}
+				if err := c.store.Save(ctx, []store.Chat{{JID: alicePN.String()}, {JID: testGroup.String()}}, nil); err != nil {
+					t.Fatal(err)
+				}
+			},
+			evts: []any{&events.Connected{}},
+			check: func(t *testing.T, c *Client) {
+				want := map[string]string{alicePN.String(): "Alice Saved", testGroup.String(): "Family"}
+				if got := chatNames(t, c, alicePN, testGroup); !reflect.DeepEqual(got, want) {
+					t.Errorf("names = %v, want %v", got, want)
+				}
+			},
+		},
+		{
 			name:  "connection state changes only log",
 			evts:  []any{&events.Disconnected{}, &events.LoggedOut{}, struct{}{}},
 			check: func(*testing.T, *Client) {},
@@ -135,7 +171,39 @@ func TestHandleEventRoutes(t *testing.T) {
 			for _, e := range tt.evts {
 				c.handleEvent(e)
 			}
+			c.bg.Wait()
 			tt.check(t, c)
 		})
+	}
+}
+
+// A burst of history syncs must not cost a reconcile pass each: while one
+// pass runs, all further requests fold into a single queued pass.
+func TestHistorySyncBurstCoalescesReconcile(t *testing.T) {
+	c, _, _, contacts := newTestClient(t)
+	contacts.gate = make(chan struct{})
+	for range 10 {
+		c.handleEvent(&events.HistorySync{Data: &waHistorySync.HistorySync{}})
+	}
+	close(contacts.gate)
+	c.bg.Wait()
+	if contacts.calls < 1 || contacts.calls > 2 {
+		t.Errorf("10 history syncs ran %d reconcile passes, want 1 or 2", contacts.calls)
+	}
+}
+
+// whatsmeow keeps delivering queued history syncs after Disconnect; they must
+// not start work that would hold up shutdown.
+func TestHistorySyncAfterStopStartsNoReconcile(t *testing.T) {
+	c, _, _, contacts := newTestClient(t)
+	c.Stop()
+	c.handleEvent(&events.HistorySync{Data: &waHistorySync.HistorySync{}})
+	c.handleEvent(liveMessage(testGroup, alicePN, "G1", false, "Alice", text("hi")))
+	c.bg.Wait()
+	if contacts.calls != 0 {
+		t.Errorf("%d reconcile passes after Stop, want 0", contacts.calls)
+	}
+	if _, looked := c.groupLookups.Load(testGroup.String()); looked {
+		t.Error("group name lookup started after Stop")
 	}
 }

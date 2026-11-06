@@ -372,14 +372,20 @@ func (m *memLIDs) GetLIDForPN(_ context.Context, pn types.JID) (types.JID, error
 // use panic.
 type memContacts struct {
 	wastore.ContactStore
-	mu  sync.Mutex
-	all map[types.JID]types.ContactInfo
-	err error
+	mu    sync.Mutex
+	all   map[types.JID]types.ContactInfo
+	err   error
+	calls int           // GetAllContacts calls, one per reconcile pass
+	gate  chan struct{} // when set, GetAllContacts blocks until it is closed
 }
 
 func (m *memContacts) GetAllContacts(context.Context) (map[types.JID]types.ContactInfo, error) {
+	if m.gate != nil {
+		<-m.gate
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	m.calls++
 	if m.err != nil {
 		return nil, m.err
 	}

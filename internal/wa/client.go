@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mdp/qrterminal/v3"
@@ -44,7 +45,12 @@ type Client struct {
 	mu sync.RWMutex
 	qr string // current pairing code, empty when none is pending
 
-	reconcileMu sync.Mutex // serialises reconcile runs
+	reconcileMu     sync.Mutex         // held by the one reconcile worker while it runs
+	reconcileWanted atomic.Bool        // a reconcile pass was requested since the last one started
+	reconcileGroups atomic.Bool        // the requested pass must also sync group names
+	bg              sync.WaitGroup     // goroutines Stop waits for: the reconcile worker and group name lookups
+	bgCtx           context.Context    // parent of every bg goroutine's context; Stop cancels it
+	stopBg          context.CancelFunc // cancels bgCtx
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
@@ -91,6 +97,7 @@ func New(ctx context.Context, sqlDB *sql.DB, dialect string, st *store.Store, lo
 // newClient builds a Client around cli, whose Store must be device. New uses
 // it with a real whatsmeow client, tests with a fake.
 func newClient(cli whatsmeowClient, device *wastore.Device, st *store.Store, log *slog.Logger, qrOut io.Writer) *Client {
+	bgCtx, stopBg := context.WithCancel(context.Background())
 	return &Client{
 		cli:        cli,
 		device:     device,
@@ -98,6 +105,8 @@ func newClient(cli whatsmeowClient, device *wastore.Device, st *store.Store, log
 		log:        log,
 		qrOut:      qrOut,
 		fetchLimit: rateLimit{interval: fetchInterval},
+		bgCtx:      bgCtx,
+		stopBg:     stopBg,
 	}
 }
 
@@ -153,8 +162,14 @@ func (c *Client) QRCode() string {
 	return c.qr
 }
 
-// Stop disconnects.
-func (c *Client) Stop() { c.cli.Disconnect() }
+// Stop disconnects, cancels background work and waits for it to abort its
+// current statement, so the archive can be closed afterwards. Events whatsmeow
+// still delivers after Stop start no new work.
+func (c *Client) Stop() {
+	c.cli.Disconnect()
+	c.stopBg()
+	c.bg.Wait()
+}
 
 // Status reports the connection state.
 func (c *Client) Status() Status {

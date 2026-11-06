@@ -27,7 +27,8 @@ Environment=DATABASE_URL=sqlite://%h/.local/state/whatsapp-mcp/whatsapp.db
 ExecStart=%h/.local/bin/whatsapp-mcp
 Restart=on-failure
 RestartSec=10
-# Above the 10 s shutdown deadline in the binary.
+# Above the 10 s HTTP shutdown deadline in the binary; the client stop that
+# follows only waits for background work to abort its current statement.
 TimeoutStopSec=15
 UMask=0077
 
