@@ -5,10 +5,12 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/storetest"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
@@ -73,6 +75,19 @@ func TestMessageContextTool(t *testing.T) {
 	}
 	if fake.namesCalls != len(tests) {
 		t.Errorf("Names calls = %d, want one per tool call (%d)", fake.namesCalls, len(tests))
+	}
+}
+
+func TestListMessagesBeforeID(t *testing.T) {
+	cs := connect(t, &fakeWA{}, contextStore(t), Options{})
+	var out MessagesOut
+	call(t, cs, "list_messages", map[string]any{"chat_jid": ctxChat, "before_id": "m10", "limit": 2}, &out)
+	if len(out.Messages) != 2 || out.Messages[0].ID != "m09" || out.Messages[1].ID != "m08" {
+		t.Errorf("before_id m10: got %+v, want m09, m08", out.Messages)
+	}
+	res := call(t, cs, "list_messages", map[string]any{"chat_jid": ctxChat, "before_id": "unknown"}, nil)
+	if !res.IsError || !strings.Contains(res.Content[0].(*mcp.TextContent).Text, "page cursor unknown is not archived") {
+		t.Errorf("unknown before_id: want tool error naming the cursor, got %+v", res)
 	}
 }
 

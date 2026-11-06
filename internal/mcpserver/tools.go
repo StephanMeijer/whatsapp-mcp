@@ -36,8 +36,9 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.listChats)
 	mcp.AddTool(s, &mcp.Tool{
-		Name:        "list_messages",
-		Description: "List a chat's messages, newest first. Page backwards by passing the oldest timestamp seen as 'before'.",
+		Name: "list_messages",
+		Description: "List a chat's messages, newest first. Page backwards by passing the id of the last message " +
+			"returned as before_id; before (a time) is only for jumping to a date and can skip messages.",
 		Annotations: readOnly,
 	}, t.listMessages)
 	mcp.AddTool(s, &mcp.Tool{
