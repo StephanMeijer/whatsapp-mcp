@@ -349,8 +349,10 @@ func (s *Store) ListMessages(ctx context.Context, chatJID string, before time.Ti
 // ListMessagesBefore returns the messages preceding one archived message,
 // newest first, or ErrNotFound when that message is not archived. Unlike
 // ListMessages with a time, it keeps messages that share the cursor's second.
+// A cursor that was revoked since it was listed still works: MarkDeleted
+// keeps its timestamp and seq.
 func (s *Store) ListMessagesBefore(ctx context.Context, chatJID, messageID string, limit int) ([]Message, error) {
-	cursor, err := s.MessageByID(ctx, chatJID, messageID)
+	cursor, err := one[Message](s.db.WithContext(ctx).Where("chat_jid = ? AND message_id = ?", chatJID, messageID))
 	if err != nil {
 		return nil, err
 	}

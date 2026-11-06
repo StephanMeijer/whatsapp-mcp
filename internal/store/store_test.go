@@ -350,6 +350,16 @@ func TestListMessagesBeforeKeepsSameSecond(t *testing.T) {
 		if _, err := s.ListMessagesBefore(ctx, chat, "unknown", 2); !errors.Is(err, store.ErrNotFound) {
 			t.Errorf("unknown cursor: err = %v, want ErrNotFound", err)
 		}
+
+		// A cursor revoked between pages still pages, and is itself not listed.
+		if _, err := s.MarkDeleted(ctx, chat, "m2b"); err != nil {
+			t.Fatal(err)
+		}
+		page, err = s.ListMessagesBefore(ctx, chat, "m2b", 2)
+		must(t, err)
+		if got, want := ids(page), []string{"m2a", "m1"}; !slices.Equal(got, want) {
+			t.Errorf("page before deleted cursor = %v, want %v", got, want)
+		}
 	})
 }
 
