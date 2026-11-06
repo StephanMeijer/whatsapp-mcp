@@ -86,6 +86,22 @@ func TestForwardDocumentCaption(t *testing.T) {
 	}
 }
 
+func TestForwardVoiceNote(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	ref := mediaRef(&waE2E.Message{AudioMessage: &waE2E.AudioMessage{
+		DirectPath: proto.String("/v/ptt"), Mimetype: proto.String("audio/ogg; codecs=opus"), FileLength: proto.Uint64(4), PTT: proto.Bool(true),
+	}}, false)
+	src := store.Message{ChatJID: alicePN.String(), MessageID: "V1", MediaType: store.MediaAudio, MediaRef: ref}
+	fake.download = []byte("OggS")
+
+	if _, err := c.Forward(context.Background(), bobPN.String(), src); err != nil {
+		t.Fatal(err)
+	}
+	if !fake.sent[0].msg.GetAudioMessage().GetPTT() {
+		t.Errorf("sent message = %v, want a voice note", fake.sent[0].msg)
+	}
+}
+
 func TestForwardRefuses(t *testing.T) {
 	c, fake, _, _ := newTestClient(t)
 	poll := store.Message{ChatJID: alicePN.String(), MessageID: "Q1", MediaType: store.MediaPoll, Text: "Lunch?"}

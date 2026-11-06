@@ -54,6 +54,9 @@ func (c *Client) Forward(ctx context.Context, recipient string, m store.Message)
 		return store.Message{}, fmt.Errorf("upload: %w", err)
 	}
 	msg := buildMediaMessage(m.MediaType, up, media.MIMEType, caption, media.FileName)
+	if src, ok := sub.(*waE2E.AudioMessage); ok {
+		msg.AudioMessage.PTT = src.PTT // a voice note stays a voice note
+	}
 	setContextInfo(msg, ci)
 	return c.sendAndArchive(ctx, to, msg, "forward", "from", m.ChatJID, "source_id", m.MessageID, "kind", m.MediaType)
 }
