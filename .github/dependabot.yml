@@ -20,3 +20,26 @@ updates:
     groups:
       go:
         patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      docker:
+        patterns: ["*"]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    ignore:
+      # A pgdata volume initialised by one major cannot start on the next.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
