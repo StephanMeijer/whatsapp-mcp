@@ -17,11 +17,17 @@ test:
 
 # Runs the store tests against a throwaway Postgres container as well.
 test-postgres:
-	docker run -d --rm --name whatsapp-mcp-test-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=wa \
-		-p 127.0.0.1:55432:5432 postgres:17-alpine >/dev/null
-	until docker exec whatsapp-mcp-test-pg pg_isready -h 127.0.0.1 -U postgres -d wa >/dev/null 2>&1; do sleep 1; done
-	TEST_POSTGRES_URL='$(PG_URL)' go test -count=1 ./internal/store/...; \
-		status=$$?; docker stop whatsapp-mcp-test-pg >/dev/null; exit $$status
+	docker rm -f whatsapp-mcp-test-pg >/dev/null 2>&1 || true; \
+	docker run -d --name whatsapp-mcp-test-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=wa \
+		-p 127.0.0.1:55432:5432 postgres:17-alpine >/dev/null || exit 1; \
+	trap 'docker rm -f whatsapp-mcp-test-pg >/dev/null 2>&1' EXIT; trap 'exit 130' INT TERM; \
+	for _ in $$(seq 60); do \
+		docker exec whatsapp-mcp-test-pg pg_isready -h 127.0.0.1 -U postgres -d wa >/dev/null 2>&1 && break; \
+		sleep 1; \
+	done; \
+	docker exec whatsapp-mcp-test-pg pg_isready -h 127.0.0.1 -U postgres -d wa >/dev/null 2>&1 \
+		|| { echo 'postgres did not become ready within 60s'; docker logs whatsapp-mcp-test-pg; exit 1; }; \
+	TEST_POSTGRES_URL='$(PG_URL)' go test -count=1 ./internal/store/...
 
 vet:
 	go vet ./...
