@@ -280,6 +280,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `list_messages` | a chat's messages, newest first, paged with `before_id` (or jumped to a time with `before`); your own carry a `status` (sent, delivered, read, played); a poll shows its question and options, a location its place, coordinates and a map link, a contact card its names and numbers |
 | `search_messages` | full-text search over text, captions, polls, location names and contact cards |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
+| `list_status_updates` | status updates (stories) grouped by person, by default from the last 24 hours; statuses are left out of `list_chats`, `recent_messages` and `search_messages` |
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `message_receipts` | who has received, read or played one of your messages, per recipient, with times |
 | `poll_results` | a poll's options with vote counts and who chose each; votes are missing only on polls this server never received |

@@ -56,6 +56,14 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.recentMessages)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "list_status_updates",
+		Description: "Status updates (stories) from your contacts, grouped by person, by default from the last " +
+			"24 hours. They are not part of list_chats, recent_messages or search_messages. Fetch a photo or video " +
+			"with get_media using chat_jid " + store.StatusChat + " and the update's id; WhatsApp may delete status " +
+			"media sooner than chat media.",
+		Annotations: readOnly,
+	}, t.listStatusUpdates)
+	mcp.AddTool(s, &mcp.Tool{
 		Name: "message_context",
 		Description: "The conversation around one message: up to `before` messages before it and `after` after it " +
 			"in the same chat, oldest first. messages[target_index] is the requested message. " +

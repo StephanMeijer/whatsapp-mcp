@@ -257,3 +257,20 @@ func TestOnHistorySyncResolvesOnDemandFetches(t *testing.T) {
 	}
 	archived(t, c, alicePN, "A1")
 }
+
+func TestStatusUpdatesDontRenameTheStatusChat(t *testing.T) {
+	c, _, _, _ := newTestClient(t)
+	c.onMessage(liveMessage(types.StatusBroadcastJID, aliceLID, "S1", false, "Alice", text("at the beach")))
+	m := archived(t, c, types.StatusBroadcastJID, "S1")
+	if m.SenderJID != alicePN.String() {
+		t.Errorf("status sender = %s, want %s", m.SenderJID, alicePN)
+	}
+	if names := chatNames(t, c, types.StatusBroadcastJID); names[types.StatusBroadcastJID.String()] != "" {
+		t.Errorf("status chat named %q after its poster", names[types.StatusBroadcastJID.String()])
+	}
+	// A direct chat is still named after the sender.
+	c.onMessage(liveMessage(bobPN, bobPN, "M1", false, "Bob", text("hi")))
+	if names := chatNames(t, c, bobPN); names[bobPN.String()] != "Bob" {
+		t.Errorf("direct chat name = %q, want Bob", names[bobPN.String()])
+	}
+}

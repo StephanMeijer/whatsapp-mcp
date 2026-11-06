@@ -72,8 +72,10 @@ func (c *Client) onMessage(e *events.Message) {
 		return
 	}
 	var chats []store.Chat
-	// In a direct chat with someone else, their push name is the best name we have.
-	if !e.Info.IsGroup && !e.Info.IsFromMe && e.Info.PushName != "" {
+	// In a direct chat with someone else, their push name is the best name we
+	// have. Not for status updates, whose "chat" is everyone's broadcast.
+	direct := e.Info.Chat.Server == types.DefaultUserServer || e.Info.Chat.Server == types.HiddenUserServer
+	if direct && !e.Info.IsFromMe && e.Info.PushName != "" {
 		chats = append(chats, store.Chat{JID: m.ChatJID, Name: e.Info.PushName})
 	}
 	if err := c.store.Save(ctx, chats, []store.Message{m}); err != nil {
@@ -117,6 +119,9 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			archiveJID = pn.ToNonAD()
 		}
 		chat := store.Chat{JID: archiveJID.String(), Name: cmp.Or(conv.GetName(), conv.GetDisplayName())}
+		if archiveJID == types.StatusBroadcastJID {
+			chat.Name = "" // not a conversation with anyone to be named after
+		}
 		var msgs []store.Message
 		var changes []change
 		var votes []store.PollVote
