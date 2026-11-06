@@ -34,6 +34,8 @@ type WhatsApp interface {
 	ProfilePicture(ctx context.Context, jid types.JID, preview bool) (wa.Media, error)
 	// SendText sends a message, as a reply quoting quoted when it is set.
 	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
+	// Forward sends an archived message to recipient labelled "Forwarded".
+	Forward(ctx context.Context, recipient string, m store.Message) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.

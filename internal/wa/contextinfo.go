@@ -34,6 +34,26 @@ func contextInfo(m *waE2E.Message) *waE2E.ContextInfo {
 	return ci
 }
 
+// setContextInfo sets ci on m's content sub-message. It reports false when
+// m has no sub-message that takes one (a plain Conversation, for one).
+func setContextInfo(m *waE2E.Message, ci *waE2E.ContextInfo) bool {
+	set := false
+	m.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		if fd.Kind() != protoreflect.MessageKind || fd.IsList() || fd.IsMap() {
+			return true
+		}
+		sub := v.Message()
+		f := sub.Descriptor().Fields().ByName(contextInfoField)
+		if f == nil {
+			return true
+		}
+		sub.Set(f, protoreflect.ValueOfMessage(ci.ProtoReflect()))
+		set = true
+		return false
+	})
+	return set
+}
+
 // forwarding reports whether m was forwarded, and how often (WhatsApp's
 // forwarding score; the phone says "Forwarded many times" from 5).
 func forwarding(m *waE2E.Message) (bool, int) {
