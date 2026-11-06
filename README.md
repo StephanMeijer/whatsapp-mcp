@@ -343,8 +343,8 @@ make docker-build    # container image (see "Run with Docker")
 ```
 
 The Go toolchain is pinned in `mise.toml`; `mise install` gets it. CI runs gofmt, `go vet`,
-`go mod tidy -diff`, govulncheck, the tests with the race detector against SQLite and Postgres, and
-a static build on every push and pull request.
+staticcheck, `go mod tidy -diff`, govulncheck, the tests with the race detector against SQLite and
+Postgres, and a static build on every push and pull request.
 
 ## Not yet
 
