@@ -69,7 +69,8 @@ recipient.
 
 - `/mcp`: MCP streamable HTTP (bearer auth)
 - `GET /pair`: the pending pairing QR code as PNG, 404 when there is none (bearer auth)
-- `GET /healthz`: liveness, no auth. `whatsapp-mcp healthcheck` probes it, for container health
+- `GET /healthz`: no auth. 200 while logged in to WhatsApp or waiting for a QR scan, 503 once
+  it cannot work (logged out by WhatsApp, or the QR codes expired unscanned; restart then). `whatsapp-mcp healthcheck` probes it, for container health
   checks; it reads `WHATSAPP_MCP_ADDR` and needs no token
 
 ## Run with Docker

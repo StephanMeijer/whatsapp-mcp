@@ -90,7 +90,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	handler, err := routes(cfg.PublicURL, cfg.AuthToken, mcpSrv, pairHandler(client))
+	handler, err := routes(cfg.PublicURL, cfg.AuthToken, mcpSrv, pairHandler(client), healthHandler(client))
 	if err != nil {
 		return err
 	}
@@ -137,12 +137,10 @@ func run() error {
 // loopback listener; the SDK's DNS-rebinding check would refuse that, so
 // AllowHosts takes over the check, for every endpoint, accepting the public
 // host and loopback.
-func routes(publicURL, token string, mcpSrv *mcp.Server, pair http.Handler) (http.Handler, error) {
+func routes(publicURL, token string, mcpSrv *mcp.Server, pair, health http.Handler) (http.Handler, error) {
 	behindProxy := publicURL != ""
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})
+	mux.Handle("GET /healthz", health)
 	mux.Handle("GET /pair", httpx.RequireBearer(token, pair))
 	mux.Handle("/mcp", httpx.RequireBearer(token,
 		mcpserver.Handler(mcpSrv, mcpserver.HandlerOptions{HostCheckedByCaller: behindProxy})))
@@ -154,6 +152,24 @@ func routes(publicURL, token string, mcpSrv *mcp.Server, pair http.Handler) (htt
 		return nil, fmt.Errorf("public URL: %w", err)
 	}
 	return httpx.AllowHosts([]string{public.Hostname()}, mux), nil
+}
+
+// healthHandler reports 200 while the server can work or is waiting for a QR
+// scan, and 503 once it cannot (logged out, or pairing ended unscanned). A
+// short reconnect also reads as 503; the container's health check retries
+// absorb that. The body never names the account: the endpoint has no auth.
+func healthHandler(client interface{ Status() wa.Status }) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		switch s := client.Status(); {
+		case s.LoggedIn:
+			fmt.Fprintln(w, "ok")
+		case s.Pairing:
+			fmt.Fprintln(w, "pairing")
+		default:
+			http.Error(w, "not logged in to WhatsApp", http.StatusServiceUnavailable)
+		}
+	})
 }
 
 // pairHandler serves the pending pairing QR code as a PNG, for hosts where

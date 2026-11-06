@@ -18,6 +18,7 @@ const testToken = "0123456789abcdef0123456789abcdef"
 func TestRoutesHostCheck(t *testing.T) {
 	srv := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "0"}, nil)
 	pair := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) })
+	health := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	tests := []struct {
 		name, publicURL, host, token, path string
 		want                               int
@@ -36,7 +37,7 @@ func TestRoutesHostCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, err := routes(tt.publicURL, testToken, srv, pair)
+			h, err := routes(tt.publicURL, testToken, srv, pair, health)
 			if err != nil {
 				t.Fatal(err)
 			}
