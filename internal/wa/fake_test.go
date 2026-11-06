@@ -95,13 +95,20 @@ type fakeWA struct {
 	qr          chan whatsmeow.QRChannelItem
 	qrCalls     int
 
-	timers   []timerCall
-	timerErr error
-	sent     []sentMsg
-	peer     []*waE2E.Message
-	patches  []appstate.PatchInfo
-	reads    []readCall
-	rejected []rejectCall
+	timers []timerCall
+	// CreateGroup returns created or createErr and records each request;
+	// LeaveGroup records the groups left and returns leaveErr.
+	createReqs []whatsmeow.ReqCreateGroup
+	created    *types.GroupInfo
+	createErr  error
+	left       []types.JID
+	leaveErr   error
+	timerErr   error
+	sent       []sentMsg
+	peer       []*waE2E.Message
+	patches    []appstate.PatchInfo
+	reads      []readCall
+	rejected   []rejectCall
 
 	groupInfoCalls []types.JID
 	userInfoCalls  [][]types.JID
@@ -271,6 +278,23 @@ func (f *fakeWA) GetGroupInfo(_ context.Context, jid types.JID) (*types.GroupInf
 		return nil, fmt.Errorf("no such group %s", jid)
 	}
 	return info, nil
+}
+
+func (f *fakeWA) CreateGroup(_ context.Context, req whatsmeow.ReqCreateGroup) (*types.GroupInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.createReqs = append(f.createReqs, req)
+	if f.createErr != nil {
+		return nil, f.createErr
+	}
+	return f.created, nil
+}
+
+func (f *fakeWA) LeaveGroup(_ context.Context, jid types.JID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.left = append(f.left, jid)
+	return f.leaveErr
 }
 
 func (f *fakeWA) GetJoinedGroups(context.Context) ([]*types.GroupInfo, error) {

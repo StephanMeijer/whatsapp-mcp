@@ -40,6 +40,12 @@ type Config struct {
 	// ExpireDisappearing deletes archived messages from disappearing chats
 	// once their timer runs out, as they vanish for the people in the chat.
 	ExpireDisappearing bool
+	// EnableGroupAdmin offers the tools that create, change and leave
+	// groups. They are hard to undo, so they are off unless asked for.
+	EnableGroupAdmin bool
+	// AllowInviteLinks lets group_invite_link work while an allowlist is
+	// set, though anyone with a link can join a group regardless of it.
+	AllowInviteLinks bool
 	// AllowRecipients, when non-empty, limits write tools to these JIDs or
 	// phone numbers (plus the account's own number).
 	AllowRecipients []string
@@ -64,11 +70,21 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	groupAdminDefault, err := envBool(getenv, "WHATSAPP_MCP_ENABLE_GROUP_ADMIN")
+	if err != nil {
+		return Config{}, err
+	}
+	inviteLinksDefault, err := envBool(getenv, "WHATSAPP_MCP_ALLOW_INVITE_LINKS")
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{AuthToken: getenv("WHATSAPP_MCP_TOKEN")}
 	var allow string
 	fs := flag.NewFlagSet("whatsapp-mcp", flag.ContinueOnError)
 	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
+	fs.BoolVar(&cfg.EnableGroupAdmin, "enable-group-admin", groupAdminDefault, "offer the tools that create, change and leave groups (env WHATSAPP_MCP_ENABLE_GROUP_ADMIN)")
+	fs.BoolVar(&cfg.AllowInviteLinks, "allow-invite-links", inviteLinksDefault, "let group_invite_link work while -allow-recipients is set; a link lets anyone join (env WHATSAPP_MCP_ALLOW_INVITE_LINKS)")
 	fs.BoolVar(&cfg.ExpireDisappearing, "expire-disappearing", expireDefault, "delete archived messages from disappearing chats once their timer runs out (env WHATSAPP_MCP_EXPIRE_DISAPPEARING)")
 	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
@@ -108,6 +124,9 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	}
 	if cfg.ReadOnly && len(cfg.AllowRecipients) > 0 {
 		return Config{}, errors.New("-allow-recipients has no effect with -read-only; set one or the other")
+	}
+	if cfg.ReadOnly && cfg.EnableGroupAdmin {
+		return Config{}, errors.New("-enable-group-admin has no effect with -read-only; set one or the other")
 	}
 	return cfg, nil
 }

@@ -22,6 +22,8 @@ import (
 
 type fakeWA struct {
 	sent []string
+	// refuseMembers makes CreateGroup report these members as refused, with the reason.
+	refuseMembers map[string]string
 	// lids maps @lid JIDs to phone-number JIDs for Canonical.
 	lids map[string]string
 	// names are returned by Names; namesErr makes it fail.
@@ -251,6 +253,27 @@ func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer t
 		return f.writeErr
 	}
 	f.sent = append(f.sent, "timer "+chat.String()+" "+timer.String())
+	return nil
+}
+
+func (f *fakeWA) CreateGroup(_ context.Context, name string, members []types.JID) (wa.GroupCreated, error) {
+	if f.writeErr != nil {
+		return wa.GroupCreated{}, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("create %q %v", name, members))
+	g := wa.GroupCreated{JID: types.NewJID("120363000000000077", types.GroupServer), Name: name}
+	for _, m := range members {
+		reason, refused := f.refuseMembers[m.String()]
+		g.Members = append(g.Members, wa.MemberResult{JID: m, OK: !refused, Error: reason})
+	}
+	return g, nil
+}
+
+func (f *fakeWA) LeaveGroup(_ context.Context, group types.JID) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.sent = append(f.sent, "leave "+group.String())
 	return nil
 }
 

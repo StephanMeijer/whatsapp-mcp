@@ -35,6 +35,8 @@ type whatsmeowClient interface {
 	DownloadToFile(ctx context.Context, msg whatsmeow.DownloadableMessage, file whatsmeow.File) error
 
 	GetGroupInfo(ctx context.Context, jid types.JID) (*types.GroupInfo, error)
+	CreateGroup(ctx context.Context, req whatsmeow.ReqCreateGroup) (*types.GroupInfo, error)
+	LeaveGroup(ctx context.Context, jid types.JID) error
 	GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error)
 	GetUserInfo(ctx context.Context, jids []types.JID) (map[types.JID]types.UserInfo, error)
 	GetProfilePictureInfo(ctx context.Context, jid types.JID, params *whatsmeow.GetProfilePictureParams) (*types.ProfilePictureInfo, error)

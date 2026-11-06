@@ -47,6 +47,17 @@ func TestLoad(t *testing.T) {
 			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info"},
 		},
 		{
+			name: "group admin and invite links from env",
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ENABLE_GROUP_ADMIN": "true", "WHATSAPP_MCP_ALLOW_INVITE_LINKS": "1"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnableGroupAdmin: true, AllowInviteLinks: true},
+		},
+		{
+			name: "group admin by flag",
+			args: []string{"-enable-group-admin"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnableGroupAdmin: true},
+		},
+		{
 			name: "allowlist is trimmed and drops empty entries",
 			args: []string{"-allow-recipients", " +31 6 1234 5678 , ,123@g.us,"},
 			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
@@ -78,6 +89,22 @@ func TestLoad(t *testing.T) {
 			name:    "invalid expire disappearing env",
 			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_EXPIRE_DISAPPEARING": "sometimes"},
 			wantErr: "WHATSAPP_MCP_EXPIRE_DISAPPEARING",
+		},
+		{
+			name:    "invalid group admin env",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ENABLE_GROUP_ADMIN": "perhaps"},
+			wantErr: "WHATSAPP_MCP_ENABLE_GROUP_ADMIN",
+		},
+		{
+			name:    "invalid invite links env",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ALLOW_INVITE_LINKS": "perhaps"},
+			wantErr: "WHATSAPP_MCP_ALLOW_INVITE_LINKS",
+		},
+		{
+			name:    "read-only with group admin",
+			args:    []string{"-read-only", "-enable-group-admin"},
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
+			wantErr: "-enable-group-admin has no effect with -read-only",
 		},
 		{
 			name:    "read-only with allowlist",

@@ -41,6 +41,8 @@ session without a new QR code.
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
 | `-expire-disappearing` | `WHATSAPP_MCP_EXPIRE_DISAPPEARING` | `false`: keep messages from disappearing chats; `true` deletes them from the archive once their timer runs out, checked hourly, together with their read receipts and poll votes. Only messages archived with a timer qualify, so not ones archived before this option existed. A message kept in the chat ("Keep in chat") never expires, and stays kept if that is later undone |
+| `-enable-group-admin` | `WHATSAPP_MCP_ENABLE_GROUP_ADMIN` | `false`: `true` offers the tools that create, change and leave groups (see [Guardrails](#guardrails)); not allowed with `-read-only` |
+| `-allow-invite-links` | `WHATSAPP_MCP_ALLOW_INVITE_LINKS` | `false`: with `-allow-recipients` set, group invite links are refused, because anyone with a link can join; `true` allows them for allowlisted groups |
 | `-media-dir` | `WHATSAPP_MCP_MEDIA_DIR` | *(empty: off)* the only folder `send_media` may read files from |
 | `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
 | `-public-url` | `WHATSAPP_MCP_PUBLIC_URL` | *(empty)* the https address clients reach the server at through a reverse proxy, see [Remote access over TLS](#remote-access-over-tls) |
@@ -65,6 +67,11 @@ Allowlist entries are normalised, so `+31 6 1234 5678`, `31612345678@s.whatsapp.
 person's `@lid` privacy ID (once WhatsApp has revealed the mapping) all match each other.
 Every message sent is logged with recipient and message ID (not its text), and so is every refused
 recipient.
+
+Managing groups is off unless you start the server with `-enable-group-admin`, because removing
+people or leaving a group can't be undone from here. With it on, the allowlist still applies: the
+group itself must be listed, and so must everyone added to it. A group made with `create_group` is
+not added to the allowlist; add its JID and restart to manage or message it.
 
 ### Endpoints
 
@@ -304,6 +311,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `mark_read` | mark a chat as read on all your devices |
 | `set_chat_state` | archive, pin or mute a chat (`mute`: off, forever or a duration), synced to your phone |
 | `set_disappearing_timer` | turn disappearing messages on (`24h`, `7d`, `90d`) or `off` for a chat; `list_chats` shows each chat's timer |
+| `create_group` | create a group with you as admin and add up to 20 people; people WhatsApp refused are listed per member (needs `-enable-group-admin`) |
+| `leave_group` | leave a group (needs `-enable-group-admin`) |
 
 ## Why a database
 

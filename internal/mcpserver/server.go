@@ -38,6 +38,11 @@ type WhatsApp interface {
 	Forward(ctx context.Context, recipient string, m store.Message) (store.Message, error)
 	// SendPoll sends a poll; with multiple, people may choose several options.
 	SendPoll(ctx context.Context, recipient, question string, options []string, multiple bool) (store.Message, error)
+	// CreateGroup makes a group and tries to add members; it fails only when
+	// no group was made, and reports each member's outcome otherwise.
+	CreateGroup(ctx context.Context, name string, members []types.JID) (wa.GroupCreated, error)
+	// LeaveGroup leaves a group.
+	LeaveGroup(ctx context.Context, group types.JID) error
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.
