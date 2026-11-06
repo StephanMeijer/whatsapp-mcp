@@ -183,7 +183,7 @@ func TestUpdateGroupMembers(t *testing.T) {
 	if res := call(t, cs, "update_group_members", map[string]any{"chat_jid": gaListed, "action": "remove", "members": []string{gaAlice, gaCarol}}, &out); res.IsError {
 		t.Fatalf("partly refused: %s", errText(res))
 	}
-	if len(out.Members) != 2 || !out.Members[0].Added || out.Members[1].Added || out.Members[1].Error == "" {
+	if len(out.Members) != 2 || !out.Members[0].OK || out.Members[1].OK || out.Members[1].Error == "" {
 		t.Errorf("partly refused = %+v", out)
 	}
 	if res := update("remove", gaCarol); !res.IsError || !strings.Contains(errText(res), "nobody could be changed") {

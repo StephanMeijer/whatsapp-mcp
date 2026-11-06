@@ -123,10 +123,17 @@ type UpdateGroupMembersIn struct {
 	Members []string `json:"members" jsonschema:"JIDs or international phone numbers, at most 20"`
 }
 
+type UpdatedMember struct {
+	JID   string `json:"jid"`
+	Name  string `json:"name,omitempty"`
+	OK    bool   `json:"ok" jsonschema:"true when this person's change went through"`
+	Error string `json:"error,omitempty" jsonschema:"why WhatsApp refused this person"`
+}
+
 type UpdateGroupMembersOut struct {
-	JID     string        `json:"jid"`
-	Action  string        `json:"action"`
-	Members []GroupMember `json:"members" jsonschema:"added is true when this person's change went through"`
+	JID     string          `json:"jid"`
+	Action  string          `json:"action"`
+	Members []UpdatedMember `json:"members"`
 }
 
 // checkedActions bring someone new in or give them power over the group,
@@ -157,10 +164,10 @@ func (t *tools) updateGroupMembers(ctx context.Context, _ *mcp.CallToolRequest, 
 		jids[i] = r.JID.String()
 	}
 	names := t.senderNames(ctx, jids)
-	out := UpdateGroupMembersOut{JID: group.String(), Action: in.Action, Members: make([]GroupMember, len(results))}
+	out := UpdateGroupMembersOut{JID: group.String(), Action: in.Action, Members: make([]UpdatedMember, len(results))}
 	var reasons []string
 	for i, r := range results {
-		out.Members[i] = GroupMember{JID: jids[i], Name: names[jids[i]], Added: r.OK, Error: r.Error}
+		out.Members[i] = UpdatedMember{JID: jids[i], Name: names[jids[i]], OK: r.OK, Error: r.Error}
 		if !r.OK {
 			reasons = append(reasons, jids[i]+": "+r.Error)
 		}
