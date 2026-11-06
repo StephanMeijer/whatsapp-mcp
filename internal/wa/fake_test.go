@@ -339,6 +339,10 @@ func (f *fakeWA) BuildHistorySyncRequest(last *types.MessageInfo, count int) *wa
 	return f.real.BuildHistorySyncRequest(last, count)
 }
 
+func (f *fakeWA) BuildPollCreation(name string, options []string, selectable int) *waE2E.Message {
+	return f.real.BuildPollCreation(name, options, selectable)
+}
+
 func (f *fakeWA) ParseWebMessage(chat types.JID, msg *waWeb.WebMessageInfo) (*events.Message, error) {
 	return f.real.ParseWebMessage(chat, msg)
 }

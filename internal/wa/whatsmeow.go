@@ -47,6 +47,7 @@ type whatsmeowClient interface {
 	BuildReaction(chat, sender types.JID, id types.MessageID, reaction string) *waE2E.Message
 	BuildRevoke(chat, sender types.JID, id types.MessageID) *waE2E.Message
 	BuildEdit(chat types.JID, id types.MessageID, newContent *waE2E.Message) *waE2E.Message
+	BuildPollCreation(name string, optionNames []string, selectableOptionCount int) *waE2E.Message
 	BuildHistorySyncRequest(lastKnownMessageInfo *types.MessageInfo, count int) *waE2E.Message
 	ParseWebMessage(chatJID types.JID, webMsg *waWeb.WebMessageInfo) (*events.Message, error)
 }

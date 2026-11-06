@@ -52,7 +52,7 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, send_location, send_contact, forward_message, react, edit_message, delete_message, mark_read, set_chat_state, set_disappearing_timer and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, send_location, send_contact, send_poll, forward_message, react, edit_message, delete_message, mark_read, set_chat_state, set_disappearing_timer and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
 # Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
@@ -295,6 +295,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `send_location` | send a location pin, with an optional place name and address |
 | `send_contact` | send a contact card (name and phone number) |
 | `forward_message` | forward an archived message to another chat, labelled "Forwarded"; text, images, videos, audio and documents (a file is downloaded and sent again, so an expired one fails) |
+| `send_poll` | send a poll with 2 to 12 options; one answer, or any number with `multiple` |
 | `list_calls` | incoming calls: who, audio or video, when, and whether they were answered, rejected, missed or ended |
 | `reject_call` | decline a call that is still ringing |
 | `react` | react to a message with an emoji (empty removes it) |

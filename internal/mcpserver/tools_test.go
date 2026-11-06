@@ -220,6 +220,15 @@ func (f *fakeWA) Forward(_ context.Context, recipient string, m store.Message) (
 		Text: m.Text, Forwarded: true, ForwardingScore: m.ForwardingScore + 1}, nil
 }
 
+func (f *fakeWA) SendPoll(_ context.Context, recipient, question string, options []string, multiple bool) (store.Message, error) {
+	if f.writeErr != nil {
+		return store.Message{}, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("poll %s %q %q multiple=%v", recipient, question, options, multiple))
+	return store.Message{ChatJID: recipient, MessageID: "POLL1", Timestamp: 1_700_000_000, FromMe: true,
+		Text: question, MediaType: store.MediaPoll}, nil
+}
+
 func (f *fakeWA) SendMedia(_ context.Context, recipient string, m wa.OutgoingMedia) (store.Message, error) {
 	if f.writeErr != nil {
 		return store.Message{}, f.writeErr
@@ -328,7 +337,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "forward_message", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "poll_results", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_contact", "send_location", "send_media", "send_message", "set_chat_state", "set_disappearing_timer"}
+	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "forward_message", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "poll_results", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_contact", "send_location", "send_media", "send_message", "send_poll", "set_chat_state", "set_disappearing_timer"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

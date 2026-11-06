@@ -36,6 +36,8 @@ type WhatsApp interface {
 	SendText(ctx context.Context, recipient, text string, quoted *store.Message) (store.Message, error)
 	// Forward sends an archived message to recipient labelled "Forwarded".
 	Forward(ctx context.Context, recipient string, m store.Message) (store.Message, error)
+	// SendPoll sends a poll; with multiple, people may choose several options.
+	SendPoll(ctx context.Context, recipient, question string, options []string, multiple bool) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.
