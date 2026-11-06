@@ -46,10 +46,10 @@ type Receipt struct {
 
 // RecordReceipt notes that participant reached status for one of the
 // account's own messages at time at, and moves the message's status forward
-// if this is further than it was. Receipts for messages that aren't archived,
-// or weren't sent by the account, are ignored. A time already recorded is
-// kept, so replayed or out-of-order receipts change nothing. It reports
-// whether the message's status moved.
+// if this is further than it was. Receipts for messages that aren't
+// archived, were deleted, or weren't sent by the account, are ignored. A
+// time already recorded is kept, so replayed or out-of-order receipts change
+// nothing. It reports whether the message's status moved.
 func (s *Store) RecordReceipt(ctx context.Context, chatJID, messageID, participant, status string, at time.Time) (bool, error) {
 	r := Receipt{ChatJID: chatJID, MessageID: messageID, ParticipantJID: participant}
 	var column string
@@ -66,7 +66,7 @@ func (s *Store) RecordReceipt(ctx context.Context, chatJID, messageID, participa
 	var moved bool
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var n int64
-		if err := tx.Model(&Message{}).Where("chat_jid = ? AND message_id = ? AND from_me = ?", chatJID, messageID, true).
+		if err := tx.Model(&Message{}).Where("chat_jid = ? AND message_id = ? AND from_me = ? AND deleted = ?", chatJID, messageID, true, false).
 			Count(&n).Error; err != nil || n == 0 {
 			return err
 		}

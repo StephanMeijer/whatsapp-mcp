@@ -28,7 +28,14 @@ type PollVote struct {
 // RecordPollVote stores a vote, replacing the voter's earlier one only when
 // this one is at least as new, so votes may arrive in any order.
 func (s *Store) RecordPollVote(ctx context.Context, v PollVote) error {
-	return upsertPollVote(s.db.WithContext(ctx), v)
+	db := s.db.WithContext(ctx)
+	// A vote on a deleted poll is dropped; one that arrives before its poll counts.
+	var gone int64
+	if err := db.Model(&Message{}).Where("chat_jid = ? AND message_id = ? AND deleted = ?", v.ChatJID, v.PollID, true).
+		Count(&gone).Error; err != nil || gone > 0 {
+		return err
+	}
+	return upsertPollVote(db, v)
 }
 
 func upsertPollVote(tx *gorm.DB, v PollVote) error {
