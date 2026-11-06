@@ -31,6 +31,9 @@ type Store struct {
 	search searcher
 }
 
+// models is every table the store owns; tests drop them by this list.
+var models = []any{&Chat{}, &Message{}, &Call{}, &Receipt{}}
+
 // searcher is the one dialect-specific part of the store: GORM has no
 // abstraction over SQLite FTS5 and Postgres full-text search.
 type searcher interface {
@@ -53,7 +56,7 @@ func New(ctx context.Context, d *db.DB) (*Store, error) {
 	}
 
 	g := d.Gorm.WithContext(ctx)
-	if err := g.AutoMigrate(&Chat{}, &Message{}, &Call{}, &Receipt{}); err != nil {
+	if err := g.AutoMigrate(models...); err != nil {
 		return nil, fmt.Errorf("store: migrate: %w", err)
 	}
 	if err := s.setup(g); err != nil {

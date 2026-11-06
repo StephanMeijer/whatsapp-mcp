@@ -34,7 +34,7 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 		}
 		t.Cleanup(func() { _ = d.Close() })
 		// Start from empty tables so subtests don't see each other's rows.
-		if err := d.Gorm.Migrator().DropTable(&store.Message{}, &store.Chat{}, &store.Call{}, &store.Receipt{}); err != nil {
+		if err := d.Gorm.Migrator().DropTable(store.Models...); err != nil {
 			t.Fatal(err)
 		}
 		s, err := store.New(context.Background(), d)
