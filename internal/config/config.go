@@ -37,6 +37,9 @@ type Config struct {
 	LogLevel string
 	// ReadOnly leaves out every tool that changes anything on WhatsApp.
 	ReadOnly bool
+	// ExpireDisappearing deletes archived messages from disappearing chats
+	// once their timer runs out, as they vanish for the people in the chat.
+	ExpireDisappearing bool
 	// AllowRecipients, when non-empty, limits write tools to these JIDs or
 	// phone numbers (plus the account's own number).
 	AllowRecipients []string
@@ -53,19 +56,20 @@ type Config struct {
 // environment variables, which take precedence over defaults. The auth token
 // is read from the environment only, so it never shows up in a process list.
 func Load(args []string, getenv func(string) string) (Config, error) {
-	readOnlyDefault := false
-	if v := getenv("WHATSAPP_MCP_READ_ONLY"); v != "" {
-		b, err := strconv.ParseBool(v)
-		if err != nil {
-			return Config{}, fmt.Errorf("WHATSAPP_MCP_READ_ONLY: %w", err)
-		}
-		readOnlyDefault = b
+	readOnlyDefault, err := envBool(getenv, "WHATSAPP_MCP_READ_ONLY")
+	if err != nil {
+		return Config{}, err
+	}
+	expireDefault, err := envBool(getenv, "WHATSAPP_MCP_EXPIRE_DISAPPEARING")
+	if err != nil {
+		return Config{}, err
 	}
 
 	cfg := Config{AuthToken: getenv("WHATSAPP_MCP_TOKEN")}
 	var allow string
 	fs := flag.NewFlagSet("whatsapp-mcp", flag.ContinueOnError)
 	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
+	fs.BoolVar(&cfg.ExpireDisappearing, "expire-disappearing", expireDefault, "delete archived messages from disappearing chats once their timer runs out (env WHATSAPP_MCP_EXPIRE_DISAPPEARING)")
 	fs.StringVar(&cfg.MediaDir, "media-dir", getenv("WHATSAPP_MCP_MEDIA_DIR"), "folder send_media may read files from; empty disables file paths (env WHATSAPP_MCP_MEDIA_DIR)")
 	fs.StringVar(&allow, "allow-recipients", getenv("WHATSAPP_MCP_ALLOW_RECIPIENTS"), "comma-separated JIDs or phone numbers write tools may target; empty allows all (env WHATSAPP_MCP_ALLOW_RECIPIENTS)")
 	fs.StringVar(&cfg.PublicURL, "public-url", getenv("WHATSAPP_MCP_PUBLIC_URL"), "https origin clients reach this server at through a reverse proxy, e.g. https://wa.example.com (env WHATSAPP_MCP_PUBLIC_URL)")
@@ -130,6 +134,19 @@ func publicURL(raw string) (string, error) {
 		return "", fmt.Errorf("%q is plain http; put the server behind a TLS reverse proxy and use https", raw)
 	}
 	return scheme + "://" + strings.ToLower(u.Host), nil
+}
+
+// envBool reads a true/false environment variable; unset is false.
+func envBool(getenv func(string) string, name string) (bool, error) {
+	v := getenv(name)
+	if v == "" {
+		return false, nil
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s: %w", name, err)
+	}
+	return b, nil
 }
 
 // splitList splits a comma-separated list, trimming spaces and dropping empty entries.

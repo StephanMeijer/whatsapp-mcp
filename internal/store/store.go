@@ -440,6 +440,15 @@ func (s *Store) MarkDeleted(ctx context.Context, chatJID, messageID string) (boo
 	return res.RowsAffected > 0, res.Error
 }
 
+// ExpireMessages deletes, the way MarkDeleted does, every message whose
+// disappearing timer ran out at or before now, and reports how many.
+func (s *Store) ExpireMessages(ctx context.Context, now int64) (int64, error) {
+	res := s.db.WithContext(ctx).Model(&Message{}).
+		Where("expires_at > 0 AND expires_at <= ? AND deleted = ?", now, false).
+		Updates(map[string]any{"deleted": true, "text": "", "media_ref": nil})
+	return res.RowsAffected, res.Error
+}
+
 // ErrNotFound is returned when a requested message is not in the archive.
 var ErrNotFound = errors.New("not found")
 

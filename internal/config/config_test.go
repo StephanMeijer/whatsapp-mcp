@@ -36,6 +36,17 @@ func TestLoad(t *testing.T) {
 			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", ReadOnly: true},
 		},
 		{
+			name: "expire disappearing from env",
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_EXPIRE_DISAPPEARING": "true"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", ExpireDisappearing: true},
+		},
+		{
+			name: "expire disappearing off by flag",
+			args: []string{"-expire-disappearing=false"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_EXPIRE_DISAPPEARING": "true"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info"},
+		},
+		{
 			name: "allowlist is trimmed and drops empty entries",
 			args: []string{"-allow-recipients", " +31 6 1234 5678 , ,123@g.us,"},
 			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
@@ -62,6 +73,11 @@ func TestLoad(t *testing.T) {
 			name:    "invalid read-only env",
 			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_READ_ONLY": "maybe"},
 			wantErr: "WHATSAPP_MCP_READ_ONLY",
+		},
+		{
+			name:    "invalid expire disappearing env",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_EXPIRE_DISAPPEARING": "sometimes"},
+			wantErr: "WHATSAPP_MCP_EXPIRE_DISAPPEARING",
 		},
 		{
 			name:    "read-only with allowlist",

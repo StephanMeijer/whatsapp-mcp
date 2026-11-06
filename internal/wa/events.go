@@ -190,6 +190,10 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 		MediaRef:  mediaRef(e.Message, e.Info.IsFromMe),
 	}
 	m.Forwarded, m.ForwardingScore = forwarding(e.Message)
+	// Disappearing timers count from when the message was sent.
+	if exp := contextInfo(e.Message).GetExpiration(); exp > 0 {
+		m.ExpiresAt = m.Timestamp + int64(exp)
+	}
 	return m, true
 }
 

@@ -84,6 +84,9 @@ func run() error {
 		return fmt.Errorf("connect to WhatsApp: %w", err)
 	}
 	defer client.Stop()
+	if cfg.ExpireDisappearing {
+		client.ExpireDisappearing(time.Hour)
+	}
 
 	mcpSrv, err := mcpserver.New(version, client, st, mcpserver.Options{
 		ReadOnly:        cfg.ReadOnly,
@@ -116,7 +119,8 @@ func run() error {
 	errc := make(chan error, 1)
 	go func() {
 		log.Info("serving MCP", "url", mcpURL, "listen", cfg.Addr, "version", version,
-			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients))
+			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients),
+			"expire_disappearing", cfg.ExpireDisappearing)
 		errc <- srv.ListenAndServe()
 	}()
 
