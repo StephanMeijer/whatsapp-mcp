@@ -4,6 +4,7 @@ package store_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
@@ -68,6 +69,19 @@ func TestMergeJIDsMovesPollVotes(t *testing.T) {
 		}
 		if got := votesBy(t, s, lid, "P2"); len(got) != 0 {
 			t.Errorf("votes left under the LID chat: %+v", got)
+		}
+	})
+}
+
+func TestLIDJIDsIncludesPollVoters(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const lid = "111@lid" // only ever voted, never sent a message
+		must(t, s.RecordPollVote(ctx, store.PollVote{ChatJID: "120363000000000001@g.us", PollID: "P1", VoterJID: lid, Selected: "aa", VotedAt: 1}))
+		lids, err := s.LIDJIDs(ctx)
+		must(t, err)
+		if !slices.Equal(lids, []string{lid}) {
+			t.Errorf("LIDJIDs = %v, want [%s]", lids, lid)
 		}
 	})
 }
