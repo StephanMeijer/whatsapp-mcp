@@ -46,6 +46,12 @@ type WhatsApp interface {
 	// UpdateGroupMembers adds, removes, promotes or demotes people in a group
 	// and reports each one's outcome.
 	UpdateGroupMembers(ctx context.Context, group types.JID, action string, members []types.JID) ([]wa.MemberResult, error)
+	// SetGroupInfo renames a group and/or changes its description, and
+	// reports which parts were applied, also on an error.
+	SetGroupInfo(ctx context.Context, group types.JID, name, description *string) (wa.GroupInfoApplied, error)
+	// GroupInviteLink returns a group's invite link; reset makes a new one
+	// and revokes the old.
+	GroupInviteLink(ctx context.Context, group types.JID, reset bool) (string, error)
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.

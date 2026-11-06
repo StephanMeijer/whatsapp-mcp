@@ -108,12 +108,18 @@ type fakeWA struct {
 	memberChanges []memberChange
 	memberCodes   map[types.JID]int
 	memberErr     error
-	timerErr      error
-	sent          []sentMsg
-	peer          []*waE2E.Message
-	patches       []appstate.PatchInfo
-	reads         []readCall
-	rejected      []rejectCall
+	// SetGroupName, SetGroupTopic and GetGroupInviteLink record each call in
+	// groupEdits and fail with their error when set.
+	groupEdits []string
+	nameErr    error
+	topicErr   error
+	linkErr    error
+	timerErr   error
+	sent       []sentMsg
+	peer       []*waE2E.Message
+	patches    []appstate.PatchInfo
+	reads      []readCall
+	rejected   []rejectCall
 
 	groupInfoCalls []types.JID
 	userInfoCalls  [][]types.JID
@@ -311,6 +317,30 @@ func (f *fakeWA) UpdateGroupParticipants(_ context.Context, jid types.JID, membe
 		out[i] = types.GroupParticipant{JID: m, Error: f.memberCodes[m]}
 	}
 	return out, nil
+}
+
+func (f *fakeWA) SetGroupName(_ context.Context, jid types.JID, name string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, "name "+jid.String()+" "+name)
+	return f.nameErr
+}
+
+func (f *fakeWA) SetGroupTopic(_ context.Context, jid types.JID, _, _, topic string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, "topic "+jid.String()+" "+topic)
+	return f.topicErr
+}
+
+func (f *fakeWA) GetGroupInviteLink(_ context.Context, jid types.JID, reset bool) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, fmt.Sprintf("link %s reset=%v", jid, reset))
+	if f.linkErr != nil {
+		return "", f.linkErr
+	}
+	return whatsmeow.InviteLinkPrefix + "SECRETCODE", nil
 }
 
 func (f *fakeWA) GetJoinedGroups(context.Context) ([]*types.GroupInfo, error) {

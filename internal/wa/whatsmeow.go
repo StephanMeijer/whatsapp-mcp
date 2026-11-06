@@ -37,6 +37,9 @@ type whatsmeowClient interface {
 	GetGroupInfo(ctx context.Context, jid types.JID) (*types.GroupInfo, error)
 	CreateGroup(ctx context.Context, req whatsmeow.ReqCreateGroup) (*types.GroupInfo, error)
 	LeaveGroup(ctx context.Context, jid types.JID) error
+	SetGroupName(ctx context.Context, jid types.JID, name string) error
+	SetGroupTopic(ctx context.Context, jid types.JID, previousID, newID, topic string) error
+	GetGroupInviteLink(ctx context.Context, jid types.JID, reset bool) (string, error)
 	UpdateGroupParticipants(ctx context.Context, jid types.JID, participantChanges []types.JID, action whatsmeow.ParticipantChange) ([]types.GroupParticipant, error)
 	GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error)
 	GetUserInfo(ctx context.Context, jids []types.JID) (map[types.JID]types.UserInfo, error)

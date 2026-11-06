@@ -12,9 +12,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// maxGroupNameRunes only stops absurd input; WhatsApp's own, shorter limit
-// is enforced by WhatsApp, whose refusal is passed on.
-const maxGroupNameRunes = 256
+// maxGroupNameRunes and maxGroupDescriptionRunes only stop absurd input;
+// WhatsApp's own, shorter limits are enforced by WhatsApp, whose refusal is
+// passed on.
+const (
+	maxGroupNameRunes        = 256
+	maxGroupDescriptionRunes = 8192
+)
 
 // registerGroupAdmin adds the tools that create, change and leave groups.
 // They are hard to undo, so the operator has to switch them on.
@@ -36,6 +40,17 @@ func registerGroupAdmin(s *mcp.Server, t *tools) {
 			"Each person's outcome is listed; the call fails only when nobody could be changed.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
 	}, t.updateGroupMembers)
+	mcp.AddTool(s, &mcp.Tool{
+		Name:        "set_group_info",
+		Description: "Rename a group and/or change its description; an empty description removes it.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
+	}, t.setGroupInfo)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "group_invite_link",
+		Description: "Get a group's invite link, which lets anyone who has it join. With reset, the old link " +
+			"stops working and a new one is returned.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
+	}, t.groupInviteLink)
 }
 
 type CreateGroupIn struct {
@@ -176,4 +191,76 @@ func (t *tools) updateGroupMembers(ctx context.Context, _ *mcp.CallToolRequest, 
 		return nil, UpdateGroupMembersOut{}, fmt.Errorf("nobody could be changed: %s", strings.Join(reasons, "; "))
 	}
 	return nil, out, nil
+}
+
+type SetGroupInfoIn struct {
+	ChatJID     string  `json:"chat_jid" jsonschema:"the group's JID"`
+	Name        *string `json:"name,omitempty" jsonschema:"the new name"`
+	Description *string `json:"description,omitempty" jsonschema:"the new description; empty removes it"`
+}
+
+type SetGroupInfoOut struct {
+	JID                string `json:"jid"`
+	NameChanged        bool   `json:"name_changed"`
+	DescriptionChanged bool   `json:"description_changed"`
+}
+
+func (t *tools) setGroupInfo(ctx context.Context, _ *mcp.CallToolRequest, in SetGroupInfoIn) (*mcp.CallToolResult, SetGroupInfoOut, error) {
+	if in.Name == nil && in.Description == nil {
+		return nil, SetGroupInfoOut{}, errors.New("set name, description or both")
+	}
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			return nil, SetGroupInfoOut{}, errors.New("the name can't be empty")
+		}
+		if utf8.RuneCountInString(name) > maxGroupNameRunes {
+			return nil, SetGroupInfoOut{}, fmt.Errorf("the name is over %d characters", maxGroupNameRunes)
+		}
+		in.Name = &name
+	}
+	if in.Description != nil && utf8.RuneCountInString(*in.Description) > maxGroupDescriptionRunes {
+		return nil, SetGroupInfoOut{}, fmt.Errorf("the description is over %d characters", maxGroupDescriptionRunes)
+	}
+	group, err := t.policy.groupChat(ctx, t.wa, in.ChatJID)
+	if err != nil {
+		return nil, SetGroupInfoOut{}, err
+	}
+	done, err := t.wa.SetGroupInfo(ctx, group, in.Name, in.Description)
+	if err != nil {
+		if done.Name {
+			return nil, SetGroupInfoOut{}, fmt.Errorf("the name was changed, but not the description: %w", err)
+		}
+		return nil, SetGroupInfoOut{}, err
+	}
+	return nil, SetGroupInfoOut{JID: group.String(), NameChanged: done.Name, DescriptionChanged: done.Description}, nil
+}
+
+type GroupInviteLinkIn struct {
+	ChatJID string `json:"chat_jid" jsonschema:"the group's JID"`
+	Reset   bool   `json:"reset,omitempty" jsonschema:"revoke the current link and return a new one"`
+}
+
+type GroupInviteLinkOut struct {
+	JID   string `json:"jid"`
+	Link  string `json:"link" jsonschema:"anyone with this link can join the group"`
+	Reset bool   `json:"reset"`
+}
+
+func (t *tools) groupInviteLink(ctx context.Context, _ *mcp.CallToolRequest, in GroupInviteLinkIn) (*mcp.CallToolResult, GroupInviteLinkOut, error) {
+	// A link lets anyone join, people the allowlist would refuse included; a
+	// reset just makes a new working link.
+	if t.policy.hasAllowlist() && !t.policy.inviteLinks {
+		return nil, GroupInviteLinkOut{}, errors.New("invite links are off while an allowlist is set, " +
+			"because anyone with a link can join; start the server with -allow-invite-links to allow them")
+	}
+	group, err := t.policy.groupChat(ctx, t.wa, in.ChatJID)
+	if err != nil {
+		return nil, GroupInviteLinkOut{}, err
+	}
+	link, err := t.wa.GroupInviteLink(ctx, group, in.Reset)
+	if err != nil {
+		return nil, GroupInviteLinkOut{}, err
+	}
+	return nil, GroupInviteLinkOut{JID: group.String(), Link: link, Reset: in.Reset}, nil
 }

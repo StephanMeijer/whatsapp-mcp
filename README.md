@@ -71,7 +71,9 @@ recipient.
 Managing groups is off unless you start the server with `-enable-group-admin`, because removing
 people or leaving a group can't be undone from here. With it on, the allowlist still applies: the
 group itself must be listed, and so must everyone added to it. A group made with `create_group` is
-not added to the allowlist; add its JID and restart to manage or message it.
+not added to the allowlist; add its JID and restart to manage or message it. Anyone with a
+group's invite link can join it, allowlist or not, so while an allowlist is set
+`group_invite_link` is refused unless you also pass `-allow-invite-links`. The link is never logged.
 
 ### Endpoints
 
@@ -314,6 +316,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `create_group` | create a group with you as admin and add up to 20 people; people WhatsApp refused are listed per member (needs `-enable-group-admin`) |
 | `leave_group` | leave a group (needs `-enable-group-admin`) |
 | `update_group_members` | add, remove, promote or demote up to 20 people in a group you admin; adding or promoting someone needs them on the allowlist (needs `-enable-group-admin`) |
+| `set_group_info` | rename a group and/or change its description; an empty description removes it (needs `-enable-group-admin`) |
+| `group_invite_link` | get a group's invite link, or `reset` it to revoke the old one; refused while an allowlist is set unless `-allow-invite-links` is on (needs `-enable-group-admin`) |
 
 ## Why a database
 

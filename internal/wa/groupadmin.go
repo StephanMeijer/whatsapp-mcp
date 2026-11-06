@@ -162,3 +162,64 @@ func (c *Client) UpdateGroupMembers(ctx context.Context, group types.JID, action
 	c.log.Info("changed group members", "group", group.String(), "action", action, "members", len(members))
 	return results, nil
 }
+
+// GroupInfoApplied reports which parts of a SetGroupInfo call went through.
+type GroupInfoApplied struct {
+	Name, Description bool
+}
+
+// SetGroupInfo renames a group and/or changes its description; an empty
+// description removes it. The two are separate requests, so on an error it
+// still reports what was applied. A rename shows in the archive straight away.
+func (c *Client) SetGroupInfo(ctx context.Context, group types.JID, name, description *string) (GroupInfoApplied, error) {
+	var done GroupInfoApplied
+	if !c.cli.IsLoggedIn() {
+		return done, errNotLoggedIn
+	}
+	if name != nil {
+		if err := c.cli.SetGroupName(ctx, group, *name); err != nil {
+			return done, fmt.Errorf("rename group: %w", groupError(err))
+		}
+		done.Name = true
+		if _, err := c.store.RenameChats(ctx, map[string]string{group.String(): *name}); err != nil {
+			c.log.Error("archive group rename", "err", err, "group", group.String())
+		}
+	}
+	if description != nil {
+		// An empty previous ID makes whatsmeow look the current one up.
+		if err := c.cli.SetGroupTopic(ctx, group, "", "", *description); err != nil {
+			return done, fmt.Errorf("change group description: %w", groupError(err))
+		}
+		done.Description = true
+	}
+	c.log.Info("changed group info", "group", group.String(), "name", done.Name, "description", done.Description)
+	return done, nil
+}
+
+// GroupInviteLink returns a group's invite link; with reset, the old link
+// stops working and a new one is made. Anyone with the link can join, so it
+// is never logged.
+func (c *Client) GroupInviteLink(ctx context.Context, group types.JID, reset bool) (string, error) {
+	if !c.cli.IsLoggedIn() {
+		return "", errNotLoggedIn
+	}
+	link, err := c.cli.GetGroupInviteLink(ctx, group, reset)
+	if err != nil {
+		return "", fmt.Errorf("group invite link: %w", groupError(err))
+	}
+	c.log.Info("got group invite link", "group", group.String(), "reset", reset)
+	return link, nil
+}
+
+// groupError puts whatsmeow's group errors in plain words.
+func groupError(err error) error {
+	switch {
+	case errors.Is(err, whatsmeow.ErrGroupInviteLinkUnauthorized):
+		return errors.New("only an admin of this group can do that")
+	case errors.Is(err, whatsmeow.ErrNotInGroup):
+		return errors.New("you're not in this group")
+	case errors.Is(err, whatsmeow.ErrGroupNotFound):
+		return errors.New("this group doesn't exist")
+	}
+	return err
+}

@@ -22,7 +22,7 @@ const (
 	gaSelf     = "31600000000@s.whatsapp.net"
 )
 
-var groupAdminTools = []string{"create_group", "leave_group", "update_group_members"}
+var groupAdminTools = []string{"create_group", "leave_group", "update_group_members", "set_group_info", "group_invite_link"}
 
 func TestGroupAdminToolsNeedTheFlag(t *testing.T) {
 	has := func(names []string) []string {
@@ -202,5 +202,81 @@ func TestUpdateGroupMembers(t *testing.T) {
 	}
 	if len(fake.sent) != sentBefore {
 		t.Errorf("refused calls sent %v", fake.sent[sentBefore:])
+	}
+}
+
+func TestSetGroupInfo(t *testing.T) {
+	fake := &fakeWA{}
+	cs := connect(t, fake, storetest.New(t), Options{GroupAdmin: true, AllowRecipients: []string{gaListed}})
+	set := func(args map[string]any) (SetGroupInfoOut, *mcp.CallToolResult) {
+		t.Helper()
+		var out SetGroupInfoOut
+		res := call(t, cs, "set_group_info", args, &out)
+		return out, res
+	}
+	if out, res := set(map[string]any{"chat_jid": gaListed, "name": " Lunch club "}); res.IsError || !out.NameChanged || out.DescriptionChanged {
+		t.Errorf("rename = %+v, %s", out, errText(res))
+	}
+	// An empty description is sent, to clear it, not dropped.
+	if out, res := set(map[string]any{"chat_jid": gaListed, "description": ""}); res.IsError || !out.DescriptionChanged {
+		t.Errorf("clear description = %+v, %s", out, errText(res))
+	}
+	if want := []string{`name ` + gaListed + ` "Lunch club"`, `description ` + gaListed + ` ""`}; !slices.Equal(fake.sent, want) {
+		t.Errorf("sent = %v, want %v", fake.sent, want)
+	}
+
+	sentBefore := len(fake.sent)
+	for name, args := range map[string]map[string]any{
+		"neither field":        {"chat_jid": gaListed},
+		"blank name":           {"chat_jid": gaListed, "name": "   "},
+		"too long description": {"chat_jid": gaListed, "description": strings.Repeat("é", maxGroupDescriptionRunes+1)},
+		"unlisted group":       {"chat_jid": gaUnlisted, "name": "X"},
+	} {
+		if _, res := set(args); !res.IsError {
+			t.Errorf("%s: set_group_info succeeded", name)
+		}
+	}
+	if len(fake.sent) != sentBefore {
+		t.Errorf("refused calls sent %v", fake.sent[sentBefore:])
+	}
+
+	// A failure after the rename says the rename happened.
+	fake.descriptionErr = fmt.Errorf("406 not acceptable")
+	_, res := set(map[string]any{"chat_jid": gaListed, "name": "New", "description": "too much"})
+	if !res.IsError || !strings.Contains(errText(res), "the name was changed, but not the description") {
+		t.Errorf("partial failure = %q", errText(res))
+	}
+}
+
+func TestGroupInviteLink(t *testing.T) {
+	link := func(opts Options, chat string, reset bool) (GroupInviteLinkOut, *mcp.CallToolResult, *fakeWA) {
+		t.Helper()
+		fake := &fakeWA{}
+		cs := connect(t, fake, storetest.New(t), opts)
+		var out GroupInviteLinkOut
+		res := call(t, cs, "group_invite_link", map[string]any{"chat_jid": chat, "reset": reset}, &out)
+		return out, res, fake
+	}
+	allowlisted := Options{GroupAdmin: true, AllowRecipients: []string{gaListed}}
+
+	// With an allowlist and the flag off, links are refused, reset too, and nothing is sent.
+	for _, reset := range []bool{false, true} {
+		_, res, fake := link(allowlisted, gaListed, reset)
+		if !res.IsError || !strings.Contains(errText(res), "-allow-invite-links") || len(fake.sent) != 0 {
+			t.Errorf("allowlist, flag off, reset=%v: %q, sent %v", reset, errText(res), fake.sent)
+		}
+	}
+	// With the flag on, a listed group gets its link; an unlisted one is still refused.
+	withFlag := allowlisted
+	withFlag.InviteLinks = true
+	if out, res, _ := link(withFlag, gaListed, true); res.IsError || out.Link == "" || !out.Reset {
+		t.Errorf("allowlist, flag on = %+v, %s", out, errText(res))
+	}
+	if _, res, _ := link(withFlag, gaUnlisted, false); !res.IsError {
+		t.Error("allowlist, flag on: an unlisted group got a link")
+	}
+	// Without an allowlist, links always work.
+	if out, res, _ := link(Options{GroupAdmin: true}, gaUnlisted, false); res.IsError || out.Link == "" {
+		t.Errorf("no allowlist = %+v, %s", out, errText(res))
 	}
 }

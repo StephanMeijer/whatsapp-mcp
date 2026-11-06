@@ -24,6 +24,8 @@ type fakeWA struct {
 	sent []string
 	// refuseMembers makes CreateGroup report these members as refused, with the reason.
 	refuseMembers map[string]string
+	// descriptionErr makes SetGroupInfo fail after applying a name.
+	descriptionErr error
 	// lids maps @lid JIDs to phone-number JIDs for Canonical.
 	lids map[string]string
 	// names are returned by Names; namesErr makes it fail.
@@ -280,6 +282,33 @@ func (f *fakeWA) UpdateGroupMembers(_ context.Context, group types.JID, action s
 		out[i] = wa.MemberResult{JID: m, OK: !refused, Error: reason}
 	}
 	return out, nil
+}
+
+func (f *fakeWA) SetGroupInfo(_ context.Context, group types.JID, name, description *string) (wa.GroupInfoApplied, error) {
+	if f.writeErr != nil {
+		return wa.GroupInfoApplied{}, f.writeErr
+	}
+	var done wa.GroupInfoApplied
+	if name != nil {
+		f.sent = append(f.sent, fmt.Sprintf("name %s %q", group, *name))
+		done.Name = true
+	}
+	if description != nil {
+		if f.descriptionErr != nil {
+			return done, f.descriptionErr
+		}
+		f.sent = append(f.sent, fmt.Sprintf("description %s %q", group, *description))
+		done.Description = true
+	}
+	return done, nil
+}
+
+func (f *fakeWA) GroupInviteLink(_ context.Context, group types.JID, reset bool) (string, error) {
+	if f.writeErr != nil {
+		return "", f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("link %s reset=%v", group, reset))
+	return "https://chat.whatsapp.com/SECRETCODE", nil
 }
 
 func (f *fakeWA) LeaveGroup(_ context.Context, group types.JID) error {

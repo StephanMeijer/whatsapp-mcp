@@ -3,9 +3,12 @@
 package wa
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
+	"strings"
 	"testing"
 
 	"go.mau.fi/whatsmeow"
@@ -143,5 +146,51 @@ func TestUpdateGroupMembers(t *testing.T) {
 	}
 	if _, err := c.UpdateGroupMembers(ctx, testGroup, "kick", []types.JID{carol}); err == nil {
 		t.Error("an unknown action was accepted")
+	}
+}
+
+func TestSetGroupInfo(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	ctx := context.Background()
+	archive(t, c, incoming(testGroup, alicePN, "G1", 100, "hi"))
+	name, desc := "Lunch club", ""
+	done, err := c.SetGroupInfo(ctx, testGroup, &name, &desc)
+	if err != nil || !done.Name || !done.Description {
+		t.Fatalf("SetGroupInfo = %+v, %v", done, err)
+	}
+	if want := []string{"name " + testGroup.String() + " Lunch club", "topic " + testGroup.String() + " "}; !slices.Equal(fake.groupEdits, want) {
+		t.Errorf("edits = %q, want %q", fake.groupEdits, want)
+	}
+	if names := chatNames(t, c, testGroup); names[testGroup.String()] != "Lunch club" {
+		t.Errorf("archived name = %q, want it renamed straight away", names[testGroup.String()])
+	}
+
+	fake.topicErr = errors.New("406 not acceptable")
+	done, err = c.SetGroupInfo(ctx, testGroup, &name, &desc)
+	if err == nil || !done.Name || done.Description {
+		t.Errorf("description refused = %+v, %v; want the name reported as applied", done, err)
+	}
+}
+
+func TestGroupInviteLink(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	var logs bytes.Buffer
+	c.log = slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	link, err := c.GroupInviteLink(context.Background(), testGroup, true)
+	if err != nil || !strings.HasSuffix(link, "SECRETCODE") {
+		t.Fatalf("GroupInviteLink = %q, %v", link, err)
+	}
+	if strings.Contains(logs.String(), "SECRETCODE") {
+		t.Errorf("the invite link was logged: %s", logs.String())
+	}
+	for werr, want := range map[error]string{
+		whatsmeow.ErrGroupInviteLinkUnauthorized: "only an admin of this group can do that",
+		whatsmeow.ErrNotInGroup:                  "you're not in this group",
+		whatsmeow.ErrGroupNotFound:               "this group doesn't exist",
+	} {
+		fake.linkErr = werr
+		if _, err := c.GroupInviteLink(context.Background(), testGroup, false); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%v: err = %v, want %q", werr, err, want)
+		}
 	}
 }
