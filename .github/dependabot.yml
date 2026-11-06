@@ -39,3 +39,7 @@ updates:
     commit-message:
       prefix: build
       include: scope
+    ignore:
+      # A pgdata volume initialised by one major cannot start on the next.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
