@@ -102,3 +102,43 @@ func TestCallLifecycle(t *testing.T) {
 		}
 	})
 }
+
+func TestLIDJIDsIncludesCallersAndReceiptParticipants(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const caller, reader, pollChat = "111@lid", "222@lid", "333@lid" // never sent a message
+		const callerPN, readerPN, pollChatPN = "31600000001@s.whatsapp.net", "31600000002@s.whatsapp.net", "31600000003@s.whatsapp.net"
+		const group = "120363000000000001@g.us"
+		must(t, s.RecordCallOffer(ctx, store.Call{CallID: "C1", CallerJID: caller, ChatJID: caller, StartedAt: 10}))
+		mine := store.Message{ChatJID: group, MessageID: "M1", SenderJID: "31600000000@s.whatsapp.net", Timestamp: 20, FromMe: true, Text: "hi"}
+		must(t, s.Save(ctx, nil, []store.Message{mine}))
+		if _, err := s.RecordReceipt(ctx, group, "M1", reader, store.StatusRead, time.Unix(30, 0)); err != nil {
+			t.Fatal(err)
+		}
+		must(t, s.RecordPollVote(ctx, store.PollVote{ChatJID: pollChat, PollID: "P1", VoterJID: "31600000000@s.whatsapp.net", VotedAt: 40}))
+
+		lids, err := s.LIDJIDs(ctx)
+		must(t, err)
+		slices.Sort(lids)
+		if want := []string{caller, reader, pollChat}; !slices.Equal(lids, want) {
+			t.Fatalf("LIDJIDs = %v, want %v", lids, want)
+		}
+
+		if _, err := s.MergeJIDs(ctx, map[string]string{caller: callerPN, reader: readerPN, pollChat: pollChatPN}); err != nil {
+			t.Fatal(err)
+		}
+		calls, err := s.ListCalls(ctx, time.Time{}, 0)
+		must(t, err)
+		if len(calls) != 1 || calls[0].CallerJID != callerPN || calls[0].ChatJID != callerPN {
+			t.Errorf("calls after merge = %+v", calls)
+		}
+		rs, err := s.Receipts(ctx, group, "M1")
+		must(t, err)
+		if len(rs) != 1 || rs[0].ParticipantJID != readerPN {
+			t.Errorf("receipts after merge = %+v", rs)
+		}
+		if lids, _ := s.LIDJIDs(ctx); len(lids) != 0 {
+			t.Errorf("LIDJIDs after merge = %v, want none", lids)
+		}
+	})
+}
