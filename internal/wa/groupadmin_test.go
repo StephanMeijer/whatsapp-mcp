@@ -183,14 +183,37 @@ func TestGroupInviteLink(t *testing.T) {
 	if strings.Contains(logs.String(), "SECRETCODE") {
 		t.Errorf("the invite link was logged: %s", logs.String())
 	}
+	fake.linkErr = whatsmeow.ErrGroupInviteLinkUnauthorized
+	if _, err := c.GroupInviteLink(context.Background(), testGroup, false); err == nil || !strings.Contains(err.Error(), "only an admin") {
+		t.Errorf("unauthorized: err = %v, want it in plain words", err)
+	}
+}
+
+func TestGroupErrorsInPlainWords(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	ctx := context.Background()
+	name := "Lunch club"
 	for werr, want := range map[error]string{
 		whatsmeow.ErrGroupInviteLinkUnauthorized: "only an admin of this group can do that",
 		whatsmeow.ErrNotInGroup:                  "you're not in this group",
 		whatsmeow.ErrGroupNotFound:               "this group doesn't exist",
+		whatsmeow.ErrIQNotAuthorized:             "only an admin of this group can do that",
+		whatsmeow.ErrIQForbidden:                 "you're not in this group, or not allowed",
+		whatsmeow.ErrIQNotFound:                  "this group doesn't exist",
+		whatsmeow.ErrIQNotAcceptable:             "WhatsApp refused the value",
 	} {
-		fake.linkErr = werr
-		if _, err := c.GroupInviteLink(context.Background(), testGroup, false); err == nil || !strings.Contains(err.Error(), want) {
-			t.Errorf("%v: err = %v, want %q", werr, err, want)
+		fake.linkErr, fake.nameErr, fake.memberErr = werr, werr, werr
+		if _, err := c.GroupInviteLink(ctx, testGroup, false); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("invite link, %v: err = %v, want %q", werr, err, want)
 		}
+		if _, err := c.SetGroupInfo(ctx, testGroup, &name, nil); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("rename, %v: err = %v, want %q", werr, err, want)
+		}
+		if _, err := c.UpdateGroupMembers(ctx, testGroup, "add", []types.JID{alicePN}); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("add member, %v: err = %v, want %q", werr, err, want)
+		}
+	}
+	if err := groupError(errors.New("timed out")); err.Error() != "timed out" {
+		t.Errorf("an unknown error was changed: %v", err)
 	}
 }

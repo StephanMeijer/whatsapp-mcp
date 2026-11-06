@@ -136,7 +136,7 @@ func (c *Client) UpdateGroupMembers(ctx context.Context, group types.JID, action
 	} else {
 		info, err := c.cli.GetGroupInfo(ctx, group)
 		if err != nil {
-			return nil, fmt.Errorf("look up group members: %w", err)
+			return nil, fmt.Errorf("look up group members: %w", groupError(err))
 		}
 		for i, m := range members {
 			p := c.findParticipant(ctx, m, info.Participants)
@@ -151,7 +151,7 @@ func (c *Client) UpdateGroupMembers(ctx context.Context, group types.JID, action
 	if len(wire) > 0 {
 		changed, err := c.cli.UpdateGroupParticipants(ctx, group, wire, change)
 		if err != nil {
-			return nil, fmt.Errorf("%s group members: %w", action, err)
+			return nil, fmt.Errorf("%s group members: %w", action, groupError(err))
 		}
 		for i, m := range members {
 			if sentAs[i] {
@@ -198,7 +198,7 @@ func (c *Client) SetGroupInfo(ctx context.Context, group types.JID, name, descri
 
 // GroupInviteLink returns a group's invite link; with reset, the old link
 // stops working and a new one is made. Anyone with the link can join, so it
-// is never logged.
+// is never logged here (whatsmeow's debug logs do contain it).
 func (c *Client) GroupInviteLink(ctx context.Context, group types.JID, reset bool) (string, error) {
 	if !c.cli.IsLoggedIn() {
 		return "", errNotLoggedIn
@@ -211,15 +211,18 @@ func (c *Client) GroupInviteLink(ctx context.Context, group types.JID, reset boo
 	return link, nil
 }
 
-// groupError puts whatsmeow's group errors in plain words.
+// groupError puts whatsmeow's group errors in plain words: the group
+// specific ones some calls wrap, and the bare IQ errors the others return.
 func groupError(err error) error {
 	switch {
-	case errors.Is(err, whatsmeow.ErrGroupInviteLinkUnauthorized):
+	case errors.Is(err, whatsmeow.ErrGroupInviteLinkUnauthorized), errors.Is(err, whatsmeow.ErrIQNotAuthorized):
 		return errors.New("only an admin of this group can do that")
-	case errors.Is(err, whatsmeow.ErrNotInGroup):
-		return errors.New("you're not in this group")
-	case errors.Is(err, whatsmeow.ErrGroupNotFound):
+	case errors.Is(err, whatsmeow.ErrNotInGroup), errors.Is(err, whatsmeow.ErrIQForbidden):
+		return errors.New("you're not in this group, or not allowed to do that")
+	case errors.Is(err, whatsmeow.ErrGroupNotFound), errors.Is(err, whatsmeow.ErrIQNotFound):
 		return errors.New("this group doesn't exist")
+	case errors.Is(err, whatsmeow.ErrIQNotAcceptable):
+		return errors.New("WhatsApp refused the value, for instance a name that is too long")
 	}
 	return err
 }
