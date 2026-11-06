@@ -54,6 +54,11 @@ type Message struct {
 	// delivered, read or played, the furthest any recipient reached. It only
 	// moves forward (see RecordReceipt). Incoming messages stay at sent.
 	Status string `gorm:"not null;default:'sent'"`
+	// Forwarded is set for a message forwarded from another chat;
+	// ForwardingScore is how many times it has been forwarded along the way
+	// (the phone says "Forwarded many times" from 5).
+	Forwarded       bool `gorm:"not null;default:false"`
+	ForwardingScore int  `gorm:"not null;default:0"`
 	// Deleted marks a message deleted for everyone. Its text is cleared and
 	// it is left out of every query that feeds the tools.
 	Deleted bool `gorm:"not null;default:false"`

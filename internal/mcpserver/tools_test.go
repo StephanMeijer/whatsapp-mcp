@@ -323,6 +323,8 @@ func TestReadTools(t *testing.T) {
 	if err := st.Save(context.Background(), []store.Chat{{JID: alice, Name: "Alice"}}, []store.Message{
 		{ChatJID: alice, MessageID: "m1", SenderJID: alice, Timestamp: 1_700_000_000, Text: "see you at the station"},
 		{ChatJID: alice, MessageID: "m2", SenderJID: alice, Timestamp: 1_700_000_100, MediaType: "image"},
+		{ChatJID: alice, MessageID: "f1", SenderJID: alice, Timestamp: 1_699_999_000, Text: "forwarded once", Forwarded: true, ForwardingScore: 1},
+		{ChatJID: alice, MessageID: "f5", SenderJID: alice, Timestamp: 1_699_999_001, Text: "chain letter", Forwarded: true, ForwardingScore: 5},
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -342,8 +344,21 @@ func TestReadTools(t *testing.T) {
 
 	var page MessagesOut
 	call(t, cs, "list_messages", map[string]any{"chat_jid": alice, "before": "2023-11-14T22:14:00Z"}, &page)
-	if len(page.Messages) != 1 || page.Messages[0].ID != "m1" {
+	if len(page.Messages) != 3 || page.Messages[0].ID != "m1" {
 		t.Errorf("list_messages before = %+v", page)
+	}
+	byID := map[string]Message{}
+	for _, m := range page.Messages {
+		byID[m.ID] = m
+	}
+	if m := byID["f1"]; !m.Forwarded || m.ForwardedManyTimes {
+		t.Errorf("forwarded once = %+v", m)
+	}
+	if m := byID["f5"]; !m.Forwarded || !m.ForwardedManyTimes {
+		t.Errorf("forwarded many times = %+v", m)
+	}
+	if m := byID["m1"]; m.Forwarded || m.ForwardedManyTimes {
+		t.Errorf("original = %+v", m)
 	}
 
 	var found MessagesOut

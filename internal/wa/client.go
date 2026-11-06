@@ -238,6 +238,7 @@ func (c *Client) sendAndArchive(ctx context.Context, to types.JID, msg *waE2E.Me
 		MediaType: kind,
 		MediaRef:  mediaRef(msg, true),
 	}
+	m.Forwarded, m.ForwardingScore = forwarding(msg)
 	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
 		// The message went out; failing to archive it shouldn't fail the send.
 		c.log.Error("archive sent "+what, "err", err, "id", resp.ID)

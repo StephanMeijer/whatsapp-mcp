@@ -159,7 +159,7 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 	if text == "" && media == "" {
 		return store.Message{}, false
 	}
-	return store.Message{
+	m := store.Message{
 		ChatJID:   canon(e.Info.Chat).String(),
 		MessageID: e.Info.ID,
 		SenderJID: canon(e.Info.Sender).String(),
@@ -168,7 +168,9 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 		Text:      text,
 		MediaType: media,
 		MediaRef:  mediaRef(e.Message, e.Info.IsFromMe),
-	}, true
+	}
+	m.Forwarded, m.ForwardingScore = forwarding(e.Message)
+	return m, true
 }
 
 // messageContent extracts the searchable text and the media kind.

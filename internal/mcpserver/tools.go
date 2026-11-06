@@ -204,7 +204,14 @@ type Message struct {
 	MediaType  string `json:"media_type,omitempty" jsonschema:"image, video, audio, document, sticker, poll, location or contact; empty for text. A poll's text is its question followed by one '- option' line per option; a location's is its name and address, then its coordinates and a map link; a contact's is one 'Name: +number' line per card"`
 	EditedAt   string `json:"edited_at,omitempty" jsonschema:"RFC 3339; set if the message was edited"`
 	Status     string `json:"status,omitempty" jsonschema:"your own messages only: sent, delivered, read or played, the furthest any recipient got; see message_receipts"`
+	Forwarded  bool   `json:"forwarded,omitempty" jsonschema:"true if the message was forwarded from another chat"`
+	// ForwardedManyTimes mirrors the phone's "Forwarded many times" label.
+	ForwardedManyTimes bool `json:"forwarded_many_times,omitempty" jsonschema:"true if it has been forwarded at least 5 times along the way"`
 }
+
+// manyTimesScore is the forwarding score from which the phone labels a
+// message "Forwarded many times".
+const manyTimesScore = 5
 
 // toMessages converts archive rows to tool output, naming senders with one
 // contacts lookup for the whole batch. A failed lookup only loses the names.
@@ -225,6 +232,9 @@ func (t *tools) toMessages(ctx context.Context, msgs []store.Message) []Message 
 			FromMe:     m.FromMe,
 			Text:       m.Text,
 			MediaType:  string(m.MediaType),
+			Forwarded:  m.Forwarded,
+			// The phone shows the label only on forwarded messages.
+			ForwardedManyTimes: m.Forwarded && m.ForwardingScore >= manyTimesScore,
 		}
 		if m.EditedAt > 0 {
 			out[i].EditedAt = formatUnix(m.EditedAt)

@@ -727,6 +727,26 @@ func TestMessageByIDAndLatestIncoming(t *testing.T) {
 	})
 }
 
+func TestForwardingRoundTrip(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		fwd := msg(chat, "fwd", 10, "passed on")
+		fwd.Forwarded, fwd.ForwardingScore = true, 6
+		must(t, s.Save(ctx, nil, []store.Message{fwd, msg(chat, "own", 20, "original")}))
+		got, err := s.MessageByID(ctx, chat, "fwd")
+		must(t, err)
+		if !got.Forwarded || got.ForwardingScore != 6 {
+			t.Errorf("forwarded message = %+v", got)
+		}
+		got, err = s.MessageByID(ctx, chat, "own")
+		must(t, err)
+		if got.Forwarded || got.ForwardingScore != 0 {
+			t.Errorf("original message = %+v", got)
+		}
+	})
+}
+
 func TestMediaRef(t *testing.T) {
 	eachDialect(t, func(t *testing.T, s *store.Store) {
 		ctx := context.Background()
