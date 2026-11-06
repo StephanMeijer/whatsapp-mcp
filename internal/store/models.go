@@ -13,6 +13,8 @@ type Chat struct {
 	Archived   bool  `gorm:"not null;default:false"`
 	Pinned     bool  `gorm:"not null;default:false"`
 	MutedUntil int64 `gorm:"not null;default:0"`
+	// DisappearingSeconds is the chat's disappearing-message timer, 0 when off.
+	DisappearingSeconds int64 `gorm:"not null;default:0"`
 }
 
 // MediaKind is the kind of media a message carries.

@@ -189,6 +189,12 @@ func registerTools(s *mcp.Server, t *tools) {
 			"Archiving also unpins. mute is off, forever, or a duration such as 8h or 168h.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.setChatState)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "set_disappearing_timer",
+		Description: "Turn disappearing messages on or off for a chat, as on the phone: new messages then vanish " +
+			"after the timer. timer is off, 24h, 7d or 90d. In a direct chat WhatsApp announces the change in the chat.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
+	}, t.setDisappearingTimer)
 }
 
 // Message is the tool-facing form of store.Message.

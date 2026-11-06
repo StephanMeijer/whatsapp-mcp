@@ -28,6 +28,8 @@ type Chat struct {
 	Archived      bool   `json:"archived,omitempty"`
 	Pinned        bool   `json:"pinned,omitempty"`
 	MutedUntil    string `json:"muted_until,omitempty" jsonschema:"RFC 3339, or forever"`
+	// DisappearingTimer is omitted when disappearing messages are off.
+	DisappearingTimer string `json:"disappearing_timer,omitempty" jsonschema:"how long messages in this chat last: 24h, 7d, 90d or another duration; absent when disappearing messages are off"`
 }
 
 func toChat(c store.Chat) Chat {
@@ -40,6 +42,9 @@ func toChat(c store.Chat) Chat {
 		out.MutedUntil = "forever"
 	case c.MutedUntil > 0:
 		out.MutedUntil = formatUnix(c.MutedUntil)
+	}
+	if c.DisappearingSeconds > 0 {
+		out.DisappearingTimer = formatTimer(c.DisappearingSeconds)
 	}
 	return out
 }

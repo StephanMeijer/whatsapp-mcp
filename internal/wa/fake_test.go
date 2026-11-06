@@ -95,6 +95,8 @@ type fakeWA struct {
 	qr          chan whatsmeow.QRChannelItem
 	qrCalls     int
 
+	timers   []timerCall
+	timerErr error
 	sent     []sentMsg
 	peer     []*waE2E.Message
 	patches  []appstate.PatchInfo
@@ -230,6 +232,13 @@ func (f *fakeWA) RejectCall(_ context.Context, from types.JID, id string) error 
 	}
 	f.rejected = append(f.rejected, rejectCall{from, id})
 	return nil
+}
+
+func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer time.Duration, _ time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.timers = append(f.timers, timerCall{chat, timer})
+	return f.timerErr
 }
 
 func (f *fakeWA) Upload(_ context.Context, _ []byte, kind whatsmeow.MediaType) (whatsmeow.UploadResponse, error) {
@@ -470,4 +479,9 @@ func chatNames(t *testing.T, c *Client, jids ...types.JID) map[string]string {
 		out[k] = ch.Name
 	}
 	return out
+}
+
+type timerCall struct {
+	chat  types.JID
+	timer time.Duration
 }

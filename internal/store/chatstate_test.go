@@ -63,16 +63,30 @@ func TestChatFlags(t *testing.T) {
 			t.Errorf("after reset = %v", got)
 		}
 
+		// The disappearing timer is set and cleared like the other flags.
+		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{DisappearingSeconds: new(int64(604800))}))
+		chats, err = s.ChatsByJID(ctx, []string{bob})
+		must(t, err)
+		if c := chats[bob]; c.DisappearingSeconds != 604800 || c.Pinned {
+			t.Errorf("bob with a timer = %+v", c)
+		}
+		must(t, s.SetChatFlags(ctx, bob, store.ChatFlags{DisappearingSeconds: new(int64(0))}))
+		chats, err = s.ChatsByJID(ctx, []string{bob})
+		must(t, err)
+		if c := chats[bob]; c.DisappearingSeconds != 0 {
+			t.Errorf("bob with the timer off = %+v", c)
+		}
+
 		// Merging an @lid chat keeps flags from either side.
 		const lid = "111@lid"
-		must(t, s.SetChatFlags(ctx, lid, store.ChatFlags{Archived: new(true)}))
+		must(t, s.SetChatFlags(ctx, lid, store.ChatFlags{Archived: new(true), DisappearingSeconds: new(int64(86400))}))
 		if _, err := s.MergeJIDs(ctx, map[string]string{lid: alice}); err != nil {
 			t.Fatal(err)
 		}
 		chats, err = s.ChatsByJID(ctx, []string{alice})
 		must(t, err)
-		if !chats[alice].Archived {
-			t.Errorf("merged alice = %+v, want archived", chats[alice])
+		if !chats[alice].Archived || chats[alice].DisappearingSeconds != 86400 {
+			t.Errorf("merged alice = %+v, want archived with the LID chat's 24h timer", chats[alice])
 		}
 	})
 }

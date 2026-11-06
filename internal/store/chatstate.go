@@ -8,12 +8,13 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-// ChatFlags is a change to a chat's archived, pinned or muted state; a nil
-// field is left as it is.
+// ChatFlags is a change to a chat's archived, pinned, muted or disappearing
+// state; a nil field is left as it is.
 type ChatFlags struct {
-	Archived   *bool
-	Pinned     *bool
-	MutedUntil *int64 // Unix seconds; 0 unmutes, -1 mutes forever
+	Archived            *bool
+	Pinned              *bool
+	MutedUntil          *int64 // Unix seconds; 0 unmutes, -1 mutes forever
+	DisappearingSeconds *int64 // disappearing-message timer; 0 turns it off
 }
 
 // ArchiveFilter says which chats ListChats returns.
@@ -38,6 +39,9 @@ func (s *Store) SetChatFlags(ctx context.Context, jid string, f ChatFlags) error
 	}
 	if f.MutedUntil != nil {
 		c.MutedUntil, cols = *f.MutedUntil, append(cols, "muted_until")
+	}
+	if f.DisappearingSeconds != nil {
+		c.DisappearingSeconds, cols = *f.DisappearingSeconds, append(cols, "disappearing_seconds")
 	}
 	if len(cols) == 0 {
 		return nil
