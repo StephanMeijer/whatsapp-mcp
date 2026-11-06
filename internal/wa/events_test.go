@@ -44,11 +44,13 @@ func historySync(typ waHistorySync.HistorySync_HistorySyncType, convs ...*waHist
 }
 
 func TestOnHistorySyncArchivesUnderPhoneNumber(t *testing.T) {
-	c, _, _, _ := newTestClient(t)
+	c, _, lids, _ := newTestClient(t)
 	ctx := context.Background()
 	c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
-		// A LID whose number is known: archived under the number.
+		// A LID whose number is known: archived under the number, and a
+		// conflicting PnJID does not replace the known mapping.
 		&waHistorySync.Conversation{ID: proto.String(aliceLID.String()), Name: proto.String("Alice"),
+			PnJID:    proto.String("31699999999@s.whatsapp.net"),
 			Messages: []*waHistorySync.HistorySyncMsg{webMsg("M1", false, 100, "", text("hi"))}},
 		// An unmapped LID whose conversation carries its number: archived under that number.
 		&waHistorySync.Conversation{ID: proto.String(stranger.String()), PnJID: proto.String("31600000009@s.whatsapp.net"),
@@ -70,10 +72,19 @@ func TestOnHistorySyncArchivesUnderPhoneNumber(t *testing.T) {
 	}
 	numberChat := types.NewJID("31600000009", types.DefaultUserServer)
 	s1 := archived(t, c, numberChat, "S1")
-	// The sender is not resolved from the conversation's number; this pins
-	// current behaviour.
-	if s1.SenderJID != stranger.String() {
-		t.Errorf("S1 sender = %s, want %s", s1.SenderJID, stranger)
+	// The conversation's number is stored as the LID's mapping, so its
+	// senders resolve to it as well.
+	if s1.SenderJID != numberChat.String() {
+		t.Errorf("S1 sender = %s, want %s", s1.SenderJID, numberChat)
+	}
+	if got := c.Canonical(ctx, stranger); got != numberChat {
+		t.Errorf("stranger maps to %s after the sync, want %s", got, numberChat)
+	}
+	if got := c.Canonical(ctx, aliceLID); got != alicePN {
+		t.Errorf("Alice maps to %s after the sync, want %s kept", got, alicePN)
+	}
+	if _, ok := lids.pnByLID["888"]; ok {
+		t.Error("a PnJID that is a LID was stored as a mapping")
 	}
 	archived(t, c, types.NewJID("888", types.HiddenUserServer), "L1")
 
