@@ -96,7 +96,7 @@ type fakeWA struct {
 	qrCalls     int
 
 	timers []timerCall
-	// CreateGroup returns created or createErr and records each request;
+	// CreateGroup returns created and createErr and records each request;
 	// LeaveGroup records the groups left and returns leaveErr.
 	createReqs []whatsmeow.ReqCreateGroup
 	created    *types.GroupInfo
@@ -284,10 +284,7 @@ func (f *fakeWA) CreateGroup(_ context.Context, req whatsmeow.ReqCreateGroup) (*
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.createReqs = append(f.createReqs, req)
-	if f.createErr != nil {
-		return nil, f.createErr
-	}
-	return f.created, nil
+	return f.created, f.createErr
 }
 
 func (f *fakeWA) LeaveGroup(_ context.Context, jid types.JID) error {

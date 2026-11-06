@@ -4,6 +4,7 @@ package wa
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"go.mau.fi/whatsmeow"
@@ -35,8 +36,15 @@ func (c *Client) CreateGroup(ctx context.Context, name string, members []types.J
 		return GroupCreated{}, errNotLoggedIn
 	}
 	info, err := c.cli.CreateGroup(ctx, whatsmeow.ReqCreateGroup{Name: name, Participants: members})
-	if err != nil {
+	if info == nil || info.JID.User == "" {
+		if err == nil {
+			err = errors.New("WhatsApp returned no group")
+		}
 		return GroupCreated{}, fmt.Errorf("create group: %w", err)
+	}
+	if err != nil {
+		// whatsmeow returns the group along with errors parsing its attributes.
+		c.log.Warn("parse created group", "err", err, "group", info.JID.String())
 	}
 	group := info.JID.ToNonAD()
 	out := GroupCreated{JID: group, Name: info.Name, Members: make([]MemberResult, len(members))}

@@ -45,6 +45,17 @@ func TestCreateGroup(t *testing.T) {
 		t.Errorf("archived chats = %v, want the new group", names)
 	}
 
+	// The group exists even when whatsmeow fails to parse part of the reply.
+	partial := types.NewJID("120363000000000078", types.GroupServer)
+	fake.created = &types.GroupInfo{JID: partial, GroupName: types.GroupName{Name: "Partial"}}
+	fake.createErr = errors.New("failed to parse creation")
+	if g, err := c.CreateGroup(ctx, "Partial", nil); err != nil || g.JID != partial {
+		t.Errorf("created with a parse error = %+v, %v; want the group", g, err)
+	}
+	if names := chatNames(t, c, partial); names[partial.String()] != "Partial" {
+		t.Errorf("archived chats = %v, want the partly parsed group", names)
+	}
+	fake.created = nil
 	fake.createErr = errors.New("406 not acceptable")
 	if _, err := c.CreateGroup(ctx, "X", []types.JID{alicePN}); err == nil {
 		t.Error("a failed create was not an error")
