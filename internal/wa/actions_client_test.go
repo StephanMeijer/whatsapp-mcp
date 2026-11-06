@@ -191,6 +191,15 @@ func TestClientMedia(t *testing.T) {
 	if got.Kind != "image" || got.MIMEType != "image/jpeg" || string(got.Data) != "data" {
 		t.Errorf("Media = %+v", got)
 	}
+	// The ref's FileLength is the sender's claim; the real file decides.
+	fake.download = make([]byte, MaxMediaBytes+1)
+	if _, err := c.Media(ctx, m); !errors.Is(err, errTooLarge) {
+		t.Errorf("lying FileLength: err = %v", err)
+	}
+	fake.download = make([]byte, MaxMediaBytes+mediaEncOverhead+1)
+	if _, err := c.Media(ctx, m); !errors.Is(err, errTooLarge) {
+		t.Errorf("capped write: err = %v", err)
+	}
 	fake.downloadErr = whatsmeow.ErrMediaDownloadFailedWith404
 	if _, err := c.Media(ctx, m); err == nil || !strings.Contains(err.Error(), "no longer on WhatsApp's servers") {
 		t.Errorf("gone: err = %v", err)

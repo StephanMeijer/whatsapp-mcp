@@ -239,10 +239,14 @@ func (f *fakeWA) Upload(_ context.Context, _ []byte, kind whatsmeow.MediaType) (
 	return f.upload, f.uploadErr
 }
 
-func (f *fakeWA) Download(context.Context, whatsmeow.DownloadableMessage) ([]byte, error) {
+func (f *fakeWA) DownloadToFile(_ context.Context, _ whatsmeow.DownloadableMessage, file whatsmeow.File) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return f.download, f.downloadErr
+	if f.downloadErr != nil {
+		return f.downloadErr
+	}
+	_, err := file.Write(f.download)
+	return err
 }
 
 func (f *fakeWA) GetGroupInfo(_ context.Context, jid types.JID) (*types.GroupInfo, error) {

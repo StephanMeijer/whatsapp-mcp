@@ -31,7 +31,7 @@ type whatsmeowClient interface {
 	MarkRead(ctx context.Context, ids []types.MessageID, timestamp time.Time, chat, sender types.JID, receiptTypeExtra ...types.ReceiptType) error
 	RejectCall(ctx context.Context, callFrom types.JID, callID string) error
 	Upload(ctx context.Context, plaintext []byte, appInfo whatsmeow.MediaType) (whatsmeow.UploadResponse, error)
-	Download(ctx context.Context, msg whatsmeow.DownloadableMessage) ([]byte, error)
+	DownloadToFile(ctx context.Context, msg whatsmeow.DownloadableMessage, file whatsmeow.File) error
 
 	GetGroupInfo(ctx context.Context, jid types.JID) (*types.GroupInfo, error)
 	GetJoinedGroups(ctx context.Context) ([]*types.GroupInfo, error)

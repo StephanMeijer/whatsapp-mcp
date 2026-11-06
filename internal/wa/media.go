@@ -4,8 +4,11 @@ package wa
 
 import (
 	"context"
+	"crypto/aes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 
 	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -16,6 +19,29 @@ import (
 
 // MaxMediaBytes is the largest file Media downloads.
 const MaxMediaBytes = 16 << 20
+
+// mediaEncOverhead is the most bytes an encrypted upload adds to its
+// plaintext: AES-CBC padding plus whatsmeow's 10-byte MAC.
+const mediaEncOverhead = aes.BlockSize + 10
+
+var errTooLarge = fmt.Errorf("file is over the %d MB limit", MaxMediaBytes>>20)
+
+// cappedFile refuses a write past the limit, so a sender lying about
+// FileLength cannot make a download fill memory or disk.
+type cappedFile struct {
+	whatsmeow.File
+}
+
+func (f *cappedFile) Write(p []byte) (int, error) {
+	pos, err := f.File.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return 0, err
+	}
+	if pos+int64(len(p)) > MaxMediaBytes+mediaEncOverhead {
+		return 0, errTooLarge
+	}
+	return f.File.Write(p)
+}
 
 // ErrNoMediaRef means a media message was archived without what is needed
 // to download it, before downloads were supported.
@@ -60,10 +86,31 @@ func (c *Client) Media(ctx context.Context, m store.Message) (Media, error) {
 	if size := sub.GetFileLength(); size > MaxMediaBytes {
 		return Media{}, fmt.Errorf("file is %d MB, over the %d MB limit", size>>20, MaxMediaBytes>>20)
 	}
-	data, err := c.cli.Download(ctx, sub)
+	f, err := os.CreateTemp("", "wa-media-*")
+	if err != nil {
+		return Media{}, fmt.Errorf("download media: %w", err)
+	}
+	defer os.Remove(f.Name())
+	defer f.Close()
+	err = c.cli.DownloadToFile(ctx, sub, &cappedFile{File: f})
 	if mediaGone(err) {
 		return Media{}, errors.New("this media is no longer on WhatsApp's servers (they keep files for a limited time)")
 	}
+	if errors.Is(err, errTooLarge) {
+		return Media{}, errTooLarge
+	}
+	if err != nil {
+		return Media{}, fmt.Errorf("download media: %w", err)
+	}
+	// FileLength above is the sender's claim; this is the file's own size.
+	info, err := f.Stat()
+	if err != nil {
+		return Media{}, fmt.Errorf("download media: %w", err)
+	}
+	if info.Size() > MaxMediaBytes {
+		return Media{}, errTooLarge
+	}
+	data, err := os.ReadFile(f.Name())
 	if err != nil {
 		return Media{}, fmt.Errorf("download media: %w", err)
 	}
