@@ -37,7 +37,7 @@ type Message struct {
 	Seq       int64  `gorm:"primaryKey;autoIncrement"`
 	ChatJID   string `gorm:"column:chat_jid;not null;uniqueIndex:idx_messages_chat_message;index:idx_messages_chat_ts,priority:1"`
 	MessageID string `gorm:"not null;uniqueIndex:idx_messages_chat_message"`
-	SenderJID string `gorm:"column:sender_jid;not null"`
+	SenderJID string `gorm:"column:sender_jid;not null;index:idx_messages_sender_jid"`
 	// Timestamp is a Unix timestamp in seconds.
 	Timestamp int64  `gorm:"not null;index:idx_messages_chat_ts,priority:2;index:idx_messages_ts"`
 	FromMe    bool   `gorm:"not null"`
