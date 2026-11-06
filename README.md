@@ -43,6 +43,7 @@ session without a new QR code.
 | `-expire-disappearing` | `WHATSAPP_MCP_EXPIRE_DISAPPEARING` | `false`: keep messages from disappearing chats; `true` deletes them from the archive once their timer runs out, checked hourly, together with their read receipts and poll votes. Only messages archived with a timer qualify, so not ones archived before this option existed. A message kept in the chat ("Keep in chat") never expires, and stays kept if that is later undone |
 | `-enable-group-admin` | `WHATSAPP_MCP_ENABLE_GROUP_ADMIN` | `false`: `true` offers the tools that create, change and leave groups (see [Guardrails](#guardrails)); not allowed with `-read-only` |
 | `-allow-invite-links` | `WHATSAPP_MCP_ALLOW_INVITE_LINKS` | `false`: with `-allow-recipients` set, group invite links are refused, because anyone with a link can join; `true` allows them for allowlisted groups |
+| `-allow-status` | `WHATSAPP_MCP_ALLOW_STATUS` | `false`: with `-allow-recipients` set, `post_status` is refused, because a status goes to your whole status audience; `true` allows it |
 | `-media-dir` | `WHATSAPP_MCP_MEDIA_DIR` | *(empty: off)* the only folder `send_media` may read files from |
 | `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
 | `-public-url` | `WHATSAPP_MCP_PUBLIC_URL` | *(empty)* the https address clients reach the server at through a reverse proxy, see [Remote access over TLS](#remote-access-over-tls) |
@@ -54,7 +55,7 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, send_location, send_contact, send_poll, forward_message, react, edit_message, delete_message, mark_read, set_chat_state, set_disappearing_timer and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, send_location, send_contact, send_poll, forward_message, react, edit_message, delete_message, mark_read, set_chat_state, set_disappearing_timer, post_status and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
 # Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
@@ -75,6 +76,11 @@ not added to the allowlist; add its JID and restart to manage or message it. Any
 group's invite link can join it, allowlist or not, so while an allowlist is set
 `group_invite_link` is refused unless you also pass `-allow-invite-links`. The server never logs the
 link itself, but at `-log-level debug` whatsmeow's protocol logs contain it.
+
+A status update goes to everyone your phone's status privacy settings allow, so only `post_status`
+posts one: every other write tool refuses `status@broadcast`, even when the allowlist lists it, except
+`delete_message`, which can take back your own status. While an allowlist is set, both are refused
+(and logged) for statuses unless you also pass `-allow-status`.
 
 ### Endpoints
 
@@ -291,6 +297,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `search_messages` | full-text search over text, captions, polls, location names and contact cards |
 | `recent_messages` | everything since a time across all chats, grouped per chat ("what did I miss?") |
 | `list_status_updates` | status updates (stories) grouped by person, by default from the last 24 hours; statuses are left out of `list_chats`, `recent_messages` and `search_messages` |
+| `post_status` | post a status update: text, or a photo or video with a caption; goes to your status audience (see Guardrails) |
 | `message_context` | the conversation around one message, e.g. a search hit |
 | `message_receipts` | who has received, read or played one of your messages, per recipient, with times |
 | `poll_results` | a poll's options with vote counts and who chose each; votes are missing only on polls this server never received |

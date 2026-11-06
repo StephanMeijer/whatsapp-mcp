@@ -201,7 +201,8 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "delete_message",
 		Description: "Delete one of your own messages for everyone in the chat. This cannot be undone. " +
-			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending.",
+			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending. " +
+			"Delete your own status update with chat_jid status@broadcast.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
 	}, t.deleteMessage)
 	mcp.AddTool(s, &mcp.Tool{
@@ -225,6 +226,12 @@ func registerTools(s *mcp.Server, t *tools) {
 	if t.policy.groupAdmin {
 		registerGroupAdmin(s, t)
 	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "post_status",
+		Description: "Post a status update (story): text, or a photo or video with an optional caption. It goes " +
+			"to everyone your phone's status privacy settings allow, and disappears after 24 hours.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
+	}, t.postStatus)
 }
 
 // Message is the tool-facing form of store.Message.

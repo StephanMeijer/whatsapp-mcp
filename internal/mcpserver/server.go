@@ -52,6 +52,8 @@ type WhatsApp interface {
 	// GroupInviteLink returns a group's invite link; reset makes a new one
 	// and revokes the old.
 	GroupInviteLink(ctx context.Context, group types.JID, reset bool) (string, error)
+	// PostStatus posts a text status update to the account's status audience.
+	PostStatus(ctx context.Context, text string) (store.Message, error)
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.

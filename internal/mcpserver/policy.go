@@ -28,6 +28,8 @@ type Options struct {
 	GroupAdmin bool
 	// InviteLinks lets group_invite_link work while AllowRecipients is set.
 	InviteLinks bool
+	// AllowStatus lets post_status work while AllowRecipients is set.
+	AllowStatus bool
 }
 
 // policy decides which recipients write tools may target. Every write tool
@@ -41,10 +43,11 @@ type policy struct {
 	log         *slog.Logger
 	groupAdmin  bool
 	inviteLinks bool
+	allowStatus bool
 }
 
 func newPolicy(opts Options) (*policy, error) {
-	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, inviteLinks: opts.InviteLinks}
+	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, inviteLinks: opts.InviteLinks, allowStatus: opts.AllowStatus}
 	if p.log == nil {
 		p.log = slog.Default()
 	}
@@ -60,13 +63,19 @@ func newPolicy(opts Options) (*policy, error) {
 
 // checkRecipient parses recipient, canonicalises it (an @lid becomes the
 // phone-number JID when known) and reports whether write tools may target
-// it. The account's own JID is always allowed once paired.
+// it. The account's own JID is always allowed once paired; the status
+// broadcast never is.
 func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient string) (types.JID, error) {
 	parsed, err := wa.ParseRecipient(recipient)
 	if err != nil {
 		return types.JID{}, err
 	}
 	jid := w.Canonical(ctx, parsed)
+	// Statuses go only through post_status and delete_message, under checkStatus.
+	if jid == types.StatusBroadcastJID {
+		p.log.Warn("refused write to the status broadcast outside post_status", "recipient", jid.String())
+		return types.JID{}, fmt.Errorf("%s is for status updates; use post_status", jid)
+	}
 	// Status().JID is already the canonical phone-number JID, "" before pairing.
 	self := w.Status().JID
 	if p.allowed == nil || p.isAllowed(ctx, w, jid) || (self != "" && jid.String() == self) {
@@ -74,6 +83,17 @@ func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient strin
 	}
 	p.log.Warn("refused write to recipient not in the allowlist", "recipient", jid.String())
 	return types.JID{}, fmt.Errorf("recipient %s is not in the allowed recipients list", jid)
+}
+
+// checkStatus reports whether a tool may post or delete a status. A status
+// goes to the whole status audience, which no allowlist entry covers.
+func (p *policy) checkStatus(tool string) error {
+	if p.hasAllowlist() && !p.allowStatus {
+		p.log.Warn("refused status write while an allowlist is set without -allow-status", "tool", tool)
+		return errors.New("posting or deleting a status is off while an allowlist is set, because a status " +
+			"goes to all your status contacts; start the server with -allow-status to allow it")
+	}
+	return nil
 }
 
 func (p *policy) isAllowed(ctx context.Context, w WhatsApp, jid types.JID) bool {

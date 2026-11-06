@@ -58,6 +58,11 @@ func TestLoad(t *testing.T) {
 			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnableGroupAdmin: true},
 		},
 		{
+			name: "allow status from env",
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ALLOW_STATUS": "true"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", AllowStatus: true},
+		},
+		{
 			name: "allowlist is trimmed and drops empty entries",
 			args: []string{"-allow-recipients", " +31 6 1234 5678 , ,123@g.us,"},
 			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
@@ -105,6 +110,11 @@ func TestLoad(t *testing.T) {
 			args:    []string{"-read-only", "-enable-group-admin"},
 			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
 			wantErr: "-enable-group-admin has no effect with -read-only",
+		},
+		{
+			name:    "invalid allow status env",
+			env:     map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ALLOW_STATUS": "kinda"},
+			wantErr: "WHATSAPP_MCP_ALLOW_STATUS",
 		},
 		{
 			name:    "read-only with allowlist",
