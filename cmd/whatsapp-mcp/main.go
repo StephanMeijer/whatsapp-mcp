@@ -155,9 +155,10 @@ func routes(publicURL, token string, mcpSrv *mcp.Server, pair, health http.Handl
 }
 
 // healthHandler reports 200 while the server can work or is waiting for a QR
-// scan, and 503 once it cannot (logged out, or pairing ended unscanned). A
-// short reconnect also reads as 503; the container's health check retries
-// absorb that. The body never names the account: the endpoint has no auth.
+// scan, and 503 once it cannot (logged out, or pairing ended unscanned).
+// whatsmeow keeps LoggedIn through a network drop, so an outage still reads
+// as 200 while it reconnects. The body never names the account: the endpoint
+// has no auth.
 func healthHandler(client interface{ Status() wa.Status }) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
