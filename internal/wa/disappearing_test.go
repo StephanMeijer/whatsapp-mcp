@@ -80,6 +80,10 @@ func TestGroupTimers(t *testing.T) {
 	if secs, _ := timerOf(t, c, testGroup); secs != 7776000 {
 		t.Errorf("after live change = %d, want 90 days", secs)
 	}
+	c.onGroupInfo(&events.GroupInfo{JID: other, Ephemeral: &types.GroupEphemeral{IsEphemeral: true, DisappearingTimer: 86400}})
+	if _, ok := timerOf(t, c, other); ok {
+		t.Error("a group with nothing archived was added by a live change")
+	}
 
 	// The connect-time sync: the archived group's timer is turned off; a
 	// group with nothing archived is not added.

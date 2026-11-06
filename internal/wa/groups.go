@@ -40,7 +40,14 @@ func (c *Client) onGroupInfo(e *events.GroupInfo) {
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
 	if e.Ephemeral != nil {
-		c.recordTimer(ctx, e.JID.ToNonAD().String(), groupTimer(*e.Ephemeral))
+		// Only for an archived group, as in syncGroupTimers, so no empty chat is added.
+		group := e.JID.ToNonAD().String()
+		known, err := c.store.ChatsByJID(ctx, []string{group})
+		if err != nil {
+			c.log.Error("record group timer: load chat", "err", err, "group", group)
+		} else if _, ok := known[group]; ok {
+			c.recordTimer(ctx, group, groupTimer(*e.Ephemeral))
+		}
 	}
 	jid, name, ok := renameFromGroupInfo(e)
 	if !ok {
