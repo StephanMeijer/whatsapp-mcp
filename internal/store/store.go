@@ -197,40 +197,39 @@ func (s *Store) MergeJIDs(ctx context.Context, renames map[string]string) (int, 
 
 func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 	var affected int64
-	res := tx.Model(&Message{}).Where("sender_jid = ?", oldJID).Update("sender_jid", newJID)
-	if res.Error != nil {
-		return false, res.Error
+	count := func(res *gorm.DB) error {
+		affected += res.RowsAffected
+		return res.Error
 	}
-	affected += res.RowsAffected
+	if err := count(tx.Model(&Message{}).Where("sender_jid = ?", oldJID).Update("sender_jid", newJID)); err != nil {
+		return false, err
+	}
 
 	// Receipts follow their messages, so they are handled around the message
 	// moves: those of dropped duplicates go first, the rest move with the chat.
 	copies := func() *gorm.DB {
 		return tx.Model(&Message{}).Select("message_id").Where("chat_jid = ?", newJID)
 	}
-	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Receipt{})
-	if res.Error != nil {
-		return false, res.Error
+	if err := count(tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Receipt{})); err != nil {
+		return false, err
 	}
-	affected += res.RowsAffected
+	if err := count(tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Message{})); err != nil {
+		return false, err
+	}
+	if err := count(tx.Model(&Message{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)); err != nil {
+		return false, err
+	}
+	if err := count(tx.Model(&Receipt{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)); err != nil {
+		return false, err
+	}
 
-	res = tx.Where("chat_jid = ? AND message_id IN (?)", oldJID, copies()).Delete(&Message{})
-	if res.Error != nil {
-		return false, res.Error
+	// creator_wire stays: a reject must go to the address WhatsApp used.
+	if err := count(tx.Model(&Call{}).Where("caller_jid = ?", oldJID).Update("caller_jid", newJID)); err != nil {
+		return false, err
 	}
-	affected += res.RowsAffected
-
-	res = tx.Model(&Message{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)
-	if res.Error != nil {
-		return false, res.Error
+	if err := count(tx.Model(&Call{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)); err != nil {
+		return false, err
 	}
-	affected += res.RowsAffected
-
-	res = tx.Model(&Receipt{}).Where("chat_jid = ?", oldJID).Update("chat_jid", newJID)
-	if res.Error != nil {
-		return false, res.Error
-	}
-	affected += res.RowsAffected
 
 	n, err := mergeParticipant(tx, oldJID, newJID)
 	if err != nil {
@@ -238,37 +237,45 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 	}
 	affected += n
 
-	var old Chat
-	res = tx.Where("jid = ?", oldJID).Limit(1).Find(&old)
-	if res.Error != nil {
-		return false, res.Error
+	n, err = mergeChat(tx, oldJID, newJID)
+	if err != nil {
+		return false, err
 	}
-	if res.RowsAffected > 0 {
-		var target Chat
-		if err := tx.Where("jid = ?", newJID).Limit(1).Find(&target).Error; err != nil {
-			return false, err
-		}
-		target.JID = newJID
-		if target.Name == "" {
-			target.Name = old.Name
-		}
-		target.LastMessageAt = max(target.LastMessageAt, old.LastMessageAt)
-		target.Archived = target.Archived || old.Archived
-		target.Pinned = target.Pinned || old.Pinned
-		if target.MutedUntil < 0 || old.MutedUntil < 0 {
-			target.MutedUntil = -1 // forever beats any date
-		} else {
-			target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
-		}
-		if err := tx.Save(&target).Error; err != nil {
-			return false, err
-		}
-		if err := tx.Delete(&Chat{}, "jid = ?", oldJID).Error; err != nil {
-			return false, err
-		}
-		affected++
-	}
+	affected += n
 	return affected > 0, nil
+}
+
+// mergeChat folds the oldJID chat into the newJID chat, keeping the target's
+// name and the stronger of each flag. It returns 1 when an old chat existed.
+func mergeChat(tx *gorm.DB, oldJID, newJID string) (int64, error) {
+	var old Chat
+	res := tx.Where("jid = ?", oldJID).Limit(1).Find(&old)
+	if res.Error != nil || res.RowsAffected == 0 {
+		return 0, res.Error
+	}
+	var target Chat
+	if err := tx.Where("jid = ?", newJID).Limit(1).Find(&target).Error; err != nil {
+		return 0, err
+	}
+	target.JID = newJID
+	if target.Name == "" {
+		target.Name = old.Name
+	}
+	target.LastMessageAt = max(target.LastMessageAt, old.LastMessageAt)
+	target.Archived = target.Archived || old.Archived
+	target.Pinned = target.Pinned || old.Pinned
+	if target.MutedUntil < 0 || old.MutedUntil < 0 {
+		target.MutedUntil = -1 // forever beats any date
+	} else {
+		target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
+	}
+	if err := tx.Save(&target).Error; err != nil {
+		return 0, err
+	}
+	if err := tx.Delete(&Chat{}, "jid = ?", oldJID).Error; err != nil {
+		return 0, err
+	}
+	return 1, nil
 }
 
 // mergeParticipant renames oldJID to newJID as a receipt participant. When the

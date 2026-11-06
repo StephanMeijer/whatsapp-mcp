@@ -145,6 +145,8 @@ func TestMergeJIDs(t *testing.T) {
 				lidMsg(lidC, "c1", 50, "unknown", lidC),
 				lidMsg(grp, "g1", 400, "in a group", lidS),
 			}))
+		// A call rung before the LID mapping was known is stored under @lid.
+		must(t, s.RecordCallOffer(ctx, store.Call{CallID: "c1", CallerJID: lidA, CreatorWire: lidA, ChatJID: lidA, StartedAt: 500}))
 
 		lids, err := s.LIDJIDs(ctx)
 		must(t, err)
@@ -199,6 +201,12 @@ func TestMergeJIDs(t *testing.T) {
 		must(t, err)
 		if len(found) != 1 || found[0].ChatJID != pnA {
 			t.Errorf("search after merge = %+v, want a2 in %s", found, pnA)
+		}
+
+		calls, err := s.ListCalls(ctx, time.Time{}, 0)
+		must(t, err)
+		if len(calls) != 1 || calls[0].CallerJID != pnA || calls[0].ChatJID != pnA || calls[0].CreatorWire != lidA {
+			t.Errorf("call after merge = %+v, want caller and chat %s, creator wire %s", calls, pnA, lidA)
 		}
 
 		n, err = s.MergeJIDs(ctx, renames)
