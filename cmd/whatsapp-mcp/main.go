@@ -95,6 +95,7 @@ func run() error {
 		MediaDir:        cfg.MediaDir,
 		GroupAdmin:      cfg.EnableGroupAdmin,
 		InviteLinks:     cfg.AllowInviteLinks,
+		AllowStatus:     cfg.AllowStatus,
 	})
 	if err != nil {
 		return err

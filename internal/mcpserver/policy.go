@@ -28,6 +28,8 @@ type Options struct {
 	GroupAdmin bool
 	// InviteLinks lets group_invite_link work while AllowRecipients is set.
 	InviteLinks bool
+	// AllowStatus lets post_status work while AllowRecipients is set.
+	AllowStatus bool
 }
 
 // policy decides which recipients write tools may target. Every write tool
@@ -41,10 +43,11 @@ type policy struct {
 	log         *slog.Logger
 	groupAdmin  bool
 	inviteLinks bool
+	allowStatus bool
 }
 
 func newPolicy(opts Options) (*policy, error) {
-	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, inviteLinks: opts.InviteLinks}
+	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, inviteLinks: opts.InviteLinks, allowStatus: opts.AllowStatus}
 	if p.log == nil {
 		p.log = slog.Default()
 	}

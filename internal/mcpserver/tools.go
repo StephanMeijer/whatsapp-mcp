@@ -225,6 +225,12 @@ func registerTools(s *mcp.Server, t *tools) {
 	if t.policy.groupAdmin {
 		registerGroupAdmin(s, t)
 	}
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "post_status",
+		Description: "Post a status update (story): text, or a photo or video with an optional caption. It goes " +
+			"to everyone your phone's status privacy settings allow, and disappears after 24 hours.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
+	}, t.postStatus)
 }
 
 // Message is the tool-facing form of store.Message.
