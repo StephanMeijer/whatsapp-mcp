@@ -34,7 +34,7 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 		}
 		t.Cleanup(func() { _ = d.Close() })
 		// Start from empty tables so subtests don't see each other's rows.
-		if err := d.Gorm.Exec("DROP TABLE IF EXISTS messages, chats, calls, receipts").Error; err != nil {
+		if err := d.Gorm.Migrator().DropTable(store.Models...); err != nil {
 			t.Fatal(err)
 		}
 		s, err := store.New(context.Background(), d)
@@ -42,6 +42,11 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 			t.Fatal(err)
 		}
 		fn(t, s)
+		// A restart: migrate again over the schema the subtest just used,
+		// including the generated search column.
+		if _, err := store.New(context.Background(), d); err != nil {
+			t.Fatalf("second New: %v", err)
+		}
 	})
 }
 

@@ -4,6 +4,9 @@ package store
 
 import "context"
 
+// Models is the AutoMigrate list, so tests drop exactly what New creates.
+var Models = models
+
 // RawRef reads a message's media reference regardless of its deleted state,
 // for tests that check what is left in the database.
 func (s *Store) RawRef(ctx context.Context, chatJID, messageID string, out *[]byte) error {
