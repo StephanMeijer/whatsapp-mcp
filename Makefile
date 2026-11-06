@@ -18,9 +18,9 @@ test:
 # Runs the store tests against a throwaway Postgres container as well.
 test-postgres:
 	docker rm -f whatsapp-mcp-test-pg >/dev/null 2>&1 || true; \
-	docker run -d --rm --name whatsapp-mcp-test-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=wa \
+	docker run -d --name whatsapp-mcp-test-pg -e POSTGRES_PASSWORD=pw -e POSTGRES_DB=wa \
 		-p 127.0.0.1:55432:5432 postgres:17-alpine >/dev/null || exit 1; \
-	trap 'docker stop whatsapp-mcp-test-pg >/dev/null 2>&1' EXIT; trap 'exit 130' INT TERM; \
+	trap 'docker rm -f whatsapp-mcp-test-pg >/dev/null 2>&1' EXIT; trap 'exit 130' INT TERM; \
 	for _ in $$(seq 60); do \
 		docker exec whatsapp-mcp-test-pg pg_isready -h 127.0.0.1 -U postgres -d wa >/dev/null 2>&1 && break; \
 		sleep 1; \
