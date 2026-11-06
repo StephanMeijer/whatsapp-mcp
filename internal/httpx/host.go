@@ -21,7 +21,7 @@ func AllowHosts(hosts []string, next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := strings.ToLower(hostname(r.Host))
-		if !allowed[host] && !isLoopback(host) {
+		if !allowed[host] && !IsLoopback(host) {
 			http.Error(w, "forbidden: unexpected Host header", http.StatusForbidden)
 			return
 		}
@@ -37,8 +37,9 @@ func hostname(hostport string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(hostport, "["), "]")
 }
 
-func isLoopback(host string) bool {
-	if host == "localhost" {
+// IsLoopback reports whether host is localhost or a loopback IP; ports already stripped.
+func IsLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
 		return true
 	}
 	ip := net.ParseIP(host)
