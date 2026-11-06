@@ -138,6 +138,10 @@ func TestParseRecipient(t *testing.T) {
 		wantErr  bool
 	}{
 		{in: "+31 6 1234-5678", want: "31612345678@s.whatsapp.net"},
+		{in: "0031 6 12345678", want: "31612345678@s.whatsapp.net"},
+		{in: "06 12345678", wantErr: true},
+		{in: "1", wantErr: true},
+		{in: "(555) 123-4567", wantErr: true},
 		{in: "31612345678@s.whatsapp.net", want: "31612345678@s.whatsapp.net"},
 		{in: "120363000000000000@g.us", want: "120363000000000000@g.us"},
 		{in: "alice", wantErr: true},
