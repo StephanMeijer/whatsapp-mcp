@@ -38,7 +38,7 @@ session without a new QR code.
 | | `WHATSAPP_MCP_TOKEN` | *(required, at least 32 characters)* bearer token for `/mcp` and `/pair` |
 | `-addr` | `WHATSAPP_MCP_ADDR` | `127.0.0.1:8080` |
 | `-database-url` | `DATABASE_URL` | `sqlite://data/whatsapp.db` |
-| `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
+| `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info`: `debug` adds whatsmeow's protocol logs, which hold everything WhatsApp sends, message contents and group invite links included, so don't use it where logs are shared |
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
 | `-expire-disappearing` | `WHATSAPP_MCP_EXPIRE_DISAPPEARING` | `false`: keep messages from disappearing chats; `true` deletes them from the archive once their timer runs out, checked hourly, together with their read receipts and poll votes. Only messages archived with a timer qualify, so not ones archived before this option existed. A message kept in the chat ("Keep in chat") never expires, and stays kept if that is later undone |
 | `-enable-group-admin` | `WHATSAPP_MCP_ENABLE_GROUP_ADMIN` | `false`: `true` offers the tools that create, change and leave groups (see [Guardrails](#guardrails)); not allowed with `-read-only` |
@@ -73,7 +73,8 @@ people or leaving a group can't be undone from here. With it on, the allowlist s
 group itself must be listed, and so must everyone added to it. A group made with `create_group` is
 not added to the allowlist; add its JID and restart to manage or message it. Anyone with a
 group's invite link can join it, allowlist or not, so while an allowlist is set
-`group_invite_link` is refused unless you also pass `-allow-invite-links`. The link is never logged.
+`group_invite_link` is refused unless you also pass `-allow-invite-links`. The server never logs the
+link itself, but at `-log-level debug` whatsmeow's protocol logs contain it.
 
 ### Endpoints
 
