@@ -3,8 +3,11 @@
 package wa
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
+	"strings"
 	"testing"
 
 	"go.mau.fi/whatsmeow/proto/waCommon"
@@ -88,6 +91,29 @@ func TestOnHistorySyncArchivesUnderPhoneNumber(t *testing.T) {
 	}
 	if _, err := c.store.MessageByID(ctx, testGroup.String(), "G1"); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("group message without a sender: err %v, want not found", err)
+	}
+}
+
+// A message whatsmeow cannot parse is logged and counted, so an archive with
+// gaps can be told apart from a sync that had fewer messages.
+func TestOnHistorySyncLogsSkippedMessages(t *testing.T) {
+	c, _, _, _ := newTestClient(t)
+	var buf bytes.Buffer
+	c.log = slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
+		&waHistorySync.Conversation{ID: proto.String(testGroup.String()),
+			Messages: []*waHistorySync.HistorySyncMsg{
+				webMsg("G1", false, 104, "", text("no sender")),
+				webMsg("G2", false, 105, alicePN.String(), text("ok")),
+			}},
+	))
+	for _, want := range []string{
+		`msg="history sync: skip message" chat=` + testGroup.String() + ` id=G1 err=`,
+		`msg="history sync archived" type=INITIAL_BOOTSTRAP conversations=1 messages=1 skipped=1`,
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Errorf("log output:\n%s\nwant a line containing %q", buf.String(), want)
+		}
 	}
 }
 
