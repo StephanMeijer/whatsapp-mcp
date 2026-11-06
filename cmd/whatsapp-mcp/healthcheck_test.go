@@ -6,7 +6,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/StephanMeijer/whatsapp-mcp/internal/wa"
 )
 
 func TestHealthURL(t *testing.T) {
@@ -59,5 +62,35 @@ func TestHealthcheck(t *testing.T) {
 	l.Close()
 	if err := healthcheck(closed); err == nil {
 		t.Error("no server: want an error")
+	}
+}
+
+type statusFunc func() wa.Status
+
+func (f statusFunc) Status() wa.Status { return f() }
+
+func TestHealthHandler(t *testing.T) {
+	const jid = "31612345678@s.whatsapp.net"
+	tests := []struct {
+		name   string
+		status wa.Status
+		want   int
+	}{
+		{"logged in", wa.Status{Connected: true, LoggedIn: true, JID: jid}, http.StatusOK},
+		{"waiting for a QR scan", wa.Status{Connected: true, Pairing: true}, http.StatusOK},
+		{"logged out or pairing ended", wa.Status{Connected: false, JID: jid}, http.StatusServiceUnavailable},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			healthHandler(statusFunc(func() wa.Status { return tt.status })).
+				ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+			if rec.Code != tt.want {
+				t.Errorf("status %d, want %d", rec.Code, tt.want)
+			}
+			if strings.Contains(rec.Body.String(), "31612345678") {
+				t.Errorf("body %q names the account", rec.Body.String())
+			}
+		})
 	}
 }
