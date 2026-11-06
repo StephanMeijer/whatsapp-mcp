@@ -269,6 +269,7 @@ func TestListChats(t *testing.T) {
 			{JID: "1@s.whatsapp.net", Name: "Alice", LastMessageAt: 10},
 			{JID: "2@s.whatsapp.net", Name: "Bob", LastMessageAt: 30},
 			{JID: "3@g.us", Name: "100% Family", LastMessageAt: 20},
+			{JID: "4@g.us", Name: "École Café", LastMessageAt: 5},
 		}, nil))
 
 		tests := []struct {
@@ -276,11 +277,14 @@ func TestListChats(t *testing.T) {
 			limit int
 			want  []string
 		}{
-			{query: "", want: []string{"Bob", "100% Family", "Alice"}},
+			{query: "", want: []string{"Bob", "100% Family", "Alice", "École Café"}},
 			{query: "", limit: 2, want: []string{"Bob", "100% Family"}},
 			{query: "ALI", want: []string{"Alice"}},
-			{query: "g.us", want: []string{"100% Family"}},
-			{query: "%", want: []string{"100% Family"}}, // LIKE wildcards are literal
+			{query: "g.us", want: []string{"100% Family", "École Café"}},
+			{query: "g.us", limit: 1, want: []string{"100% Family"}},
+			{query: "%", want: []string{"100% Family"}},    // LIKE wildcards are literal
+			{query: "école", want: []string{"École Café"}}, // SQLite LOWER() folds ASCII only
+			{query: "ÉCOLE", want: []string{"École Café"}},
 			{query: "nobody", want: []string{}},
 		}
 		for _, tt := range tests {
