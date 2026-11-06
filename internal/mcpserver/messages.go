@@ -71,9 +71,10 @@ func (t *tools) listChats(ctx context.Context, _ *mcp.CallToolRequest, in ListCh
 }
 
 type ListMessagesIn struct {
-	ChatJID string `json:"chat_jid" jsonschema:"the chat's JID, from list_chats"`
-	Before  string `json:"before,omitempty" jsonschema:"RFC 3339; only messages sent before this time"`
-	Limit   int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
+	ChatJID  string `json:"chat_jid" jsonschema:"the chat's JID, from list_chats"`
+	BeforeID string `json:"before_id,omitempty" jsonschema:"id of the last message of the previous page; returns the messages before it (overrides before)"`
+	Before   string `json:"before,omitempty" jsonschema:"RFC 3339; only messages sent before this time (coarse: skips messages sharing that second, so prefer before_id for paging)"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
 }
 
 type MessagesOut struct {
@@ -84,14 +85,23 @@ func (t *tools) listMessages(ctx context.Context, _ *mcp.CallToolRequest, in Lis
 	if in.ChatJID == "" {
 		return nil, MessagesOut{}, errors.New("chat_jid is required")
 	}
-	var before time.Time
-	if in.Before != "" {
-		var err error
-		if before, err = time.Parse(time.RFC3339, in.Before); err != nil {
-			return nil, MessagesOut{}, fmt.Errorf("before: want RFC 3339, e.g. 2026-01-02T15:04:05Z: %w", err)
+	chat := t.canonicalChat(ctx, in.ChatJID)
+	var msgs []store.Message
+	var err error
+	if in.BeforeID != "" {
+		msgs, err = t.store.ListMessagesBefore(ctx, chat, in.BeforeID, in.Limit)
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, MessagesOut{}, fmt.Errorf("before_id: page cursor %s is not archived in chat %s", in.BeforeID, chat)
 		}
+	} else {
+		var before time.Time
+		if in.Before != "" {
+			if before, err = time.Parse(time.RFC3339, in.Before); err != nil {
+				return nil, MessagesOut{}, fmt.Errorf("before: want RFC 3339, e.g. 2026-01-02T15:04:05Z: %w", err)
+			}
+		}
+		msgs, err = t.store.ListMessages(ctx, chat, before, in.Limit)
 	}
-	msgs, err := t.store.ListMessages(ctx, t.canonicalChat(ctx, in.ChatJID), before, in.Limit)
 	if err != nil {
 		return nil, MessagesOut{}, err
 	}

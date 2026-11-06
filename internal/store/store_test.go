@@ -325,6 +325,34 @@ func TestListMessagesPaging(t *testing.T) {
 	})
 }
 
+// Paging by the last message's id keeps messages that share its second,
+// which paging by time loses.
+func TestListMessagesBeforeKeepsSameSecond(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		must(t, s.Save(ctx, nil, []store.Message{
+			msg(chat, "m1", 100, "a"), msg(chat, "m2a", 200, "b"), msg(chat, "m2b", 200, "c"), msg(chat, "m3", 300, "d"),
+		}))
+
+		page, err := s.ListMessages(ctx, chat, time.Time{}, 2)
+		must(t, err)
+		var paged []string
+		for len(page) > 0 {
+			paged = append(paged, ids(page)...)
+			page, err = s.ListMessagesBefore(ctx, chat, page[len(page)-1].MessageID, 2)
+			must(t, err)
+		}
+		if want := []string{"m3", "m2b", "m2a", "m1"}; !slices.Equal(paged, want) {
+			t.Errorf("paged ids = %v, want %v", paged, want)
+		}
+
+		if _, err := s.ListMessagesBefore(ctx, chat, "unknown", 2); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("unknown cursor: err = %v, want ErrNotFound", err)
+		}
+	})
+}
+
 // A poll is archived with its question and options as text, so a search for
 // an option finds it.
 func TestSearchFindsPollOptions(t *testing.T) {
