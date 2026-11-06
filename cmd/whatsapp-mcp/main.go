@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"log/slog"
 	"net"
@@ -50,6 +51,9 @@ func main() {
 
 func run() error {
 	cfg, err := config.Load(os.Args[1:], os.Getenv)
+	if errors.Is(err, flag.ErrHelp) {
+		return nil // usage already printed; -h is not a failure
+	}
 	if err != nil {
 		return err
 	}
