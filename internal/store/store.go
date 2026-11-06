@@ -272,6 +272,9 @@ func mergeChat(tx *gorm.DB, oldJID, newJID string) (int64, error) {
 	} else {
 		target.MutedUntil = max(target.MutedUntil, old.MutedUntil)
 	}
+	if target.DisappearingSeconds == 0 {
+		target.DisappearingSeconds = old.DisappearingSeconds
+	}
 	if err := tx.Save(&target).Error; err != nil {
 		return 0, err
 	}

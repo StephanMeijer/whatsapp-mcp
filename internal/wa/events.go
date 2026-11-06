@@ -55,6 +55,10 @@ func (c *Client) onMessage(e *events.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 	defer cancel()
 	canon := func(jid types.JID) types.JID { return c.Canonical(ctx, jid) }
+	if secs, ok := ephemeralSetting(e.Message); ok {
+		c.recordTimer(ctx, canon(e.Info.Chat).String(), secs)
+		return
+	}
 	if ch, ok := c.changeFor(ctx, e, canon); ok {
 		c.applyChange(ctx, ch)
 		return
@@ -128,6 +132,9 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			// After saving, so changes can target originals from the same batch.
 			for _, ch := range changes {
 				c.applyChange(ctx, ch)
+			}
+			if conv.EphemeralExpiration != nil {
+				c.recordTimer(ctx, chat.JID, int64(conv.GetEphemeralExpiration()))
 			}
 		}
 		cancel()

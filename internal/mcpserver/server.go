@@ -44,6 +44,9 @@ type WhatsApp interface {
 	// SetChatState archives, pins or mutes a chat on WhatsApp, for each field
 	// that is set; recording it in the archive is the caller's job.
 	SetChatState(ctx context.Context, chat types.JID, f store.ChatFlags) error
+	// SetDisappearingTimer turns disappearing messages on for a chat with the
+	// given timer, or off with 0; recording it in the archive is the caller's job.
+	SetDisappearingTimer(ctx context.Context, chat types.JID, timer time.Duration) error
 	// MarkChatRead marks a chat as read on all the account's devices.
 	MarkChatRead(ctx context.Context, chat types.JID) error
 	// Canonical maps a JID to the form the archive uses: the phone-number

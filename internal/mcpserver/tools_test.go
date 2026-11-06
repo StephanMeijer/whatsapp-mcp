@@ -228,6 +228,14 @@ func (f *fakeWA) RejectCall(_ context.Context, callID string) (store.Call, error
 	return store.Call{CallID: callID, CallerJID: "31600000001@s.whatsapp.net", Status: store.CallRejected, StartedAt: 1}, nil
 }
 
+func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer time.Duration) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.sent = append(f.sent, "timer "+chat.String()+" "+timer.String())
+	return nil
+}
+
 func (f *fakeWA) SetChatState(_ context.Context, chat types.JID, fl store.ChatFlags) error {
 	if f.writeErr != nil {
 		return f.writeErr
@@ -311,7 +319,7 @@ func TestToolsAreListed(t *testing.T) {
 		names = append(names, tool.Name)
 	}
 	slices.Sort(names)
-	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_contact", "send_location", "send_media", "send_message", "set_chat_state"}
+	want := []string{"check_number", "connection_status", "contact_info", "delete_message", "edit_message", "fetch_older_messages", "get_media", "get_profile_picture", "group_info", "list_calls", "list_chats", "list_messages", "mark_read", "message_context", "message_receipts", "react", "recent_messages", "reject_call", "search_contacts", "search_messages", "send_contact", "send_location", "send_media", "send_message", "set_chat_state", "set_disappearing_timer"}
 	if !slices.Equal(names, want) {
 		t.Errorf("tools = %v, want %v", names, want)
 	}

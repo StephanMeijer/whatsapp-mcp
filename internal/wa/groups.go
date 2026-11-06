@@ -24,6 +24,7 @@ func (c *Client) syncGroupNames(ctx context.Context) {
 		c.log.Warn("sync group names: list joined groups", "err", err)
 		return
 	}
+	c.syncGroupTimers(ctx, groups)
 	names := groupNames(groups)
 	c.nameAfterMembers(ctx, groups, names)
 	changed, err := c.store.RenameChats(ctx, names)
@@ -36,12 +37,15 @@ func (c *Client) syncGroupNames(ctx context.Context) {
 
 // onGroupInfo applies a live group rename.
 func (c *Client) onGroupInfo(e *events.GroupInfo) {
+	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+	defer cancel()
+	if e.Ephemeral != nil {
+		c.recordTimer(ctx, e.JID.ToNonAD().String(), groupTimer(*e.Ephemeral))
+	}
 	jid, name, ok := renameFromGroupInfo(e)
 	if !ok {
 		return
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
-	defer cancel()
 	if _, err := c.store.RenameChats(ctx, map[string]string{jid: name}); err != nil {
 		c.log.Error("rename group", "err", err, "group", jid)
 	}
@@ -234,4 +238,25 @@ func renameFromGroupInfo(e *events.GroupInfo) (jid, name string, ok bool) {
 		return "", "", false
 	}
 	return e.JID.ToNonAD().String(), e.Name.Name, true
+}
+
+// syncGroupTimers records each archived group's disappearing timer where it
+// changed. Groups with nothing archived are left out, so this adds no empty
+// chats; their timer is picked up on a later connect, once they have one.
+func (c *Client) syncGroupTimers(ctx context.Context, groups []*types.GroupInfo) {
+	jids := make([]string, len(groups))
+	for i, g := range groups {
+		jids[i] = g.JID.ToNonAD().String()
+	}
+	known, err := c.store.ChatsByJID(ctx, jids)
+	if err != nil {
+		c.log.Warn("sync group timers: load chats", "err", err)
+		return
+	}
+	for i, g := range groups {
+		chat, ok := known[jids[i]]
+		if secs := groupTimer(g.GroupEphemeral); ok && chat.DisappearingSeconds != secs {
+			c.recordTimer(ctx, jids[i], secs)
+		}
+	}
 }

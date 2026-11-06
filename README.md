@@ -51,7 +51,7 @@ session without a new QR code.
 By default the client may message anyone. Two options limit that:
 
 ```sh
-# Reading and searching only: send_message, send_media, send_location, send_contact, react, edit_message, delete_message, mark_read, set_chat_state and reject_call are not offered at all.
+# Reading and searching only: send_message, send_media, send_location, send_contact, react, edit_message, delete_message, mark_read, set_chat_state, set_disappearing_timer and reject_call are not offered at all.
 whatsapp-mcp -read-only
 
 # Writing (sending, reacting, editing, deleting, marking read, rejecting calls) and looking people up
@@ -299,6 +299,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `delete_message` | delete one of your own messages for everyone (WhatsApp allows this only for a limited time) |
 | `mark_read` | mark a chat as read on all your devices |
 | `set_chat_state` | archive, pin or mute a chat (`mute`: off, forever or a duration), synced to your phone |
+| `set_disappearing_timer` | turn disappearing messages on (`24h`, `7d`, `90d`) or `off` for a chat; `list_chats` shows each chat's timer |
 
 ## Why a database
 

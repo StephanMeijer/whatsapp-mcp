@@ -30,6 +30,7 @@ type whatsmeowClient interface {
 	SendAppState(ctx context.Context, patch appstate.PatchInfo) error
 	MarkRead(ctx context.Context, ids []types.MessageID, timestamp time.Time, chat, sender types.JID, receiptTypeExtra ...types.ReceiptType) error
 	RejectCall(ctx context.Context, callFrom types.JID, callID string) error
+	SetDisappearingTimer(ctx context.Context, chat types.JID, timer time.Duration, settingTS time.Time) error
 	Upload(ctx context.Context, plaintext []byte, appInfo whatsmeow.MediaType) (whatsmeow.UploadResponse, error)
 	DownloadToFile(ctx context.Context, msg whatsmeow.DownloadableMessage, file whatsmeow.File) error
 
