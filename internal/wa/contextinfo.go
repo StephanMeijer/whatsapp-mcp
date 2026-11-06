@@ -4,6 +4,7 @@ package wa
 
 import (
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -59,4 +60,35 @@ func setContextInfo(m *waE2E.Message, ci *waE2E.ContextInfo) bool {
 func forwarding(m *waE2E.Message) (bool, int) {
 	ci := contextInfo(m)
 	return ci.GetIsForwarded(), int(ci.GetForwardingScore())
+}
+
+// withExpiration marks msg to disappear secs seconds after it is sent, as
+// every message in a disappearing chat is. A plain Conversation becomes an
+// ExtendedTextMessage, which can carry a ContextInfo; an existing ContextInfo,
+// such as a reply's quote, is kept.
+func withExpiration(msg *waE2E.Message, secs uint32) *waE2E.Message {
+	if text := msg.GetConversation(); text != "" {
+		msg = &waE2E.Message{
+			ExtendedTextMessage: &waE2E.ExtendedTextMessage{Text: proto.String(text)},
+			MessageContextInfo:  msg.GetMessageContextInfo(),
+		}
+	}
+	ci := contextInfo(msg)
+	if ci == nil {
+		ci = &waE2E.ContextInfo{}
+		if !setContextInfo(msg, ci) {
+			return msg
+		}
+	}
+	ci.Expiration = proto.Uint32(secs)
+	return msg
+}
+
+// expiresAt is when a message sent at sentAt disappears, in Unix seconds,
+// or 0 when it carries no disappearing timer. Timers count from sending.
+func expiresAt(m *waE2E.Message, sentAt int64) int64 {
+	if exp := contextInfo(m).GetExpiration(); exp > 0 {
+		return sentAt + int64(exp)
+	}
+	return 0
 }

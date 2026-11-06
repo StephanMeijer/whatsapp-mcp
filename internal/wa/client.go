@@ -221,6 +221,11 @@ func (c *Client) SendText(ctx context.Context, recipient, text string, quoted *s
 // sendAndArchive sends msg to a chat and archives it as sent by this
 // account. logAttrs are added to the "sent <what>" log line.
 func (c *Client) sendAndArchive(ctx context.Context, to types.JID, msg *waE2E.Message, what string, logAttrs ...any) (store.Message, error) {
+	// In a disappearing chat the message must carry the timer itself, or it
+	// stays for the recipients; whatsmeow doesn't add it.
+	if secs := c.chatTimer(ctx, to); secs > 0 {
+		msg = withExpiration(msg, uint32(secs))
+	}
 	resp, err := c.cli.SendMessage(ctx, to, msg)
 	if err != nil {
 		return store.Message{}, fmt.Errorf("send: %w", err)
@@ -239,6 +244,7 @@ func (c *Client) sendAndArchive(ctx context.Context, to types.JID, msg *waE2E.Me
 		MediaRef:  mediaRef(msg, true),
 	}
 	m.Forwarded, m.ForwardingScore = forwarding(msg)
+	m.ExpiresAt = expiresAt(msg, m.Timestamp)
 	if err := c.store.Save(ctx, nil, []store.Message{m}); err != nil {
 		// The message went out; failing to archive it shouldn't fail the send.
 		c.log.Error("archive sent "+what, "err", err, "id", resp.ID)
