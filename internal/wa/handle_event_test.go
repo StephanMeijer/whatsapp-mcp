@@ -171,7 +171,7 @@ func TestHandleEventRoutes(t *testing.T) {
 			for _, e := range tt.evts {
 				c.handleEvent(e)
 			}
-			c.Stop()
+			c.bg.Wait()
 			tt.check(t, c)
 		})
 	}
@@ -186,8 +186,24 @@ func TestHistorySyncBurstCoalescesReconcile(t *testing.T) {
 		c.handleEvent(&events.HistorySync{Data: &waHistorySync.HistorySync{}})
 	}
 	close(contacts.gate)
-	c.Stop()
+	c.bg.Wait()
 	if contacts.calls < 1 || contacts.calls > 2 {
 		t.Errorf("10 history syncs ran %d reconcile passes, want 1 or 2", contacts.calls)
+	}
+}
+
+// whatsmeow keeps delivering queued history syncs after Disconnect; they must
+// not start work that would hold up shutdown.
+func TestHistorySyncAfterStopStartsNoReconcile(t *testing.T) {
+	c, _, _, contacts := newTestClient(t)
+	c.Stop()
+	c.handleEvent(&events.HistorySync{Data: &waHistorySync.HistorySync{}})
+	c.handleEvent(liveMessage(testGroup, alicePN, "G1", false, "Alice", text("hi")))
+	c.bg.Wait()
+	if contacts.calls != 0 {
+		t.Errorf("%d reconcile passes after Stop, want 0", contacts.calls)
+	}
+	if _, looked := c.groupLookups.Load(testGroup.String()); looked {
+		t.Error("group name lookup started after Stop")
 	}
 }

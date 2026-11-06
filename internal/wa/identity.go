@@ -65,20 +65,21 @@ func (c *Client) reconcile(ctx context.Context, withGroups bool) {
 // requestReconcile asks for a reconcile pass off the event loop. Requests
 // coalesce: while a pass runs, any number of further requests cost one more
 // pass, with withGroups kept if any of them set it, and each pass's timeout
-// starts when it does. One worker at a time holds reconcileMu.
+// starts when it does. One worker at a time holds reconcileMu. After Stop,
+// requests are ignored.
 func (c *Client) requestReconcile(withGroups bool) {
 	// Groups first: a worker that swaps reconcileWanted after this sees it.
 	if withGroups {
 		c.reconcileGroups.Store(true)
 	}
 	c.reconcileWanted.Store(true)
-	if !c.reconcileMu.TryLock() {
+	if c.bgCtx.Err() != nil || !c.reconcileMu.TryLock() {
 		return
 	}
 	c.bg.Go(func() {
 		for {
 			for c.reconcileWanted.Swap(false) {
-				ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
+				ctx, cancel := context.WithTimeout(c.bgCtx, reconcileTimeout)
 				c.reconcile(ctx, c.reconcileGroups.Swap(false))
 				cancel()
 			}

@@ -63,14 +63,17 @@ func (c *Client) onJoinedGroup(e *events.JoinedGroup) {
 
 // nameGroupIfNeeded looks up the name of a group that sent a message but has
 // no name in the archive, at most once per group per run. It runs off the
-// event loop, since it may make a network request.
+// event loop, since it may make a network request, and not at all after Stop.
 func (c *Client) nameGroupIfNeeded(group types.JID) {
 	jid := group.ToNonAD().String()
+	if c.bgCtx.Err() != nil {
+		return
+	}
 	if _, done := c.groupLookups.LoadOrStore(jid, struct{}{}); done {
 		return
 	}
 	c.bg.Go(func() {
-		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
+		ctx, cancel := context.WithTimeout(c.bgCtx, saveTimeout)
 		defer cancel()
 		c.lookupGroupName(ctx, group)
 	})
