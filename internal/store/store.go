@@ -32,7 +32,7 @@ type Store struct {
 }
 
 // models is every table the store owns; tests drop them by this list.
-var models = []any{&Chat{}, &Message{}, &Call{}, &Receipt{}}
+var models = []any{&Chat{}, &Message{}, &Call{}, &Receipt{}, &PollVote{}}
 
 // searcher is the one dialect-specific part of the store: GORM has no
 // abstraction over SQLite FTS5 and Postgres full-text search.
@@ -158,14 +158,16 @@ func (s *Store) RenameChats(ctx context.Context, names map[string]string) (int64
 	return changed, err
 }
 
-// LIDJIDs returns the distinct @lid JIDs used as chat or sender, the
-// candidates for MergeJIDs once their phone number is known.
+// LIDJIDs returns the distinct @lid JIDs used as chat, sender or poll
+// voter, the candidates for MergeJIDs once their phone number is known.
 func (s *Store) LIDJIDs(ctx context.Context) ([]string, error) {
 	var jids []string
 	err := s.db.WithContext(ctx).Raw(
 		`SELECT jid FROM chats WHERE jid LIKE '%@lid'
 		 UNION
-		 SELECT DISTINCT sender_jid FROM messages WHERE sender_jid LIKE '%@lid'`,
+		 SELECT DISTINCT sender_jid FROM messages WHERE sender_jid LIKE '%@lid'
+		 UNION
+		 SELECT DISTINCT voter_jid FROM poll_votes WHERE voter_jid LIKE '%@lid'`,
 	).Scan(&jids).Error
 	return jids, err
 }
@@ -235,6 +237,12 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 	}
 
 	n, err := mergeParticipant(tx, oldJID, newJID)
+	if err != nil {
+		return false, err
+	}
+	affected += n
+
+	n, err = mergePollVotes(tx, oldJID, newJID)
 	if err != nil {
 		return false, err
 	}
