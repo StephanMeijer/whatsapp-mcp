@@ -4,6 +4,7 @@ package mcpserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"log/slog"
 	"slices"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"github.com/StephanMeijer/whatsapp-mcp/internal/storetest"
 )
 
@@ -97,6 +99,55 @@ func TestWriteToolsRefuseStatusBroadcast(t *testing.T) {
 		}
 		if res := call(t, cs, "post_status", map[string]any{"text": "hi"}, nil); res.IsError || len(fake.sent) != 1 {
 			t.Errorf("%s: post_status = %q, sent %v", name, resultText(res), fake.sent)
+		}
+	}
+}
+
+// Your own status can be deleted under post_status's rule; someone else's
+// can't, and edit_message still refuses the status broadcast.
+func TestDeleteOwnStatus(t *testing.T) {
+	const status = "status@broadcast"
+	newStore := func(t *testing.T) *store.Store {
+		t.Helper()
+		st := storetest.New(t)
+		if err := st.Save(context.Background(), nil, []store.Message{
+			{ChatJID: status, MessageID: "MYSTATUS", SenderJID: "31600000000@s.whatsapp.net", FromMe: true, Timestamp: 1, Text: "oops"},
+			{ChatJID: status, MessageID: "THEIRS", SenderJID: alice, Timestamp: 2, Text: "beach"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return st
+	}
+	del := func(id string) map[string]any { return map[string]any{"chat_jid": status, "message_id": id} }
+	for name, tt := range map[string]struct {
+		opts Options
+		ok   bool
+	}{
+		"no allowlist":        {Options{}, true},
+		"allowlist, flag on":  {Options{AllowRecipients: []string{alice}, AllowStatus: true}, true},
+		"allowlist, flag off": {Options{AllowRecipients: []string{alice}}, false},
+	} {
+		var logs bytes.Buffer
+		tt.opts.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+		fake := &fakeWA{}
+		cs := connect(t, fake, newStore(t), tt.opts)
+		res := call(t, cs, "delete_message", del("MYSTATUS"), nil)
+		want := []string{"delete status@broadcast/MYSTATUS"}
+		if tt.ok && (res.IsError || !slices.Equal(fake.sent, want)) {
+			t.Errorf("%s: delete own status = %q, sent %v", name, resultText(res), fake.sent)
+		}
+		if !tt.ok && (!res.IsError || !strings.Contains(resultText(res), "-allow-status") || len(fake.sent) != 0 ||
+			!strings.Contains(logs.String(), "tool=delete_message")) {
+			t.Errorf("%s: delete own status = %q, sent %v, logs %q", name, resultText(res), fake.sent, logs.String())
+		}
+		fake.sent = nil
+		for tool, args := range map[string]map[string]any{
+			"delete_message": del("THEIRS"),
+			"edit_message":   {"chat_jid": status, "message_id": "MYSTATUS", "text": "fixed"},
+		} {
+			if res := call(t, cs, tool, args, nil); !res.IsError || len(fake.sent) != 0 {
+				t.Errorf("%s: %s = %q, sent %v", name, tool, resultText(res), fake.sent)
+			}
 		}
 	}
 }

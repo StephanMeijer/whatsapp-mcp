@@ -201,7 +201,8 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "delete_message",
 		Description: "Delete one of your own messages for everyone in the chat. This cannot be undone. " +
-			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending.",
+			"Only messages you sent can be deleted, and WhatsApp only allows it for a limited time after sending. " +
+			"Delete your own status update with chat_jid status@broadcast.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
 	}, t.deleteMessage)
 	mcp.AddTool(s, &mcp.Tool{

@@ -25,11 +25,8 @@ type PostStatusIn struct {
 }
 
 func (t *tools) postStatus(ctx context.Context, _ *mcp.CallToolRequest, in PostStatusIn) (*mcp.CallToolResult, Message, error) {
-	// A status goes to the whole status audience, which no allowlist entry covers.
-	if t.policy.hasAllowlist() && !t.policy.allowStatus {
-		t.policy.log.Warn("refused post_status while an allowlist is set without -allow-status")
-		return nil, Message{}, errors.New("posting a status is off while an allowlist is set, because a status " +
-			"goes to all your status contacts; start the server with -allow-status to allow it")
+	if err := t.policy.checkStatus("post_status"); err != nil {
+		return nil, Message{}, err
 	}
 	hasFile := in.Data != "" || in.Path != ""
 	text := strings.TrimSpace(in.Text)

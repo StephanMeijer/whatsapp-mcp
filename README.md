@@ -78,8 +78,9 @@ group's invite link can join it, allowlist or not, so while an allowlist is set
 link itself, but at `-log-level debug` whatsmeow's protocol logs contain it.
 
 A status update goes to everyone your phone's status privacy settings allow, so only `post_status`
-posts one: every other write tool refuses `status@broadcast`, even when the allowlist lists it. While
-an allowlist is set, `post_status` is refused (and logged) unless you also pass `-allow-status`.
+posts one: every other write tool refuses `status@broadcast`, even when the allowlist lists it, except
+`delete_message`, which can take back your own status. While an allowlist is set, both are refused
+(and logged) for statuses unless you also pass `-allow-status`.
 
 ### Endpoints
 

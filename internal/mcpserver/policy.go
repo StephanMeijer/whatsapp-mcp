@@ -71,7 +71,7 @@ func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient strin
 		return types.JID{}, err
 	}
 	jid := w.Canonical(ctx, parsed)
-	// Statuses go only through post_status, under its own -allow-status gate.
+	// Statuses go only through post_status and delete_message, under checkStatus.
 	if jid == types.StatusBroadcastJID {
 		p.log.Warn("refused write to the status broadcast outside post_status", "recipient", jid.String())
 		return types.JID{}, fmt.Errorf("%s is for status updates; use post_status", jid)
@@ -83,6 +83,17 @@ func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient strin
 	}
 	p.log.Warn("refused write to recipient not in the allowlist", "recipient", jid.String())
 	return types.JID{}, fmt.Errorf("recipient %s is not in the allowed recipients list", jid)
+}
+
+// checkStatus reports whether a tool may post or delete a status. A status
+// goes to the whole status audience, which no allowlist entry covers.
+func (p *policy) checkStatus(tool string) error {
+	if p.hasAllowlist() && !p.allowStatus {
+		p.log.Warn("refused status write while an allowlist is set without -allow-status", "tool", tool)
+		return errors.New("posting or deleting a status is off while an allowlist is set, because a status " +
+			"goes to all your status contacts; start the server with -allow-status to allow it")
+	}
+	return nil
 }
 
 func (p *policy) isAllowed(ctx context.Context, w WhatsApp, jid types.JID) bool {

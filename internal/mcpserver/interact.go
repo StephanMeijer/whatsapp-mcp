@@ -12,6 +12,7 @@ import (
 	"go.mau.fi/whatsmeow/types"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
+	"github.com/StephanMeijer/whatsapp-mcp/internal/wa"
 )
 
 type ReactIn struct {
@@ -59,9 +60,20 @@ func (t *tools) chatTarget(ctx context.Context, chatJID, messageID string) (type
 }
 
 // ownMessage is chatTarget for a tool that may only act on the account's
-// own messages; verb says what the tool does with it.
-func (t *tools) ownMessage(ctx context.Context, chatJID, messageID, verb string) (types.JID, store.Message, error) {
-	chat, m, err := t.chatTarget(ctx, chatJID, messageID)
+// own messages; verb says what the tool does with it. A non-empty
+// statusTool lets the chat be the status broadcast too, under checkStatus.
+func (t *tools) ownMessage(ctx context.Context, chatJID, messageID, verb, statusTool string) (types.JID, store.Message, error) {
+	var chat types.JID
+	var m store.Message
+	var err error
+	if jid, perr := wa.ParseRecipient(chatJID); statusTool != "" && perr == nil && jid == types.StatusBroadcastJID && messageID != "" {
+		chat = jid
+		if err = t.policy.checkStatus(statusTool); err == nil {
+			m, err = t.archivedMessage(ctx, chat, messageID)
+		}
+	} else {
+		chat, m, err = t.chatTarget(ctx, chatJID, messageID)
+	}
 	if err != nil {
 		return types.JID{}, store.Message{}, err
 	}
@@ -81,7 +93,7 @@ func (t *tools) editMessage(ctx context.Context, _ *mcp.CallToolRequest, in Edit
 	if strings.TrimSpace(in.Text) == "" {
 		return nil, Message{}, errors.New("text is required")
 	}
-	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "edited")
+	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "edited", "")
 	if err != nil {
 		return nil, Message{}, err
 	}
@@ -104,7 +116,7 @@ type DeleteMessageOut struct {
 }
 
 func (t *tools) deleteMessage(ctx context.Context, _ *mcp.CallToolRequest, in DeleteMessageIn) (*mcp.CallToolResult, DeleteMessageOut, error) {
-	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "deleted")
+	chat, target, err := t.ownMessage(ctx, in.ChatJID, in.MessageID, "deleted", "delete_message")
 	if err != nil {
 		return nil, DeleteMessageOut{}, err
 	}
