@@ -67,10 +67,11 @@ func (c *Client) reconcile(ctx context.Context, withGroups bool) {
 // pass, with withGroups kept if any of them set it, and each pass's timeout
 // starts when it does. One worker at a time holds reconcileMu.
 func (c *Client) requestReconcile(withGroups bool) {
-	c.reconcileWanted.Store(true)
+	// Groups first: a worker that swaps reconcileWanted after this sees it.
 	if withGroups {
 		c.reconcileGroups.Store(true)
 	}
+	c.reconcileWanted.Store(true)
 	if !c.reconcileMu.TryLock() {
 		return
 	}
