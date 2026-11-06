@@ -164,21 +164,41 @@ func TestOnHistorySyncAppliesChangesAfterSave(t *testing.T) {
 // content under the original's ID, so it never reaches toChange, and the
 // archive keeps the old text.
 func TestOnHistorySyncAppliesPlainEdits(t *testing.T) {
-	t.Skip("history-sync MESSAGE_EDIT edits are lost: #62")
-	c, _, _, _ := newTestClient(t)
-	edit := &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
-		Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
-		Key:           &waCommon.MessageKey{ID: proto.String("M1")},
-		EditedMessage: text("edited"),
-	}}
-	c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
-		&waHistorySync.Conversation{ID: proto.String(alicePN.String()), Messages: []*waHistorySync.HistorySyncMsg{
-			webMsg("M1", false, 100, "", text("draft")),
-			webMsg("E1", false, 200, "", edit),
+	edit := func(target, to string) *waE2E.Message {
+		return &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+			Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
+			Key:           &waCommon.MessageKey{ID: proto.String(target)},
+			EditedMessage: text(to),
+		}}
+	}
+	for _, tt := range []struct {
+		name string
+		wrap func(*waE2E.Message) *waE2E.Message
+	}{
+		{"bare", func(m *waE2E.Message) *waE2E.Message { return m }},
+		{"wrapped in EditedMessage", func(m *waE2E.Message) *waE2E.Message {
+			return &waE2E.Message{EditedMessage: &waE2E.FutureProofMessage{Message: m}}
 		}},
-	))
-	if m := archived(t, c, alicePN, "M1"); m.Text != "edited" {
-		t.Errorf("M1 = %q, want the edit applied", m.Text)
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			c, _, _, _ := newTestClient(t)
+			c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
+				&waHistorySync.Conversation{ID: proto.String(alicePN.String()), Messages: []*waHistorySync.HistorySyncMsg{
+					webMsg("M1", false, 100, "", text("draft")),
+					webMsg("E1", false, 200, "", tt.wrap(edit("M1", "edited"))),
+					webMsg("M2", false, 300, "", text("unrelated")),
+				}},
+			))
+			if m := archived(t, c, alicePN, "M1"); m.Text != "edited" {
+				t.Errorf("M1 = %q, want the edit applied", m.Text)
+			}
+			if m := archived(t, c, alicePN, "M2"); m.Text != "unrelated" {
+				t.Errorf("M2 = %q, want it archived as sent", m.Text)
+			}
+			if _, err := c.store.MessageByID(context.Background(), alicePN.String(), "E1"); !errors.Is(err, store.ErrNotFound) {
+				t.Errorf("the edit itself was archived as a message: err %v", err)
+			}
+		})
 	}
 }
 
