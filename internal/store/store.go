@@ -308,19 +308,30 @@ func mergeParticipant(tx *gorm.DB, oldJID, newJID string) (int64, error) {
 // filters on name or JID, case-insensitively.
 func (s *Store) ListChats(ctx context.Context, query string, archived ArchiveFilter, limit int) ([]Chat, error) {
 	tx := s.db.WithContext(ctx).Model(&Chat{})
-	if query != "" {
-		pattern := "%" + escapeLike(strings.ToLower(query)) + "%"
-		tx = tx.Where(`LOWER(name) LIKE ? ESCAPE '\' OR LOWER(jid) LIKE ? ESCAPE '\'`, pattern, pattern)
-	}
 	switch archived {
 	case ExcludeArchived:
 		tx = tx.Where("archived = ?", false)
 	case OnlyArchived:
 		tx = tx.Where("archived = ?", true)
 	}
+	tx = tx.Order("pinned DESC").Order("last_message_at DESC").Order("jid")
+	limit = clampLimit(limit)
+	if query == "" {
+		tx = tx.Limit(limit)
+	}
 	var chats []Chat
-	err := tx.Order("pinned DESC").Order("last_message_at DESC").Order("jid").Limit(clampLimit(limit)).Find(&chats).Error
-	return chats, err
+	if err := tx.Find(&chats).Error; err != nil {
+		return nil, err
+	}
+	if query == "" {
+		return chats, nil
+	}
+	// Filter in Go: SQLite's LOWER() folds only ASCII, so "école" would miss "École".
+	q := strings.ToLower(query)
+	chats = slices.DeleteFunc(chats, func(c Chat) bool {
+		return !strings.Contains(strings.ToLower(c.Name), q) && !strings.Contains(strings.ToLower(c.JID), q)
+	})
+	return chats[:min(len(chats), limit)], nil
 }
 
 // ListMessages returns a chat's messages, newest first. A non-zero before
@@ -523,8 +534,4 @@ func clampLimit(limit int) int {
 		return DefaultLimit
 	}
 	return min(limit, MaxLimit)
-}
-
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
 }
