@@ -440,6 +440,16 @@ func (s *Store) MarkDeleted(ctx context.Context, chatJID, messageID string) (boo
 	return res.RowsAffected > 0, res.Error
 }
 
+// KeepMessage records that a message was kept in the chat for everyone, so
+// its disappearing timer no longer applies. It reports false when the
+// message isn't archived, was already deleted, or has no timer.
+func (s *Store) KeepMessage(ctx context.Context, chatJID, messageID string) (bool, error) {
+	res := s.db.WithContext(ctx).Model(&Message{}).
+		Where("chat_jid = ? AND message_id = ? AND deleted = ? AND expires_at > 0", chatJID, messageID, false).
+		Update("expires_at", 0)
+	return res.RowsAffected > 0, res.Error
+}
+
 // ExpireMessages deletes, the way MarkDeleted does, every message whose
 // disappearing timer ran out at or before now, and reports how many.
 func (s *Store) ExpireMessages(ctx context.Context, now int64) (int64, error) {

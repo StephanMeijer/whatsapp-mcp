@@ -8,7 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
+	"go.mau.fi/whatsmeow/proto/waHistorySync"
+	"go.mau.fi/whatsmeow/proto/waWeb"
 	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	"google.golang.org/protobuf/proto"
@@ -33,6 +36,40 @@ func TestToMessageRecordsExpiry(t *testing.T) {
 	e.Message = &waE2E.Message{Conversation: proto.String("stays")}
 	if m, _ := toMessage(e, canon); m.ExpiresAt != 0 {
 		t.Errorf("ExpiresAt without a timer = %d, want 0", m.ExpiresAt)
+	}
+}
+
+func TestKeepInChatStopsExpiry(t *testing.T) {
+	c, _, _, _ := newTestClient(t)
+	ctx := context.Background()
+	keep := func(id string, typ waE2E.KeepType) *waE2E.Message {
+		return &waE2E.Message{KeepInChatMessage: &waE2E.KeepInChatMessage{
+			Key: &waCommon.MessageKey{ID: proto.String(id)}, KeepType: typ.Enum()}}
+	}
+	timed := func(s string) *waE2E.Message {
+		return &waE2E.Message{ExtendedTextMessage: &waE2E.ExtendedTextMessage{
+			Text: proto.String(s), ContextInfo: &waE2E.ContextInfo{Expiration: proto.Uint32(60)}}}
+	}
+
+	// Live: a keep clears the timer, and an undo leaves it kept.
+	c.onMessage(liveMessage(alicePN, alicePN, "M1", false, "", timed("keep me")))
+	c.onMessage(liveMessage(alicePN, alicePN, "K1", false, "", keep("M1", waE2E.KeepType_KEEP_FOR_ALL)))
+	c.onMessage(liveMessage(alicePN, alicePN, "U1", false, "", keep("M1", waE2E.KeepType_UNDO_KEEP_FOR_ALL)))
+	// History sync: a message whose WebMessageInfo says it was kept.
+	hm := webMsg("M2", false, 100, "", timed("kept earlier"))
+	hm.Message.KeepInChat = &waWeb.KeepInChat{KeepType: waE2E.KeepType_KEEP_FOR_ALL.Enum()}
+	c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
+		&waHistorySync.Conversation{ID: proto.String(alicePN.String()), Messages: []*waHistorySync.HistorySyncMsg{hm}}))
+
+	for _, id := range []string{"M1", "M2"} {
+		if m := archived(t, c, alicePN, id); m.ExpiresAt != 0 {
+			t.Errorf("%s ExpiresAt = %d, want 0 once kept", id, m.ExpiresAt)
+		}
+	}
+	for _, id := range []string{"K1", "U1"} {
+		if _, err := c.store.MessageByID(ctx, alicePN.String(), id); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("keep %s archived as a message", id)
+		}
 	}
 }
 

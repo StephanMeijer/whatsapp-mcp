@@ -191,7 +191,9 @@ func toMessage(e *events.Message, canon func(types.JID) types.JID) (store.Messag
 	}
 	m.Forwarded, m.ForwardingScore = forwarding(e.Message)
 	// Disappearing timers count from when the message was sent.
-	if exp := contextInfo(e.Message).GetExpiration(); exp > 0 {
+	// History sync marks a message kept in the chat on its WebMessageInfo.
+	kept := e.SourceWebMsg.GetKeepInChat().GetKeepType() == waE2E.KeepType_KEEP_FOR_ALL
+	if exp := contextInfo(e.Message).GetExpiration(); exp > 0 && !kept {
 		m.ExpiresAt = m.Timestamp + int64(exp)
 	}
 	return m, true
