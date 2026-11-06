@@ -97,6 +97,8 @@ func (c *Client) historyVotes(chat types.JID, archiveChat string, poll *waWeb.We
 				continue
 			}
 			voter = p
+		case chat.Server == types.GroupServer:
+			continue // a group vote without its voter: the group is not one
 		}
 		out = append(out, store.PollVote{
 			ChatJID: archiveChat, PollID: poll.GetKey().GetID(), VoterJID: canon(voter).String(),

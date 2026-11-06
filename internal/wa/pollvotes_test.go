@@ -74,6 +74,9 @@ func TestOnHistorySyncRecordsPollVotes(t *testing.T) {
 			Vote: voteFor("Pizza"), SenderTimestampMS: proto.Int64(200_000)},
 		{PollUpdateMessageKey: &waCommon.MessageKey{FromMe: proto.Bool(true)},
 			Vote: voteFor("Pizza", "Sushi"), SenderTimestampMS: proto.Int64(300_000)},
+		// A group vote naming no voter is skipped, not counted as the group's.
+		{PollUpdateMessageKey: &waCommon.MessageKey{},
+			Vote: voteFor("Sushi"), SenderTimestampMS: proto.Int64(400_000)},
 	}
 	c.onHistorySync(historySync(waHistorySync.HistorySync_INITIAL_BOOTSTRAP,
 		&waHistorySync.Conversation{ID: proto.String(testGroup.String()),
