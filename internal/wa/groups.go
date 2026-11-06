@@ -69,11 +69,11 @@ func (c *Client) nameGroupIfNeeded(group types.JID) {
 	if _, done := c.groupLookups.LoadOrStore(jid, struct{}{}); done {
 		return
 	}
-	go func() {
+	c.bg.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), saveTimeout)
 		defer cancel()
 		c.lookupGroupName(ctx, group)
-	}()
+	})
 }
 
 // lookupGroupName names an archived group chat that has no name yet, from

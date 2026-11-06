@@ -30,10 +30,10 @@ func (c *Client) handleEvent(evt any) {
 		c.onMessage(e)
 	case *events.HistorySync:
 		c.onHistorySync(e)
-		go c.reconcileWithTimeout(false)
+		c.requestReconcile(false)
 	case *events.Connected:
 		c.log.Info("connected to WhatsApp")
-		go c.reconcileWithTimeout(true)
+		c.requestReconcile(true)
 	case *events.GroupInfo:
 		c.onGroupInfo(e)
 	case *events.JoinedGroup:

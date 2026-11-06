@@ -51,11 +51,10 @@ func (c *Client) memoCanonical(ctx context.Context) func(types.JID) types.JID {
 // reconcile brings archived data in line with what is now known: chats and
 // senders stored under an @lid whose phone number has since been learned are
 // merged, then chats are named after contacts and, when withGroups is set,
-// groups after their current names. It runs on every connect (withGroups)
-// and after every history sync, which is when new mappings and names arrive.
+// groups after their current names. requestReconcile runs it on every
+// connect (withGroups) and after every history sync, which is when new
+// mappings and names arrive.
 func (c *Client) reconcile(ctx context.Context, withGroups bool) {
-	c.reconcileMu.Lock()
-	defer c.reconcileMu.Unlock()
 	c.mergeLIDChats(ctx)
 	c.syncChatNames(ctx)
 	if withGroups {
@@ -63,10 +62,33 @@ func (c *Client) reconcile(ctx context.Context, withGroups bool) {
 	}
 }
 
-func (c *Client) reconcileWithTimeout(withGroups bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
-	defer cancel()
-	c.reconcile(ctx, withGroups)
+// requestReconcile asks for a reconcile pass off the event loop. Requests
+// coalesce: while a pass runs, any number of further requests cost one more
+// pass, with withGroups kept if any of them set it, and each pass's timeout
+// starts when it does. One worker at a time holds reconcileMu.
+func (c *Client) requestReconcile(withGroups bool) {
+	c.reconcileWanted.Store(true)
+	if withGroups {
+		c.reconcileGroups.Store(true)
+	}
+	if !c.reconcileMu.TryLock() {
+		return
+	}
+	c.bg.Go(func() {
+		for {
+			for c.reconcileWanted.Swap(false) {
+				ctx, cancel := context.WithTimeout(context.Background(), reconcileTimeout)
+				c.reconcile(ctx, c.reconcileGroups.Swap(false))
+				cancel()
+			}
+			c.reconcileMu.Unlock()
+			// A request made between the last Swap and Unlock found the
+			// lock held and started no worker; pick it up here.
+			if !c.reconcileWanted.Load() || !c.reconcileMu.TryLock() {
+				return
+			}
+		}
+	})
 }
 
 func (c *Client) mergeLIDChats(ctx context.Context) {

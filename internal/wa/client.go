@@ -15,6 +15,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/mdp/qrterminal/v3"
@@ -44,7 +45,10 @@ type Client struct {
 	mu sync.RWMutex
 	qr string // current pairing code, empty when none is pending
 
-	reconcileMu sync.Mutex // serialises reconcile runs
+	reconcileMu     sync.Mutex     // held by the one reconcile worker while it runs
+	reconcileWanted atomic.Bool    // a reconcile pass was requested since the last one started
+	reconcileGroups atomic.Bool    // the requested pass must also sync group names
+	bg              sync.WaitGroup // goroutines Stop waits for: the reconcile worker and group name lookups
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
@@ -153,8 +157,12 @@ func (c *Client) QRCode() string {
 	return c.qr
 }
 
-// Stop disconnects.
-func (c *Client) Stop() { c.cli.Disconnect() }
+// Stop disconnects and waits for background work (bounded by its timeouts),
+// so the archive can be closed afterwards.
+func (c *Client) Stop() {
+	c.cli.Disconnect()
+	c.bg.Wait()
+}
 
 // Status reports the connection state.
 func (c *Client) Status() Status {
