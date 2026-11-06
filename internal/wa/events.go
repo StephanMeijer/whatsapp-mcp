@@ -59,6 +59,10 @@ func (c *Client) onMessage(e *events.Message) {
 		c.recordTimer(ctx, canon(e.Info.Chat).String(), secs)
 		return
 	}
+	if e.Message.GetPollUpdateMessage() != nil {
+		c.onPollVote(ctx, e, canon)
+		return
+	}
 	if ch, ok := c.changeFor(ctx, e, canon); ok {
 		c.applyChange(ctx, ch)
 		return
@@ -115,7 +119,9 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		chat := store.Chat{JID: archiveJID.String(), Name: cmp.Or(conv.GetName(), conv.GetDisplayName())}
 		var msgs []store.Message
 		var changes []change
+		var votes []store.PollVote
 		for _, hm := range conv.GetMessages() {
+			votes = append(votes, c.historyVotes(chatJID, chat.JID, hm.GetMessage(), canon)...)
 			evt, err := c.cli.ParseWebMessage(chatJID, hm.GetMessage())
 			if err != nil {
 				// Mostly group stubs without a sender, so Debug: the count alone over-reads as gaps.
@@ -142,6 +148,9 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			}
 			if conv.EphemeralExpiration != nil {
 				c.recordTimer(ctx, chat.JID, int64(conv.GetEphemeralExpiration()))
+			}
+			for _, v := range votes {
+				c.recordVote(ctx, v)
 			}
 		}
 		cancel()

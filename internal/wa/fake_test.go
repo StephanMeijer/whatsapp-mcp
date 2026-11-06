@@ -131,7 +131,8 @@ type fakeWA struct {
 	uploadErr   error
 	download    []byte
 	downloadErr error
-	decrypted   map[string]*waE2E.Message // by target message ID; missing is an error
+	decrypted   map[string]*waE2E.Message         // by target message ID; missing is an error
+	votes       map[string]*waE2E.PollVoteMessage // decrypted votes by vote message ID; missing is an error
 
 	// onPeer, when set, runs inside SendPeerMessage, for example to deliver
 	// the phone's answer to a history request.
@@ -305,6 +306,15 @@ func (f *fakeWA) DecryptSecretEncryptedMessage(_ context.Context, evt *events.Me
 	id := evt.Message.GetSecretEncryptedMessage().GetTargetMessageKey().GetID()
 	if m, ok := f.decrypted[id]; ok {
 		return m, nil
+	}
+	return nil, whatsmeow.ErrOriginalMessageSecretNotFound
+}
+
+func (f *fakeWA) DecryptPollVote(_ context.Context, evt *events.Message) (*waE2E.PollVoteMessage, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if v, ok := f.votes[evt.Info.ID]; ok {
+		return v, nil
 	}
 	return nil, whatsmeow.ErrOriginalMessageSecretNotFound
 }

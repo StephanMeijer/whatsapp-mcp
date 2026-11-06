@@ -40,6 +40,7 @@ type whatsmeowClient interface {
 	GetProfilePictureInfo(ctx context.Context, jid types.JID, params *whatsmeow.GetProfilePictureParams) (*types.ProfilePictureInfo, error)
 	IsOnWhatsApp(ctx context.Context, phones []string) ([]types.IsOnWhatsAppResponse, error)
 	DecryptSecretEncryptedMessage(ctx context.Context, evt *events.Message) (*waE2E.Message, error)
+	DecryptPollVote(ctx context.Context, vote *events.Message) (*waE2E.PollVoteMessage, error)
 
 	// These build or decode messages without touching the network.
 	BuildMessageKey(chat, sender types.JID, id types.MessageID) *waCommon.MessageKey

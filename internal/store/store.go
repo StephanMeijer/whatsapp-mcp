@@ -32,7 +32,7 @@ type Store struct {
 }
 
 // models is every table the store owns; tests drop them by this list.
-var models = []any{&Chat{}, &Message{}, &Call{}, &Receipt{}}
+var models = []any{&Chat{}, &Message{}, &Call{}, &Receipt{}, &PollVote{}}
 
 // searcher is the one dialect-specific part of the store: GORM has no
 // abstraction over SQLite FTS5 and Postgres full-text search.
@@ -235,6 +235,12 @@ func mergeJID(tx *gorm.DB, oldJID, newJID string) (bool, error) {
 	}
 
 	n, err := mergeParticipant(tx, oldJID, newJID)
+	if err != nil {
+		return false, err
+	}
+	affected += n
+
+	n, err = mergePollVotes(tx, oldJID, newJID)
 	if err != nil {
 		return false, err
 	}

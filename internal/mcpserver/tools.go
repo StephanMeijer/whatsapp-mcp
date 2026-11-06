@@ -70,6 +70,13 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.messageReceipts)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "poll_results",
+		Description: "A poll's options with how many people chose each and who. A later vote replaces an " +
+			"earlier one. Votes are only known from when this server was paired: votes cast before that, " +
+			"or on polls sent before it, are missing.",
+		Annotations: readOnly,
+	}, t.pollResults)
+	mcp.AddTool(s, &mcp.Tool{
 		Name: "fetch_older_messages",
 		Description: "Ask the phone for messages older than the oldest one archived in a chat, and archive them. " +
 			"Call it again to page further back. Needs the phone to be online. status is \"fetched\" (with the " +
