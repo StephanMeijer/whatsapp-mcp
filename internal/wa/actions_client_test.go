@@ -370,6 +370,14 @@ func TestFetchOlder(t *testing.T) {
 	if err != nil || res.Status != FetchPending {
 		t.Errorf("FetchOlder = %+v, err %v; want pending", res, err)
 	}
+	if len(fake.peer) != 1 {
+		t.Errorf("pending fetch sent %d requests, want 1", len(fake.peer))
+	}
+	// The late answer is still archived.
+	c.onHistorySync(historySync(waHistorySync.HistorySync_ON_DEMAND,
+		&waHistorySync.Conversation{ID: proto.String(alicePN.String()),
+			Messages: []*waHistorySync.HistorySyncMsg{webMsg("A1", false, 100, "", text("older"))}}))
+	archived(t, c, alicePN, "A1")
 
 	c, fake, _, _ = newTestClient(t)
 	archive(t, c, incoming(alicePN, alicePN, "A5", 500, "newest"))
