@@ -30,6 +30,12 @@ func registerGroupAdmin(s *mcp.Server, t *tools) {
 		Description: "Leave a group. You can only get back in if an admin adds you or you have an invite link.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
 	}, t.leaveGroup)
+	mcp.AddTool(s, &mcp.Tool{
+		Name: "update_group_members",
+		Description: "Add, remove, promote to admin or demote people in a group you admin, up to 20 per call. " +
+			"Each person's outcome is listed; the call fails only when nobody could be changed.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), DestructiveHint: new(true)},
+	}, t.updateGroupMembers)
 }
 
 type CreateGroupIn struct {
@@ -109,4 +115,58 @@ func (t *tools) leaveGroup(ctx context.Context, _ *mcp.CallToolRequest, in Leave
 		return nil, LeaveGroupOut{}, err
 	}
 	return nil, LeaveGroupOut{JID: group.String(), Left: true}, nil
+}
+
+type UpdateGroupMembersIn struct {
+	ChatJID string   `json:"chat_jid" jsonschema:"the group's JID"`
+	Action  string   `json:"action" jsonschema:"add, remove, promote or demote"`
+	Members []string `json:"members" jsonschema:"JIDs or international phone numbers, at most 20"`
+}
+
+type UpdateGroupMembersOut struct {
+	JID     string        `json:"jid"`
+	Action  string        `json:"action"`
+	Members []GroupMember `json:"members" jsonschema:"added is true when this person's change went through"`
+}
+
+// checkedActions bring someone new in or give them power over the group,
+// so the people they name must pass the allowlist; remove and demote act
+// on people already there.
+var checkedActions = map[string]bool{"add": true, "promote": true}
+
+func (t *tools) updateGroupMembers(ctx context.Context, _ *mcp.CallToolRequest, in UpdateGroupMembersIn) (*mcp.CallToolResult, UpdateGroupMembersOut, error) {
+	switch in.Action {
+	case "add", "remove", "promote", "demote":
+	default:
+		return nil, UpdateGroupMembersOut{}, fmt.Errorf("action: want add, remove, promote or demote, not %q", in.Action)
+	}
+	group, err := t.policy.groupChat(ctx, t.wa, in.ChatJID)
+	if err != nil {
+		return nil, UpdateGroupMembersOut{}, err
+	}
+	members, err := t.policy.groupMembers(ctx, t.wa, in.Members, checkedActions[in.Action])
+	if err != nil {
+		return nil, UpdateGroupMembersOut{}, err
+	}
+	results, err := t.wa.UpdateGroupMembers(ctx, group, in.Action, members)
+	if err != nil {
+		return nil, UpdateGroupMembersOut{}, err
+	}
+	jids := make([]string, len(results))
+	for i, r := range results {
+		jids[i] = r.JID.String()
+	}
+	names := t.senderNames(ctx, jids)
+	out := UpdateGroupMembersOut{JID: group.String(), Action: in.Action, Members: make([]GroupMember, len(results))}
+	var reasons []string
+	for i, r := range results {
+		out.Members[i] = GroupMember{JID: jids[i], Name: names[jids[i]], Added: r.OK, Error: r.Error}
+		if !r.OK {
+			reasons = append(reasons, jids[i]+": "+r.Error)
+		}
+	}
+	if len(reasons) == len(results) {
+		return nil, UpdateGroupMembersOut{}, fmt.Errorf("nobody could be changed: %s", strings.Join(reasons, "; "))
+	}
+	return nil, out, nil
 }

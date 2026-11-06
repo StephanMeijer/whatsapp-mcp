@@ -43,6 +43,9 @@ type WhatsApp interface {
 	CreateGroup(ctx context.Context, name string, members []types.JID) (wa.GroupCreated, error)
 	// LeaveGroup leaves a group.
 	LeaveGroup(ctx context.Context, group types.JID) error
+	// UpdateGroupMembers adds, removes, promotes or demotes people in a group
+	// and reports each one's outcome.
+	UpdateGroupMembers(ctx context.Context, group types.JID, action string, members []types.JID) ([]wa.MemberResult, error)
 	// React sets the account's reaction to a message; "" removes it.
 	React(ctx context.Context, chat types.JID, target store.Message, emoji string) error
 	// DeleteMessage deletes one of the account's own messages for everyone.

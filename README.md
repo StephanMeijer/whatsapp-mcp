@@ -313,6 +313,7 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `set_disappearing_timer` | turn disappearing messages on (`24h`, `7d`, `90d`) or `off` for a chat; `list_chats` shows each chat's timer |
 | `create_group` | create a group with you as admin and add up to 20 people; people WhatsApp refused are listed per member (needs `-enable-group-admin`) |
 | `leave_group` | leave a group (needs `-enable-group-admin`) |
+| `update_group_members` | add, remove, promote or demote up to 20 people in a group you admin; adding or promoting someone needs them on the allowlist (needs `-enable-group-admin`) |
 
 ## Why a database
 

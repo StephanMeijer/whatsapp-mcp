@@ -269,6 +269,19 @@ func (f *fakeWA) CreateGroup(_ context.Context, name string, members []types.JID
 	return g, nil
 }
 
+func (f *fakeWA) UpdateGroupMembers(_ context.Context, group types.JID, action string, members []types.JID) ([]wa.MemberResult, error) {
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("%s %s %v", action, group, members))
+	out := make([]wa.MemberResult, len(members))
+	for i, m := range members {
+		reason, refused := f.refuseMembers[m.String()]
+		out[i] = wa.MemberResult{JID: m, OK: !refused, Error: reason}
+	}
+	return out, nil
+}
+
 func (f *fakeWA) LeaveGroup(_ context.Context, group types.JID) error {
 	if f.writeErr != nil {
 		return f.writeErr

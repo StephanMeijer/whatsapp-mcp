@@ -109,3 +109,56 @@ func participantError(p *types.GroupParticipant) string {
 	}
 	return fmt.Sprintf("WhatsApp refused (code %d)", p.Error)
 }
+
+// UpdateGroupMembers adds, removes, promotes or demotes people in a group,
+// reporting each one's outcome. People already in the group are addressed
+// by the JID the group itself uses for them, so groups that address members
+// by LID work too; someone who isn't a member is reported, not sent.
+func (c *Client) UpdateGroupMembers(ctx context.Context, group types.JID, action string, members []types.JID) ([]MemberResult, error) {
+	change, ok := map[string]whatsmeow.ParticipantChange{
+		"add": whatsmeow.ParticipantChangeAdd, "remove": whatsmeow.ParticipantChangeRemove,
+		"promote": whatsmeow.ParticipantChangePromote, "demote": whatsmeow.ParticipantChangeDemote,
+	}[action]
+	if !ok {
+		return nil, fmt.Errorf("action: want add, remove, promote or demote, not %q", action)
+	}
+	if !c.cli.IsLoggedIn() {
+		return nil, errNotLoggedIn
+	}
+	results := make([]MemberResult, len(members))
+	wire := make([]types.JID, 0, len(members))
+	sentAs := make(map[int]bool, len(members))
+	if change == whatsmeow.ParticipantChangeAdd {
+		wire = append(wire, members...)
+		for i := range members {
+			sentAs[i] = true
+		}
+	} else {
+		info, err := c.cli.GetGroupInfo(ctx, group)
+		if err != nil {
+			return nil, fmt.Errorf("look up group members: %w", err)
+		}
+		for i, m := range members {
+			p := c.findParticipant(ctx, m, info.Participants)
+			if p == nil {
+				results[i] = MemberResult{JID: m, Error: "not a member of this group"}
+				continue
+			}
+			wire = append(wire, p.JID)
+			sentAs[i] = true
+		}
+	}
+	if len(wire) > 0 {
+		changed, err := c.cli.UpdateGroupParticipants(ctx, group, wire, change)
+		if err != nil {
+			return nil, fmt.Errorf("%s group members: %w", action, err)
+		}
+		for i, m := range members {
+			if sentAs[i] {
+				results[i] = c.memberResult(ctx, m, changed)
+			}
+		}
+	}
+	c.log.Info("changed group members", "group", group.String(), "action", action, "members", len(members))
+	return results, nil
+}

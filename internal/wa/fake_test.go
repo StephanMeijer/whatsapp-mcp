@@ -103,12 +103,17 @@ type fakeWA struct {
 	createErr  error
 	left       []types.JID
 	leaveErr   error
-	timerErr   error
-	sent       []sentMsg
-	peer       []*waE2E.Message
-	patches    []appstate.PatchInfo
-	reads      []readCall
-	rejected   []rejectCall
+	// UpdateGroupParticipants records each change and reports memberCodes
+	// (by the JID sent) as the participant error codes, or fails with memberErr.
+	memberChanges []memberChange
+	memberCodes   map[types.JID]int
+	memberErr     error
+	timerErr      error
+	sent          []sentMsg
+	peer          []*waE2E.Message
+	patches       []appstate.PatchInfo
+	reads         []readCall
+	rejected      []rejectCall
 
 	groupInfoCalls []types.JID
 	userInfoCalls  [][]types.JID
@@ -292,6 +297,20 @@ func (f *fakeWA) LeaveGroup(_ context.Context, jid types.JID) error {
 	defer f.mu.Unlock()
 	f.left = append(f.left, jid)
 	return f.leaveErr
+}
+
+func (f *fakeWA) UpdateGroupParticipants(_ context.Context, jid types.JID, members []types.JID, action whatsmeow.ParticipantChange) ([]types.GroupParticipant, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.memberChanges = append(f.memberChanges, memberChange{jid, members, action})
+	if f.memberErr != nil {
+		return nil, f.memberErr
+	}
+	out := make([]types.GroupParticipant, len(members))
+	for i, m := range members {
+		out[i] = types.GroupParticipant{JID: m, Error: f.memberCodes[m]}
+	}
+	return out, nil
 }
 
 func (f *fakeWA) GetJoinedGroups(context.Context) ([]*types.GroupInfo, error) {
@@ -519,4 +538,10 @@ func chatNames(t *testing.T, c *Client, jids ...types.JID) map[string]string {
 type timerCall struct {
 	chat  types.JID
 	timer time.Duration
+}
+
+type memberChange struct {
+	group   types.JID
+	members []types.JID
+	action  whatsmeow.ParticipantChange
 }

@@ -22,7 +22,7 @@ const (
 	gaSelf     = "31600000000@s.whatsapp.net"
 )
 
-var groupAdminTools = []string{"create_group", "leave_group"}
+var groupAdminTools = []string{"create_group", "leave_group", "update_group_members"}
 
 func TestGroupAdminToolsNeedTheFlag(t *testing.T) {
 	has := func(names []string) []string {
@@ -142,5 +142,65 @@ func TestGroupToolsRefuseAPerson(t *testing.T) {
 	}
 	if len(fake.sent) != 0 {
 		t.Errorf("sent = %v", fake.sent)
+	}
+}
+
+func TestUpdateGroupMembers(t *testing.T) {
+	fake := &fakeWA{lids: map[string]string{gaAliceLID: gaAlice}, refuseMembers: map[string]string{}}
+	cs := connect(t, fake, storetest.New(t), Options{GroupAdmin: true, AllowRecipients: []string{gaAlice, gaListed}})
+	update := func(action string, members ...string) *mcp.CallToolResult {
+		t.Helper()
+		return call(t, cs, "update_group_members", map[string]any{"chat_jid": gaListed, "action": action, "members": members}, nil)
+	}
+
+	// add and promote: the people must be allowed; remove and demote: anyone already there.
+	for _, action := range []string{"add", "promote"} {
+		if res := update(action, gaAliceLID); res.IsError {
+			t.Errorf("%s an allowed member: %s", action, errText(res))
+		}
+		if res := update(action, gaCarol); !res.IsError {
+			t.Errorf("%s an unlisted member succeeded", action)
+		}
+	}
+	for _, action := range []string{"remove", "demote"} {
+		if res := update(action, gaCarol); res.IsError {
+			t.Errorf("%s an unlisted member: %s", action, errText(res))
+		}
+	}
+	want := []string{
+		"add " + gaListed + " [" + gaAlice + "]",
+		"promote " + gaListed + " [" + gaAlice + "]",
+		"remove " + gaListed + " [" + gaCarol + "]",
+		"demote " + gaListed + " [" + gaCarol + "]",
+	}
+	if !slices.Equal(fake.sent, want) {
+		t.Errorf("sent = %v, want %v", fake.sent, want)
+	}
+
+	// One refused of two is a success listing both; all refused is an error.
+	fake.refuseMembers[gaCarol] = "not a member of this group"
+	var out UpdateGroupMembersOut
+	if res := call(t, cs, "update_group_members", map[string]any{"chat_jid": gaListed, "action": "remove", "members": []string{gaAlice, gaCarol}}, &out); res.IsError {
+		t.Fatalf("partly refused: %s", errText(res))
+	}
+	if len(out.Members) != 2 || !out.Members[0].Added || out.Members[1].Added || out.Members[1].Error == "" {
+		t.Errorf("partly refused = %+v", out)
+	}
+	if res := update("remove", gaCarol); !res.IsError || !strings.Contains(errText(res), "nobody could be changed") {
+		t.Errorf("all refused = %q, want an error", errText(res))
+	}
+
+	sentBefore := len(fake.sent)
+	for name, args := range map[string]map[string]any{
+		"unknown action": {"chat_jid": gaListed, "action": "kick", "members": []string{gaAlice}},
+		"unlisted group": {"chat_jid": gaUnlisted, "action": "remove", "members": []string{gaAlice}},
+		"no members":     {"chat_jid": gaListed, "action": "remove", "members": []string{}},
+	} {
+		if res := call(t, cs, "update_group_members", args, nil); !res.IsError {
+			t.Errorf("%s: update_group_members succeeded", name)
+		}
+	}
+	if len(fake.sent) != sentBefore {
+		t.Errorf("refused calls sent %v", fake.sent[sentBefore:])
 	}
 }

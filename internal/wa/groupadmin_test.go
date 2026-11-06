@@ -8,6 +8,7 @@ import (
 	"slices"
 	"testing"
 
+	"go.mau.fi/whatsmeow"
 	"go.mau.fi/whatsmeow/types"
 )
 
@@ -93,5 +94,54 @@ func TestParticipantError(t *testing.T) {
 		if got := participantError(&tc.p); got != tc.want {
 			t.Errorf("participantError(%d) = %q, want %q", tc.p.Error, got, tc.want)
 		}
+	}
+}
+
+func TestUpdateGroupMembers(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	ctx := context.Background()
+	carol := types.NewJID("31600000003", types.DefaultUserServer)
+	// The group addresses Alice by her LID; Carol isn't in it.
+	fake.groups[testGroup] = &types.GroupInfo{JID: testGroup, Participants: []types.GroupParticipant{
+		{JID: aliceLID, LID: aliceLID, PhoneNumber: alicePN},
+		{JID: bobPN, PhoneNumber: bobPN},
+	}}
+
+	res, err := c.UpdateGroupMembers(ctx, testGroup, "promote", []types.JID{alicePN, carol})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.memberChanges) != 1 || !slices.Equal(fake.memberChanges[0].members, []types.JID{aliceLID}) ||
+		fake.memberChanges[0].action != whatsmeow.ParticipantChangePromote {
+		t.Errorf("changes = %+v, want Alice promoted by the LID the group uses", fake.memberChanges)
+	}
+	want := []MemberResult{{JID: alicePN, OK: true}, {JID: carol, Error: "not a member of this group"}}
+	if !slices.Equal(res, want) {
+		t.Errorf("results = %+v, want %+v", res, want)
+	}
+
+	// add sends the JIDs as given, without looking the group up.
+	calls := len(fake.groupInfoCalls)
+	fake.memberCodes = map[types.JID]int{carol: 409}
+	res, err = c.UpdateGroupMembers(ctx, testGroup, "add", []types.JID{carol})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.groupInfoCalls) != calls || !slices.Equal(fake.memberChanges[1].members, []types.JID{carol}) {
+		t.Errorf("add looked the group up or sent %v", fake.memberChanges[1].members)
+	}
+	if !slices.Equal(res, []MemberResult{{JID: carol, Error: "already a member"}}) {
+		t.Errorf("add results = %+v", res)
+	}
+
+	// Nobody in the group to change: nothing is sent.
+	if _, err := c.UpdateGroupMembers(ctx, testGroup, "remove", []types.JID{carol}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fake.memberChanges) != 2 {
+		t.Errorf("a remove of a non-member was sent: %+v", fake.memberChanges[2:])
+	}
+	if _, err := c.UpdateGroupMembers(ctx, testGroup, "kick", []types.JID{carol}); err == nil {
+		t.Error("an unknown action was accepted")
 	}
 }
