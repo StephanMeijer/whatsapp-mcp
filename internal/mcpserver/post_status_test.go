@@ -74,3 +74,29 @@ func TestPostStatus(t *testing.T) {
 		}
 	}
 }
+
+// Only post_status may post a status: the other write tools refuse the status
+// broadcast even when the allowlist lists it, and without any allowlist,
+// while post_status still posts.
+func TestWriteToolsRefuseStatusBroadcast(t *testing.T) {
+	const status = "status@broadcast"
+	for name, opts := range map[string]Options{
+		"listed":       {AllowRecipients: []string{status}, AllowStatus: true},
+		"no allowlist": {},
+	} {
+		var logs bytes.Buffer
+		opts.Logger = slog.New(slog.NewTextHandler(&logs, nil))
+		fake := &fakeWA{}
+		cs := connect(t, fake, storetest.New(t), opts)
+		res := call(t, cs, "send_message", map[string]any{"recipient": status, "text": "hi"}, nil)
+		if !res.IsError || !strings.Contains(resultText(res), "post_status") || len(fake.sent) != 0 {
+			t.Errorf("%s: send_message = %q, sent %v", name, resultText(res), fake.sent)
+		}
+		if !strings.Contains(logs.String(), "level=WARN") {
+			t.Errorf("%s: refusal not logged: %q", name, logs.String())
+		}
+		if res := call(t, cs, "post_status", map[string]any{"text": "hi"}, nil); res.IsError || len(fake.sent) != 1 {
+			t.Errorf("%s: post_status = %q, sent %v", name, resultText(res), fake.sent)
+		}
+	}
+}

@@ -63,13 +63,19 @@ func newPolicy(opts Options) (*policy, error) {
 
 // checkRecipient parses recipient, canonicalises it (an @lid becomes the
 // phone-number JID when known) and reports whether write tools may target
-// it. The account's own JID is always allowed once paired.
+// it. The account's own JID is always allowed once paired; the status
+// broadcast never is.
 func (p *policy) checkRecipient(ctx context.Context, w WhatsApp, recipient string) (types.JID, error) {
 	parsed, err := wa.ParseRecipient(recipient)
 	if err != nil {
 		return types.JID{}, err
 	}
 	jid := w.Canonical(ctx, parsed)
+	// Statuses go only through post_status, under its own -allow-status gate.
+	if jid == types.StatusBroadcastJID {
+		p.log.Warn("refused write to the status broadcast outside post_status", "recipient", jid.String())
+		return types.JID{}, fmt.Errorf("%s is for status updates; use post_status", jid)
+	}
 	// Status().JID is already the canonical phone-number JID, "" before pairing.
 	self := w.Status().JID
 	if p.allowed == nil || p.isAllowed(ctx, w, jid) || (self != "" && jid.String() == self) {
