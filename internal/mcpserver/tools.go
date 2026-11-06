@@ -154,6 +154,13 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
 	}, t.sendContact)
 	mcp.AddTool(s, &mcp.Tool{
+		Name: "forward_message",
+		Description: "Forward an archived message to another chat, labelled \"Forwarded\" as on the phone. " +
+			"Text, images, videos, audio and documents can be forwarded; a file is downloaded and sent again, " +
+			"so one that has expired from WhatsApp's servers fails with an error.",
+		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
+	}, t.forwardMessage)
+	mcp.AddTool(s, &mcp.Tool{
 		Name:        "reject_call",
 		Description: "Decline an incoming call that is still ringing; the caller sees it as declined.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true)},
