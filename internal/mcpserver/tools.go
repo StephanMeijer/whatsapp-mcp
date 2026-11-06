@@ -72,8 +72,7 @@ func registerTools(s *mcp.Server, t *tools) {
 	mcp.AddTool(s, &mcp.Tool{
 		Name: "poll_results",
 		Description: "A poll's options with how many people chose each and who. A later vote replaces an " +
-			"earlier one. Votes are only known from when this server was paired: votes cast before that, " +
-			"or on polls sent before it, are missing.",
+			"earlier one. Votes are missing only on polls this server never received.",
 		Annotations: readOnly,
 	}, t.pollResults)
 	mcp.AddTool(s, &mcp.Tool{

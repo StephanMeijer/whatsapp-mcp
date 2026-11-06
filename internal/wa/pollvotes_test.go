@@ -53,7 +53,7 @@ func TestOnMessageRecordsPollVotes(t *testing.T) {
 
 	// From Alice's LID in the group: recorded under her number.
 	c.onMessage(liveMessage(testGroup, aliceLID, "V1", false, "", update))
-	// A vote whatsmeow can't decrypt (a poll from before pairing) is dropped.
+	// A vote whatsmeow can't decrypt (a poll this server never received) is dropped.
 	c.onMessage(liveMessage(testGroup, bobPN, "V2", false, "", update))
 
 	got := pollVotes(t, c, testGroup.String(), "POLL1")
