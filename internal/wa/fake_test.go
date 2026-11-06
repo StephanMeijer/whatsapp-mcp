@@ -95,13 +95,31 @@ type fakeWA struct {
 	qr          chan whatsmeow.QRChannelItem
 	qrCalls     int
 
-	timers   []timerCall
-	timerErr error
-	sent     []sentMsg
-	peer     []*waE2E.Message
-	patches  []appstate.PatchInfo
-	reads    []readCall
-	rejected []rejectCall
+	timers []timerCall
+	// CreateGroup returns created and createErr and records each request;
+	// LeaveGroup records the groups left and returns leaveErr.
+	createReqs []whatsmeow.ReqCreateGroup
+	created    *types.GroupInfo
+	createErr  error
+	left       []types.JID
+	leaveErr   error
+	// UpdateGroupParticipants records each change and reports memberCodes
+	// (by the JID sent) as the participant error codes, or fails with memberErr.
+	memberChanges []memberChange
+	memberCodes   map[types.JID]int
+	memberErr     error
+	// SetGroupName, SetGroupTopic and GetGroupInviteLink record each call in
+	// groupEdits and fail with their error when set.
+	groupEdits []string
+	nameErr    error
+	topicErr   error
+	linkErr    error
+	timerErr   error
+	sent       []sentMsg
+	peer       []*waE2E.Message
+	patches    []appstate.PatchInfo
+	reads      []readCall
+	rejected   []rejectCall
 
 	groupInfoCalls []types.JID
 	userInfoCalls  [][]types.JID
@@ -271,6 +289,58 @@ func (f *fakeWA) GetGroupInfo(_ context.Context, jid types.JID) (*types.GroupInf
 		return nil, fmt.Errorf("no such group %s", jid)
 	}
 	return info, nil
+}
+
+func (f *fakeWA) CreateGroup(_ context.Context, req whatsmeow.ReqCreateGroup) (*types.GroupInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.createReqs = append(f.createReqs, req)
+	return f.created, f.createErr
+}
+
+func (f *fakeWA) LeaveGroup(_ context.Context, jid types.JID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.left = append(f.left, jid)
+	return f.leaveErr
+}
+
+func (f *fakeWA) UpdateGroupParticipants(_ context.Context, jid types.JID, members []types.JID, action whatsmeow.ParticipantChange) ([]types.GroupParticipant, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.memberChanges = append(f.memberChanges, memberChange{jid, members, action})
+	if f.memberErr != nil {
+		return nil, f.memberErr
+	}
+	out := make([]types.GroupParticipant, len(members))
+	for i, m := range members {
+		out[i] = types.GroupParticipant{JID: m, Error: f.memberCodes[m]}
+	}
+	return out, nil
+}
+
+func (f *fakeWA) SetGroupName(_ context.Context, jid types.JID, name string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, "name "+jid.String()+" "+name)
+	return f.nameErr
+}
+
+func (f *fakeWA) SetGroupTopic(_ context.Context, jid types.JID, _, _, topic string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, "topic "+jid.String()+" "+topic)
+	return f.topicErr
+}
+
+func (f *fakeWA) GetGroupInviteLink(_ context.Context, jid types.JID, reset bool) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.groupEdits = append(f.groupEdits, fmt.Sprintf("link %s reset=%v", jid, reset))
+	if f.linkErr != nil {
+		return "", f.linkErr
+	}
+	return whatsmeow.InviteLinkPrefix + "SECRETCODE", nil
 }
 
 func (f *fakeWA) GetJoinedGroups(context.Context) ([]*types.GroupInfo, error) {
@@ -498,4 +568,10 @@ func chatNames(t *testing.T, c *Client, jids ...types.JID) map[string]string {
 type timerCall struct {
 	chat  types.JID
 	timer time.Duration
+}
+
+type memberChange struct {
+	group   types.JID
+	members []types.JID
+	action  whatsmeow.ParticipantChange
 }

@@ -222,6 +222,9 @@ func registerTools(s *mcp.Server, t *tools) {
 			"after the timer. timer is off, 24h, 7d or 90d. In a direct chat WhatsApp announces the change in the chat.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.setDisappearingTimer)
+	if t.policy.groupAdmin {
+		registerGroupAdmin(s, t)
+	}
 }
 
 // Message is the tool-facing form of store.Message.

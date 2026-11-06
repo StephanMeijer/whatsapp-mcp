@@ -22,6 +22,10 @@ import (
 
 type fakeWA struct {
 	sent []string
+	// refuseMembers makes CreateGroup report these members as refused, with the reason.
+	refuseMembers map[string]string
+	// descriptionErr makes SetGroupInfo fail after applying a name.
+	descriptionErr error
 	// lids maps @lid JIDs to phone-number JIDs for Canonical.
 	lids map[string]string
 	// names are returned by Names; namesErr makes it fail.
@@ -251,6 +255,67 @@ func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer t
 		return f.writeErr
 	}
 	f.sent = append(f.sent, "timer "+chat.String()+" "+timer.String())
+	return nil
+}
+
+func (f *fakeWA) CreateGroup(_ context.Context, name string, members []types.JID) (wa.GroupCreated, error) {
+	if f.writeErr != nil {
+		return wa.GroupCreated{}, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("create %q %v", name, members))
+	g := wa.GroupCreated{JID: types.NewJID("120363000000000077", types.GroupServer), Name: name}
+	for _, m := range members {
+		reason, refused := f.refuseMembers[m.String()]
+		g.Members = append(g.Members, wa.MemberResult{JID: m, OK: !refused, Error: reason})
+	}
+	return g, nil
+}
+
+func (f *fakeWA) UpdateGroupMembers(_ context.Context, group types.JID, action string, members []types.JID) ([]wa.MemberResult, error) {
+	if f.writeErr != nil {
+		return nil, f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("%s %s %v", action, group, members))
+	out := make([]wa.MemberResult, len(members))
+	for i, m := range members {
+		reason, refused := f.refuseMembers[m.String()]
+		out[i] = wa.MemberResult{JID: m, OK: !refused, Error: reason}
+	}
+	return out, nil
+}
+
+func (f *fakeWA) SetGroupInfo(_ context.Context, group types.JID, name, description *string) (wa.GroupInfoApplied, error) {
+	if f.writeErr != nil {
+		return wa.GroupInfoApplied{}, f.writeErr
+	}
+	var done wa.GroupInfoApplied
+	if name != nil {
+		f.sent = append(f.sent, fmt.Sprintf("name %s %q", group, *name))
+		done.Name = true
+	}
+	if description != nil {
+		if f.descriptionErr != nil {
+			return done, f.descriptionErr
+		}
+		f.sent = append(f.sent, fmt.Sprintf("description %s %q", group, *description))
+		done.Description = true
+	}
+	return done, nil
+}
+
+func (f *fakeWA) GroupInviteLink(_ context.Context, group types.JID, reset bool) (string, error) {
+	if f.writeErr != nil {
+		return "", f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("link %s reset=%v", group, reset))
+	return "https://chat.whatsapp.com/SECRETCODE", nil
+}
+
+func (f *fakeWA) LeaveGroup(_ context.Context, group types.JID) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.sent = append(f.sent, "leave "+group.String())
 	return nil
 }
 

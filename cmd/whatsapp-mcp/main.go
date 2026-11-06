@@ -93,6 +93,8 @@ func run() error {
 		AllowRecipients: cfg.AllowRecipients,
 		Logger:          log,
 		MediaDir:        cfg.MediaDir,
+		GroupAdmin:      cfg.EnableGroupAdmin,
+		InviteLinks:     cfg.AllowInviteLinks,
 	})
 	if err != nil {
 		return err
@@ -120,7 +122,7 @@ func run() error {
 	go func() {
 		log.Info("serving MCP", "url", mcpURL, "listen", cfg.Addr, "version", version,
 			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients),
-			"expire_disappearing", cfg.ExpireDisappearing)
+			"expire_disappearing", cfg.ExpireDisappearing, "group_admin", cfg.EnableGroupAdmin)
 		errc <- srv.ListenAndServe()
 	}()
 
