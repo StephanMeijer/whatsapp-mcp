@@ -42,6 +42,8 @@ services:
       - "127.0.0.1:8080:8080"
     # The health check (whatsapp-mcp healthcheck, on /healthz) comes from the image.
     read_only: true
+    # get_media downloads to /tmp, one file at a time, capped at 16 MB each.
+    tmpfs: ["/tmp:size=64m"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 

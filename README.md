@@ -87,7 +87,7 @@ docker run -d --name whatsapp-mcp \
   -e WHATSAPP_MCP_TOKEN="$WHATSAPP_MCP_TOKEN" \
   -v whatsapp-mcp-data:/data \
   -p 127.0.0.1:8080:8080 \
-  --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --read-only --tmpfs /tmp:size=64m --cap-drop ALL --security-opt no-new-privileges \
   ghcr.io/stephanmeijer/whatsapp-mcp:latest
 
 docker logs -f whatsapp-mcp            # scan the QR code shown here on first start
@@ -95,7 +95,8 @@ docker logs -f whatsapp-mcp            # scan the QR code shown here on first st
 
 Publish the port on `127.0.0.1` only, as above; the container listens on all interfaces internally.
 Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
-container keeps the session. The other options from the table above work as environment variables.
+container keeps the session. The root filesystem is read-only, so `get_media` needs the tmpfs on
+`/tmp` (downloads are one at a time, at most 16 MB each). The other options from the table above work as environment variables.
 
 ## Run with Docker Compose and Postgres
 
