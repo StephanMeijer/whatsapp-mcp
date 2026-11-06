@@ -18,7 +18,8 @@ env:
 
 jobs:
   lint:
-    runs-on: 9xx
+    # Fork PRs stay on hosted runners: untrusted code must not reach the self-hosted pool.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || '9xx' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
@@ -46,7 +47,7 @@ jobs:
         run: go run "golang.org/x/vuln/cmd/govulncheck@${GOVULNCHECK_VERSION}" ./...
 
   test:
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:17-alpine
@@ -86,7 +87,7 @@ jobs:
           [ "$passed" -gt 0 ]
 
   build:
-    runs-on: 9xx
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || '9xx' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
