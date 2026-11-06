@@ -86,7 +86,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 	// Answers to FetchOlder; resolved after archiving so the waiter sees the messages.
 	onDemand := e.Data.GetSyncType() == waHistorySync.HistorySync_ON_DEMAND
 	convs := e.Data.GetConversations()
-	saved := 0
+	saved, skipped := 0, 0
 	for _, conv := range convs {
 		chatJID, err := types.ParseJID(conv.GetID())
 		if err != nil {
@@ -107,6 +107,9 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		for _, hm := range conv.GetMessages() {
 			evt, err := c.cli.ParseWebMessage(chatJID, hm.GetMessage())
 			if err != nil {
+				// Mostly group stubs without a sender, so Debug: the count alone over-reads as gaps.
+				skipped++
+				c.log.Debug("history sync: skip message", "chat", conv.GetID(), "id", hm.GetMessage().GetKey().GetID(), "err", err)
 				continue
 			}
 			if ch, ok := c.changeFor(syncCtx, evt, canon); ok {
@@ -141,7 +144,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 		c.fetches.resolveSession(e.Notification.GetPeerDataRequestSessionID())
 	}
 	c.log.Info("history sync archived", "type", e.Data.GetSyncType().String(),
-		"conversations", len(convs), "messages", saved)
+		"conversations", len(convs), "messages", saved, "skipped", skipped)
 }
 
 // toMessage converts a whatsmeow message event into an archive row, storing
