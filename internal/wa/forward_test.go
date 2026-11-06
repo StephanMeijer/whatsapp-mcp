@@ -3,6 +3,7 @@
 package wa
 
 import (
+	"cmp"
 	"context"
 	"strings"
 	"testing"
@@ -83,6 +84,37 @@ func TestForwardDocumentCaption(t *testing.T) {
 	}
 	if doc := fake.sent[0].msg.GetDocumentMessage(); doc == nil || doc.Caption != nil || doc.GetFileName() != "q3.pdf" {
 		t.Errorf("sent message = %v, want q3.pdf with no caption", fake.sent[0].msg)
+	}
+}
+
+// An edit keeps the original MediaRef, so the forward takes the edited text:
+// a removed caption must not reach the new recipient.
+func TestForwardEditedCaption(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	img := mediaRef(&waE2E.Message{ImageMessage: &waE2E.ImageMessage{
+		DirectPath: proto.String("/v/img"), Mimetype: proto.String("image/jpeg"), FileLength: proto.Uint64(4), Caption: proto.String("old secret"),
+	}}, false)
+	doc := mediaRef(&waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{
+		DirectPath: proto.String("/v/doc"), Mimetype: proto.String("application/pdf"), FileLength: proto.Uint64(4),
+		Caption: proto.String("old secret"), Title: proto.String("Q3 report"), FileName: proto.String("q3.pdf"),
+	}}, false)
+	fake.download = []byte("\xff\xd8\xff\xe0")
+
+	for _, src := range []store.Message{
+		{ChatJID: alicePN.String(), MessageID: "E1", MediaType: store.MediaImage, MediaRef: img, Text: "new caption", EditedAt: 200},
+		{ChatJID: alicePN.String(), MessageID: "E2", MediaType: store.MediaImage, MediaRef: img, Text: "", EditedAt: 200},
+		{ChatJID: alicePN.String(), MessageID: "E3", MediaType: store.MediaDocument, MediaRef: doc, Text: "new caption", EditedAt: 200},
+		{ChatJID: alicePN.String(), MessageID: "E4", MediaType: store.MediaDocument, MediaRef: doc, Text: "Q3 report", EditedAt: 200},
+	} {
+		want := map[string]string{"E1": "new caption", "E3": "new caption"}[src.MessageID]
+		if _, err := c.Forward(context.Background(), bobPN.String(), src); err != nil {
+			t.Fatal(err)
+		}
+		msg := fake.sent[len(fake.sent)-1].msg
+		got := cmp.Or(msg.GetImageMessage().GetCaption(), msg.GetDocumentMessage().GetCaption())
+		if got != want {
+			t.Errorf("%s: caption = %q, want %q", src.MessageID, got, want)
+		}
 	}
 }
 

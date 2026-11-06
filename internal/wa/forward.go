@@ -49,6 +49,13 @@ func (c *Client) Forward(ctx context.Context, recipient string, m store.Message)
 	if cs, ok := sub.(interface{ GetCaption() string }); ok {
 		caption = cs.GetCaption()
 	}
+	// An edit updates the text but keeps the original MediaRef, so the text holds the current caption.
+	if m.EditedAt > 0 {
+		caption = m.Text
+		if doc, ok := sub.(*waE2E.DocumentMessage); ok && (caption == doc.GetTitle() || caption == doc.GetFileName()) {
+			caption = "" // the edited text fell back to the title or file name
+		}
+	}
 	up, err := c.cli.Upload(ctx, media.Data, mediaTypeFor(m.MediaType))
 	if err != nil {
 		return store.Message{}, fmt.Errorf("upload: %w", err)
