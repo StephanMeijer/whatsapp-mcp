@@ -47,3 +47,14 @@ func (c *Client) SetDisappearingTimer(ctx context.Context, chat types.JID, timer
 	}
 	return c.cli.SetDisappearingTimer(ctx, chat, timer, time.Time{})
 }
+
+// chatTimer is a chat's stored disappearing timer in seconds, 0 when off or
+// unknown. A failed lookup is logged and the message goes without a timer.
+func (c *Client) chatTimer(ctx context.Context, chat types.JID) int64 {
+	chats, err := c.store.ChatsByJID(ctx, []string{chat.String()})
+	if err != nil {
+		c.log.Warn("look up disappearing timer", "err", err, "chat", chat.String())
+		return 0
+	}
+	return chats[chat.String()].DisappearingSeconds
+}
