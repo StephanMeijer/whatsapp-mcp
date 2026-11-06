@@ -72,7 +72,9 @@ func (c *Client) onMessage(e *events.Message) {
 		return
 	}
 	var chats []store.Chat
-	// In a direct chat with someone else, their push name is the best name we have.
+	// In a direct chat with someone else, their push name is the best name we
+	// have. whatsmeow sets IsGroup for broadcasts too, so status updates
+	// don't name the status chat after whoever posted.
 	if !e.Info.IsGroup && !e.Info.IsFromMe && e.Info.PushName != "" {
 		chats = append(chats, store.Chat{JID: m.ChatJID, Name: e.Info.PushName})
 	}

@@ -238,7 +238,7 @@ func TestCheckNumbers(t *testing.T) {
 func liveMessage(chat, sender types.JID, id string, fromMe bool, pushName string, m *waE2E.Message) *events.Message {
 	return &events.Message{
 		Info: types.MessageInfo{
-			MessageSource: types.MessageSource{Chat: chat, Sender: sender, IsFromMe: fromMe, IsGroup: chat.Server == types.GroupServer},
+			MessageSource: types.MessageSource{Chat: chat, Sender: sender, IsFromMe: fromMe, IsGroup: chat.Server == types.GroupServer || chat.Server == types.BroadcastServer},
 			ID:            id, PushName: pushName, Timestamp: time.Unix(100, 0),
 		},
 		Message: m,

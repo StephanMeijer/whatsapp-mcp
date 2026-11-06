@@ -350,10 +350,11 @@ func mergeParticipant(tx *gorm.DB, oldJID, newJID string) (int64, error) {
 	return res.RowsAffected, res.Error
 }
 
-// ListChats returns chats, pinned first, then by most recent activity. A non-empty query
-// filters on name or JID, case-insensitively.
+// ListChats returns chats, pinned first, then by most recent activity, never
+// the status updates chat. A non-empty query filters on name or JID,
+// case-insensitively.
 func (s *Store) ListChats(ctx context.Context, query string, archived ArchiveFilter, limit int) ([]Chat, error) {
-	tx := s.db.WithContext(ctx).Model(&Chat{})
+	tx := s.db.WithContext(ctx).Model(&Chat{}).Where("jid <> ?", StatusChat)
 	switch archived {
 	case ExcludeArchived:
 		tx = tx.Where("archived = ?", false)
@@ -421,8 +422,9 @@ type RecentQuery struct {
 	Limit         int
 }
 
-// RecentMessages returns messages in the window, newest first. When more
-// than the limit match, it returns the newest ones and reports truncated.
+// RecentMessages returns messages in the window, newest first, leaving out
+// status updates unless ChatJID asks for them. When more than the limit
+// match, it returns the newest ones and reports truncated.
 func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Message, truncated bool, err error) {
 	limit := clampLimit(q.Limit)
 	tx := s.db.WithContext(ctx).Where("timestamp >= ? AND deleted = ?", q.Since.Unix(), false)
@@ -431,6 +433,8 @@ func (s *Store) RecentMessages(ctx context.Context, q RecentQuery) (msgs []Messa
 	}
 	if q.ChatJID != "" {
 		tx = tx.Where("chat_jid = ?", q.ChatJID)
+	} else {
+		tx = tx.Where("chat_jid <> ?", StatusChat)
 	}
 	if !q.IncludeFromMe {
 		tx = tx.Where("from_me = ?", false)
@@ -627,7 +631,8 @@ func (s *Store) ChatsByJID(ctx context.Context, jids []string) (map[string]Chat,
 }
 
 // SearchMessages full-text searches message text, optionally within one chat,
-// best matches first.
+// best matches first. Status updates are only searched when chatJID is the
+// status chat.
 func (s *Store) SearchMessages(ctx context.Context, query, chatJID string, limit int) ([]Message, error) {
 	if strings.TrimSpace(query) == "" {
 		return nil, fmt.Errorf("search query is empty")
@@ -635,6 +640,8 @@ func (s *Store) SearchMessages(ctx context.Context, query, chatJID string, limit
 	tx := s.search.apply(s.db.WithContext(ctx).Model(&Message{}), query).Where("messages.deleted = ?", false)
 	if chatJID != "" {
 		tx = tx.Where("messages.chat_jid = ?", chatJID)
+	} else {
+		tx = tx.Where("messages.chat_jid <> ?", StatusChat)
 	}
 	var msgs []Message
 	err := tx.Order("messages.timestamp DESC").Limit(clampLimit(limit)).Find(&msgs).Error
