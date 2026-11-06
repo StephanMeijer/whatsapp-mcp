@@ -41,7 +41,7 @@ func TestForwardText(t *testing.T) {
 func TestForwardMedia(t *testing.T) {
 	c, fake, _, _ := newTestClient(t)
 	ref := mediaRef(&waE2E.Message{ImageMessage: &waE2E.ImageMessage{
-		DirectPath: proto.String("/v/img"), Mimetype: proto.String("image/jpeg"), FileLength: proto.Uint64(4),
+		DirectPath: proto.String("/v/img"), Mimetype: proto.String("image/jpeg"), FileLength: proto.Uint64(4), Caption: proto.String("the view"),
 	}}, false)
 	src := store.Message{ChatJID: alicePN.String(), MessageID: "P1", MediaType: store.MediaImage, MediaRef: ref, Text: "the view"}
 	fake.download = []byte("\xff\xd8\xff\xe0")
@@ -64,6 +64,25 @@ func TestForwardMedia(t *testing.T) {
 	}
 	if len(fake.sent) != 1 {
 		t.Errorf("expired media was sent: %d messages", len(fake.sent))
+	}
+}
+
+// A document is archived as its caption, else its title, else its file name;
+// only a real caption is forwarded as one.
+func TestForwardDocumentCaption(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	ref := mediaRef(&waE2E.Message{DocumentMessage: &waE2E.DocumentMessage{
+		DirectPath: proto.String("/v/doc"), Mimetype: proto.String("application/pdf"), FileLength: proto.Uint64(4),
+		Title: proto.String("Q3 report"), FileName: proto.String("q3.pdf"),
+	}}, false)
+	src := store.Message{ChatJID: alicePN.String(), MessageID: "F1", MediaType: store.MediaDocument, MediaRef: ref, Text: "Q3 report"}
+	fake.download = []byte("%PDF")
+
+	if _, err := c.Forward(context.Background(), bobPN.String(), src); err != nil {
+		t.Fatal(err)
+	}
+	if doc := fake.sent[0].msg.GetDocumentMessage(); doc == nil || doc.Caption != nil || doc.GetFileName() != "q3.pdf" {
+		t.Errorf("sent message = %v, want q3.pdf with no caption", fake.sent[0].msg)
 	}
 }
 

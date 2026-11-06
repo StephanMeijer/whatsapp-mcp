@@ -40,9 +40,14 @@ func (c *Client) Forward(ctx context.Context, recipient string, m store.Message)
 	if err != nil {
 		return store.Message{}, err
 	}
-	caption := m.Text
-	if caption == media.FileName {
-		caption = "" // a document's archived text falls back to its file name
+	// The archived text falls back to a document's title or file name, so take the caption from the file's own message.
+	sub, _, err := decodeMediaRef(m.MediaType, m.MediaRef)
+	if err != nil {
+		return store.Message{}, err
+	}
+	caption := ""
+	if cs, ok := sub.(interface{ GetCaption() string }); ok {
+		caption = cs.GetCaption()
 	}
 	up, err := c.cli.Upload(ctx, media.Data, mediaTypeFor(m.MediaType))
 	if err != nil {
