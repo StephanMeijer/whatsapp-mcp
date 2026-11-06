@@ -26,8 +26,6 @@ services:
     # No ports: only whatsapp-mcp needs to reach it, over the Compose network.
 
   whatsapp-mcp:
-    # Built from this checkout. The health check below needs a release newer
-    # than 0.4.0; until then, don't swap this for the published image.
     build: .
     restart: unless-stopped
     depends_on:
