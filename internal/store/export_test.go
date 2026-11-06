@@ -15,3 +15,10 @@ func (s *Store) RawRef(ctx context.Context, chatJID, messageID string, out *[]by
 	*out = m.MediaRef
 	return err
 }
+
+// MarkDeletedKeepingRows marks a message deleted the way releases before
+// MarkDeleted dropped receipts and votes did, leaving those rows behind.
+func (s *Store) MarkDeletedKeepingRows(ctx context.Context, chatJID, messageID string) error {
+	return s.db.WithContext(ctx).Model(&Message{}).
+		Where("chat_jid = ? AND message_id = ?", chatJID, messageID).Update("deleted", true).Error
+}

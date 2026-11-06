@@ -20,8 +20,20 @@ import (
 // eachDialect runs fn against SQLite, and against Postgres when
 // TEST_POSTGRES_URL points at a database the test may freely write to.
 func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
+	eachDB(t, func(t *testing.T, d *db.DB) {
+		fn(t, openStore(t, d))
+		// A restart: migrate again over the schema the subtest just used,
+		// including the generated search column.
+		if _, err := store.New(context.Background(), d); err != nil {
+			t.Fatalf("second New: %v", err)
+		}
+	})
+}
+
+// eachDB is eachDialect for tests that open the store themselves.
+func eachDB(t *testing.T, fn func(t *testing.T, d *db.DB)) {
 	t.Run("sqlite", func(t *testing.T) {
-		fn(t, storetest.New(t))
+		fn(t, storetest.NewDB(t))
 	})
 	t.Run("postgres", func(t *testing.T) {
 		url := os.Getenv("TEST_POSTGRES_URL")
@@ -37,17 +49,17 @@ func eachDialect(t *testing.T, fn func(t *testing.T, s *store.Store)) {
 		if err := d.Gorm.Migrator().DropTable(store.Models...); err != nil {
 			t.Fatal(err)
 		}
-		s, err := store.New(context.Background(), d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		fn(t, s)
-		// A restart: migrate again over the schema the subtest just used,
-		// including the generated search column.
-		if _, err := store.New(context.Background(), d); err != nil {
-			t.Fatalf("second New: %v", err)
-		}
+		fn(t, d)
 	})
+}
+
+func openStore(t *testing.T, d *db.DB) *store.Store {
+	t.Helper()
+	s, err := store.New(context.Background(), d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
 }
 
 func msg(chat, id string, ts int64, text string) store.Message {
