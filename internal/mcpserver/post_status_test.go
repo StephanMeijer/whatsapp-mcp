@@ -3,7 +3,9 @@
 package mcpserver
 
 import (
+	"bytes"
 	"encoding/base64"
+	"log/slog"
 	"slices"
 	"strings"
 	"testing"
@@ -32,10 +34,14 @@ func TestPostStatus(t *testing.T) {
 	}
 	text := map[string]any{"text": "  Back from holiday  "}
 
-	// With an allowlist and no -allow-status: refused, nothing sent.
-	allowlisted := Options{AllowRecipients: []string{listed}}
+	// With an allowlist and no -allow-status: refused and logged, nothing sent.
+	var logs bytes.Buffer
+	allowlisted := Options{AllowRecipients: []string{listed}, Logger: slog.New(slog.NewTextHandler(&logs, nil))}
 	if res, fake := post(allowlisted, text); !res.IsError || !strings.Contains(resultText(res), "-allow-status") || len(fake.sent) != 0 {
 		t.Errorf("allowlist, flag off = %q, sent %v", resultText(res), fake.sent)
+	}
+	if !strings.Contains(logs.String(), "level=WARN") || !strings.Contains(logs.String(), "post_status") {
+		t.Errorf("refusal not logged: %q", logs.String())
 	}
 	// With the flag on, and without any allowlist, it posts.
 	for name, opts := range map[string]Options{
