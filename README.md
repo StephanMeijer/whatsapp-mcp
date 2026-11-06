@@ -40,6 +40,7 @@ session without a new QR code.
 | `-database-url` | `DATABASE_URL` | `sqlite://data/whatsapp.db` |
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info` |
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
+| `-expire-disappearing` | `WHATSAPP_MCP_EXPIRE_DISAPPEARING` | `false`: keep messages from disappearing chats; `true` deletes them from the archive once their timer runs out, checked hourly. Only messages archived with a timer qualify: not ones archived before this option existed, and not ones this server sent. A message kept in the chat ("Keep in chat") never expires, and stays kept if that is later undone |
 | `-media-dir` | `WHATSAPP_MCP_MEDIA_DIR` | *(empty: off)* the only folder `send_media` may read files from |
 | `-allow-recipients` | `WHATSAPP_MCP_ALLOW_RECIPIENTS` | *(empty: anyone)* comma-separated JIDs or phone numbers |
 | `-public-url` | `WHATSAPP_MCP_PUBLIC_URL` | *(empty)* the https address clients reach the server at through a reverse proxy, see [Remote access over TLS](#remote-access-over-tls) |

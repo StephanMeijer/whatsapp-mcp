@@ -747,6 +747,72 @@ func TestForwardingRoundTrip(t *testing.T) {
 	})
 }
 
+func TestExpireMessages(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		due := msg(chat, "due", 10, "vanishes")
+		due.ExpiresAt, due.MediaRef = 100, []byte("ref")
+		later := msg(chat, "later", 20, "not yet")
+		later.ExpiresAt = 200
+		must(t, s.Save(ctx, nil, []store.Message{due, later, msg(chat, "keep", 30, "no timer")}))
+
+		n, err := s.ExpireMessages(ctx, 100)
+		must(t, err)
+		if n != 1 {
+			t.Errorf("expired %d, want 1", n)
+		}
+		if _, err := s.MessageByID(ctx, chat, "due"); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("due message: err %v, want it gone", err)
+		}
+		for _, id := range []string{"later", "keep"} {
+			if _, err := s.MessageByID(ctx, chat, id); err != nil {
+				t.Errorf("%s: %v, want it kept", id, err)
+			}
+		}
+		found, err := s.SearchMessages(ctx, "vanishes", "", 0)
+		must(t, err)
+		if len(found) != 0 {
+			t.Errorf("search still finds the expired text: %v", ids(found))
+		}
+		// Running again changes nothing.
+		n, err = s.ExpireMessages(ctx, 100)
+		must(t, err)
+		if n != 0 {
+			t.Errorf("second run expired %d, want 0", n)
+		}
+	})
+}
+
+func TestKeepMessage(t *testing.T) {
+	eachDialect(t, func(t *testing.T, s *store.Store) {
+		ctx := context.Background()
+		const chat = "1@s.whatsapp.net"
+		kept := msg(chat, "kept", 10, "stays")
+		kept.ExpiresAt = 100
+		must(t, s.Save(ctx, nil, []store.Message{kept, msg(chat, "plain", 20, "no timer")}))
+
+		for _, tt := range []struct {
+			id   string
+			want bool
+		}{{"kept", true}, {"kept", false}, {"plain", false}, {"missing", false}} {
+			ok, err := s.KeepMessage(ctx, chat, tt.id)
+			must(t, err)
+			if ok != tt.want {
+				t.Errorf("KeepMessage(%s) = %v, want %v", tt.id, ok, tt.want)
+			}
+		}
+		n, err := s.ExpireMessages(ctx, 100)
+		must(t, err)
+		if n != 0 {
+			t.Errorf("expired %d, want the kept message to stay", n)
+		}
+		if _, err := s.MessageByID(ctx, chat, "kept"); err != nil {
+			t.Errorf("kept message: %v", err)
+		}
+	})
+}
+
 func TestMediaRef(t *testing.T) {
 	eachDialect(t, func(t *testing.T, s *store.Store) {
 		ctx := context.Background()

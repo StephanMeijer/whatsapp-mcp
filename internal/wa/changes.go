@@ -16,9 +16,11 @@ type changeKind int
 const (
 	changeEdit changeKind = iota + 1
 	changeRevoke
+	changeKeep
 )
 
-// change is an edit or a deletion for everyone of an earlier message.
+// change is an edit, a deletion for everyone, or a "keep in chat" of an
+// earlier message.
 type change struct {
 	kind   changeKind
 	chat   string          // canonical chat JID, as the original is archived
@@ -32,8 +34,13 @@ type change struct {
 // toChange recognises edits and deletions for everyone. Edits arrive
 // unwrapped by whatsmeow (IsEdit) as a MESSAGE_EDIT protocol message
 // carrying the original's key and the new content; deletions as a REVOKE
-// protocol message carrying the original's key.
+// protocol message carrying the original's key. A "keep in chat" for
+// everyone stops the original from disappearing.
 func toChange(e *events.Message, canon func(types.JID) types.JID) (change, bool) {
+	// shortcut: UNDO_KEEP_FOR_ALL is ignored, so an unkept message never expires here; restore its expiry if archives must shrink after an undo.
+	if k := e.Message.GetKeepInChatMessage(); k.GetKeepType() == waE2E.KeepType_KEEP_FOR_ALL && k.GetKey().GetID() != "" {
+		return change{kind: changeKeep, chat: canon(e.Info.Chat).String(), target: k.GetKey().GetID()}, true
+	}
 	pm := e.Message.GetProtocolMessage()
 	if pm == nil || pm.GetKey().GetID() == "" {
 		return change{}, false
@@ -114,12 +121,14 @@ func (c *Client) applyChange(ctx context.Context, ch change) {
 		applied, err = c.store.ApplyEdit(ctx, ch.chat, ch.target, ch.text, ch.media, ch.ref, ch.at)
 	case changeRevoke:
 		applied, err = c.store.MarkDeleted(ctx, ch.chat, ch.target)
+	case changeKeep:
+		applied, err = c.store.KeepMessage(ctx, ch.chat, ch.target)
 	}
 	if err != nil {
 		c.log.Error("apply message change", "err", err, "chat", ch.chat, "id", ch.target)
 		return
 	}
-	kind := map[changeKind]string{changeEdit: "edit", changeRevoke: "deletion"}[ch.kind]
+	kind := map[changeKind]string{changeEdit: "edit", changeRevoke: "deletion", changeKeep: "keep"}[ch.kind]
 	if !applied {
 		c.log.Debug("message change not applied: original not archived, or already newer", "kind", kind, "chat", ch.chat, "id", ch.target)
 		return

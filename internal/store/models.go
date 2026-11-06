@@ -61,6 +61,10 @@ type Message struct {
 	// (the phone says "Forwarded many times" from 5).
 	Forwarded       bool `gorm:"not null;default:false"`
 	ForwardingScore int  `gorm:"not null;default:0"`
+	// ExpiresAt is when a message from a disappearing chat vanishes for the
+	// people in it, in Unix seconds; 0 for messages that don't disappear.
+	// ExpireMessages honours it when the operator opts in.
+	ExpiresAt int64 `gorm:"not null;default:0;index"`
 	// Deleted marks a message deleted for everyone. Its text is cleared and
 	// it is left out of every query that feeds the tools.
 	Deleted bool `gorm:"not null;default:false"`
