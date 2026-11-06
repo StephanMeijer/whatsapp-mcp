@@ -96,7 +96,8 @@ docker logs -f whatsapp-mcp            # scan the QR code shown here on first st
 Publish the port on `127.0.0.1` only, as above; the container listens on all interfaces internally.
 Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
 container keeps the session. The root filesystem is read-only, so `get_media` needs the tmpfs on
-`/tmp` (downloads are one at a time, at most 16 MB each). The other options from the table above work as environment variables.
+`/tmp`: downloads are at most 16 MB each, and 64m leaves room for a few concurrent ones, beyond
+which the call fails rather than growing. The other options from the table above work as environment variables.
 
 ## Run with Docker Compose and Postgres
 
