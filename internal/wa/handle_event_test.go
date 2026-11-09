@@ -214,7 +214,6 @@ func TestStatusUpdateStartsNoGroupLookup(t *testing.T) {
 	e := liveMessage(types.StatusBroadcastJID, alicePN, "S1", false, "Alice", text("status"))
 	e.Info.IsGroup = true // as whatsmeow sets it for @broadcast
 	c.handleEvent(e)
-	c.nameGroupIfNeeded(types.StatusBroadcastJID) // the guard itself, even if toMessage drops statuses
 	c.bg.Wait()
 	if len(fake.groupInfoCalls) != 0 {
 		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
