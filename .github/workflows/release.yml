@@ -17,7 +17,7 @@ jobs:
   # Keeps a release PR up to date from the Conventional Commits on main;
   # merging it tags the release and creates the GitHub Release.
   release-please:
-    runs-on: 9xx
+    runs-on: ubuntu-latest
     permissions:
       contents: write
       pull-requests: write
