@@ -76,6 +76,10 @@ func (c *Client) onJoinedGroup(e *events.JoinedGroup) {
 // no name in the archive, at most once per group per run. It runs off the
 // event loop, since it may make a network request, and not at all after Stop.
 func (c *Client) nameGroupIfNeeded(group types.JID) {
+	// whatsmeow marks @broadcast chats (status updates) as groups too; only real groups have group info.
+	if group.Server != types.GroupServer {
+		return
+	}
 	jid := group.ToNonAD().String()
 	if c.bgCtx.Err() != nil {
 		return

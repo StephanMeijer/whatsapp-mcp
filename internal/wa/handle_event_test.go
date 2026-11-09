@@ -207,3 +207,15 @@ func TestHistorySyncAfterStopStartsNoReconcile(t *testing.T) {
 		t.Error("group name lookup started after Stop")
 	}
 }
+
+// whatsmeow marks status updates as group messages; they must not trigger a group lookup.
+func TestStatusUpdateStartsNoGroupLookup(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	e := liveMessage(types.StatusBroadcastJID, alicePN, "S1", false, "Alice", text("status"))
+	e.Info.IsGroup = true // as whatsmeow sets it for @broadcast
+	c.handleEvent(e)
+	c.bg.Wait()
+	if len(fake.groupInfoCalls) != 0 {
+		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
+	}
+}
