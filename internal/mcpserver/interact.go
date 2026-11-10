@@ -29,7 +29,7 @@ type ReactOut struct {
 
 // maxEmojiLen bounds the reaction string: an emoji with modifiers and
 // joiners, not text.
-const maxEmojiLen = 32
+const maxEmojiLen = 64
 
 func (t *tools) react(ctx context.Context, _ *mcp.CallToolRequest, in ReactIn) (*mcp.CallToolResult, ReactOut, error) {
 	if len(in.Emoji) > maxEmojiLen || strings.ContainsAny(in.Emoji, " \t\n") {

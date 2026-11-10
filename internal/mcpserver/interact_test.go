@@ -4,7 +4,9 @@ package mcpserver
 
 import (
 	"context"
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
@@ -46,6 +48,7 @@ func TestReplyReactMarkRead(t *testing.T) {
 	call(t, cs, "send_message", map[string]any{"recipient": alice, "text": "sounds good", "reply_to": "A1"}, nil)
 	var reacted ReactOut
 	call(t, cs, "react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": "👍"}, &reacted)
+	call(t, cs, "react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": "👩🏽‍❤️‍💋‍👨🏻"}, &reacted)
 	call(t, cs, "react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": ""}, &reacted)
 	if !reacted.Removed {
 		t.Error("empty emoji: want removed")
@@ -65,6 +68,7 @@ func TestReplyReactMarkRead(t *testing.T) {
 	want := []string{
 		alice + ": sounds good (reply to A1)",
 		`react ` + alice + `/A1 "👍"`,
+		fmt.Sprintf("react %s/A1 %q", alice, "👩🏽‍❤️‍💋‍👨🏻"),
 		`react ` + alice + `/A1 ""`,
 		"read " + alice,
 		"edit " + alice + `/MINE "oops, fixed"`,
@@ -87,6 +91,7 @@ func TestInteractErrorsSendNothing(t *testing.T) {
 		{"send_message", map[string]any{"recipient": alice, "text": "x", "reply_to": "S1"}}, // other chat
 		{"react", map[string]any{"chat_jid": alice, "message_id": "UNKNOWN", "emoji": "👍"}},
 		{"react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": "not an emoji"}},
+		{"react", map[string]any{"chat_jid": alice, "message_id": "A1", "emoji": strings.Repeat("x", 65)}},
 		{"react", map[string]any{"chat_jid": alice, "emoji": "👍"}},
 		{"mark_read", map[string]any{}},
 		{"edit_message", map[string]any{"chat_jid": alice, "message_id": "A1", "text": "x"}}, // not yours
