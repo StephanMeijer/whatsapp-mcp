@@ -67,6 +67,12 @@ type WhatsApp interface {
 	// SetDisappearingTimer turns disappearing messages on for a chat with the
 	// given timer, or off with 0; recording it in the archive is the caller's job.
 	SetDisappearingTimer(ctx context.Context, chat types.JID, timer time.Duration) error
+	// Presence reports whether a person is online or typing; it marks the
+	// account online for a short while.
+	Presence(ctx context.Context, jid types.JID) (wa.Presence, error)
+	// SetTyping shows or stops "typing…" or "recording audio…" in a chat; it
+	// marks the account online for a short while.
+	SetTyping(ctx context.Context, chat types.JID, state types.ChatPresence, media types.ChatPresenceMedia) error
 	// MarkChatRead marks a chat as read on all the account's devices.
 	MarkChatRead(ctx context.Context, chat types.JID) error
 	// Canonical maps a JID to the form the archive uses: the phone-number

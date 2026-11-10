@@ -43,6 +43,9 @@ type Config struct {
 	// EnableGroupAdmin offers the tools that create, change and leave
 	// groups. They are hard to undo, so they are off unless asked for.
 	EnableGroupAdmin bool
+	// EnablePresence offers get_presence and set_typing. They make the
+	// account appear online for a short while, so they are off unless asked for.
+	EnablePresence bool
 	// AllowInviteLinks lets group_invite_link work while an allowlist is
 	// set, though anyone with a link can join a group regardless of it.
 	AllowInviteLinks bool
@@ -77,6 +80,10 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	presenceDefault, err := envBool(getenv, "WHATSAPP_MCP_ENABLE_PRESENCE")
+	if err != nil {
+		return Config{}, err
+	}
 	inviteLinksDefault, err := envBool(getenv, "WHATSAPP_MCP_ALLOW_INVITE_LINKS")
 	if err != nil {
 		return Config{}, err
@@ -91,6 +98,7 @@ func Load(args []string, getenv func(string) string) (Config, error) {
 	fs := flag.NewFlagSet("whatsapp-mcp", flag.ContinueOnError)
 	fs.BoolVar(&cfg.ReadOnly, "read-only", readOnlyDefault, "hide all tools that send or change anything (env WHATSAPP_MCP_READ_ONLY)")
 	fs.BoolVar(&cfg.EnableGroupAdmin, "enable-group-admin", groupAdminDefault, "offer the tools that create, change and leave groups (env WHATSAPP_MCP_ENABLE_GROUP_ADMIN)")
+	fs.BoolVar(&cfg.EnablePresence, "enable-presence", presenceDefault, "offer get_presence and set_typing, which show your account as online for a short while (env WHATSAPP_MCP_ENABLE_PRESENCE)")
 	fs.BoolVar(&cfg.AllowInviteLinks, "allow-invite-links", inviteLinksDefault, "let group_invite_link work while -allow-recipients is set; a link lets anyone join (env WHATSAPP_MCP_ALLOW_INVITE_LINKS)")
 	fs.BoolVar(&cfg.AllowStatus, "allow-status", statusDefault, "let post_status work while -allow-recipients is set; a status goes to your whole status audience (env WHATSAPP_MCP_ALLOW_STATUS)")
 	fs.BoolVar(&cfg.ExpireDisappearing, "expire-disappearing", expireDefault, "delete archived messages from disappearing chats once their timer runs out (env WHATSAPP_MCP_EXPIRE_DISAPPEARING)")

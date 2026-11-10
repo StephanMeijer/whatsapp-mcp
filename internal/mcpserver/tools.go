@@ -139,6 +139,17 @@ func registerTools(s *mcp.Server, t *tools) {
 		Annotations: readOnly,
 	}, t.getProfilePicture)
 
+	if t.policy.presence {
+		// Not marked read-only: it shows the account as online.
+		mcp.AddTool(s, &mcp.Tool{
+			Name: "get_presence",
+			Description: "Whether a person is online, when they were last seen, and whether they are typing to you " +
+				"right now. Takes up to 5 seconds. Your account shows as online for about 30 seconds, during which " +
+				"your phone may not notify you. Someone who hides this from you gives not_visible.",
+			Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
+		}, t.getPresence)
+	}
+
 	// Write tools: registered only when not read-only, and each must check
 	// its recipient with t.policy.
 	if t.policy.readOnly {
@@ -223,6 +234,15 @@ func registerTools(s *mcp.Server, t *tools) {
 			"after the timer. timer is off, 24h, 7d or 90d. In a direct chat WhatsApp announces the change in the chat.",
 		Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
 	}, t.setDisappearingTimer)
+	if t.policy.presence {
+		mcp.AddTool(s, &mcp.Tool{
+			Name: "set_typing",
+			Description: "Show \"typing…\" or \"recording audio…\" in a chat, for example while preparing a reply, or " +
+				"stop showing it with paused. WhatsApp drops it by itself after a while, and when you send a message. " +
+				"Your account shows as online for about 30 seconds, during which your phone may not notify you.",
+			Annotations: &mcp.ToolAnnotations{OpenWorldHint: new(true), IdempotentHint: true},
+		}, t.setTyping)
+	}
 	if t.policy.groupAdmin {
 		registerGroupAdmin(s, t)
 	}
