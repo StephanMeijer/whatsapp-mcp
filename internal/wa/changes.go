@@ -163,7 +163,6 @@ func (c *Client) mayChange(ctx context.Context, e *events.Message, ch change, ca
 		if ch.kind == changeRevoke || target.FromMe {
 			return true
 		}
-	case target.FromMe:
 	case sameUser(sender, target.SenderJID, canon):
 		return true
 	case ch.kind == changeRevoke && e.Info.IsGroup && c.isGroupAdmin(ctx, e.Info.Chat, sender, canon):

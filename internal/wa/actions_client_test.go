@@ -558,3 +558,46 @@ func TestOnMessageChangeAuthor(t *testing.T) {
 		t.Errorf("O1 after own deletion = %q", got)
 	}
 }
+
+func TestOnMessageAdminDeletesOwnMessage(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	c.groupLookups.Store(testGroup.String(), struct{}{}) // no background name lookup
+	fake.groups[testGroup] = &types.GroupInfo{JID: testGroup, Participants: []types.GroupParticipant{
+		{JID: alicePN}, {JID: bobLID, PhoneNumber: bobPN, IsAdmin: true},
+	}}
+	change := func(sender types.JID, pm *waE2E.ProtocolMessage) {
+		pm.Key = &waCommon.MessageKey{ID: proto.String("O1")}
+		e := liveMessage(testGroup, sender, "C-"+sender.User, false, "", &waE2E.Message{ProtocolMessage: pm})
+		e.IsEdit = pm.GetType() == waE2E.ProtocolMessage_MESSAGE_EDIT
+		c.onMessage(e)
+	}
+	edit := func(sender types.JID) {
+		change(sender, &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(), EditedMessage: text("forged"), TimestampMS: proto.Int64(300_000)})
+	}
+	revoke := func(sender types.JID) {
+		change(sender, &waE2E.ProtocolMessage{Type: waE2E.ProtocolMessage_REVOKE.Enum()})
+	}
+	textOf := func() string {
+		t.Helper()
+		m, err := c.store.MessageByID(context.Background(), testGroup.String(), "O1")
+		if errors.Is(err, store.ErrNotFound) {
+			return "<deleted>"
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Text
+	}
+
+	c.onMessage(liveMessage(testGroup, ownJID, "O1", true, "", text("mine")))
+	edit(alicePN)
+	revoke(alicePN)
+	edit(bobLID)
+	if got := textOf(); got != "mine" {
+		t.Errorf("own message after a member's changes and an admin's edit = %q", got)
+	}
+	revoke(bobLID)
+	if got := textOf(); got != "<deleted>" {
+		t.Errorf("own message after an admin's deletion = %q", got)
+	}
+}
