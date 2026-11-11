@@ -119,9 +119,8 @@ which the call fails rather than growing. The other options from the table above
 
 ## Run with Docker Compose and Postgres
 
-[`compose.yaml`](compose.yaml) runs the server against Postgres instead of SQLite. It builds the
-image from this checkout. The WhatsApp session and the message archive both live in Postgres, on
-the `pgdata` volume.
+[`compose.yaml`](compose.yaml) runs the released image against Postgres instead of SQLite. The
+WhatsApp session and the message archive both live in Postgres, on the `pgdata` volume.
 
 ```sh
 # 1. Create .env next to compose.yaml with a token and a database password (mode 600).
@@ -129,8 +128,8 @@ the `pgdata` volume.
 (umask 077; printf 'WHATSAPP_MCP_TOKEN=%s\nPOSTGRES_PASSWORD=%s\n' \
   "$(openssl rand -hex 32)" "$(openssl rand -hex 32)" > .env)
 
-# 2. Build and start; returns once both services are healthy.
-docker compose up -d --build --wait
+# 2. Start; returns once both services are healthy.
+docker compose up -d --wait
 
 # 3. Pair: scan the QR code in the log, or fetch it as a PNG.
 docker compose logs -f whatsapp-mcp
@@ -141,6 +140,18 @@ sed -n 's/^WHATSAPP_MCP_TOKEN=/Authorization: Bearer /p' .env \
 Connect a client as under [Connect a client](#connect-a-client), with the token from `.env`.
 `docker compose down` and `up` again keeps the session and the archive; `docker compose down -v`
 deletes them.
+
+**Versions.** Without a version, Compose runs `latest` as it was when first pulled. Pin a release in
+`.env` so you know what runs and can go back to it:
+
+```sh
+echo 'WHATSAPP_MCP_VERSION=0.6.0' >> .env
+```
+
+To upgrade or roll back, [take a backup](#backup-and-restore), change the version, then run
+`docker compose pull && docker compose up -d --wait`. The version is in the server's start-up log
+line. `docker compose up -d --build --wait` builds and runs this checkout instead, as version `dev`;
+it replaces the local image under the pinned tag, so run `docker compose pull` to go back to the release.
 
 Things to know:
 

@@ -26,6 +26,10 @@ services:
     # No ports: only whatsapp-mcp needs to reach it, over the Compose network.
 
   whatsapp-mcp:
+    # A released image; pin it with WHATSAPP_MCP_VERSION in .env (e.g. 0.6.0).
+    # `docker compose up --build` builds this checkout instead, labelled dev,
+    # under the same tag until `docker compose pull` fetches the release again.
+    image: ghcr.io/stephanmeijer/whatsapp-mcp:${WHATSAPP_MCP_VERSION:-latest}
     build: .
     restart: unless-stopped
     depends_on:
