@@ -466,6 +466,18 @@ func TestReadTools(t *testing.T) {
 		t.Errorf("search_messages = %+v", found)
 	}
 
+	// The read tools take a phone number wherever the write tools do.
+	var byPhone MessagesOut
+	call(t, cs, "list_messages", map[string]any{"chat_jid": "+31 6 0000 0001"}, &byPhone)
+	if len(byPhone.Messages) != 4 {
+		t.Errorf("list_messages by phone = %+v", byPhone)
+	}
+	byPhone = MessagesOut{}
+	call(t, cs, "search_messages", map[string]any{"query": "station", "chat_jid": "+31600000001"}, &byPhone)
+	if len(byPhone.Messages) != 1 {
+		t.Errorf("search_messages by phone = %+v", byPhone)
+	}
+
 	var contacts SearchContactsOut
 	call(t, cs, "search_contacts", map[string]any{"query": "ali"}, &contacts)
 	if len(contacts.Contacts) != 1 {
@@ -482,6 +494,9 @@ func TestToolErrors(t *testing.T) {
 		{"list_messages", map[string]any{}},
 		{"list_messages", map[string]any{"chat_jid": "x@s.whatsapp.net", "before": "yesterday"}},
 		{"search_messages", map[string]any{"query": " "}},
+		{"list_messages", map[string]any{"chat_jid": "nonsense"}},
+		{"list_messages", map[string]any{"chat_jid": "31600000001"}}, // country code not marked
+		{"search_messages", map[string]any{"query": "hi", "chat_jid": "nonsense"}},
 		{"search_contacts", map[string]any{"query": ""}},
 		{"send_message", map[string]any{"recipient": "+31600000001", "text": " "}},
 	}

@@ -18,7 +18,7 @@ const (
 )
 
 type FetchOlderIn struct {
-	ChatJID     string `json:"chat_jid" jsonschema:"the chat's JID"`
+	ChatJID     string `json:"chat_jid" jsonschema:"the chat's JID or an international phone number such as +31612345678"`
 	Count       int    `json:"count,omitempty" jsonschema:"messages to request (default 50, max 50)"`
 	WaitSeconds int    `json:"wait_seconds,omitempty" jsonschema:"how long to wait for the phone (default 30, max 60)"`
 }
@@ -48,7 +48,11 @@ func (t *tools) fetchOlderMessages(ctx context.Context, _ *mcp.CallToolRequest, 
 		return nil, FetchOlderOut{}, fmt.Errorf("wait_seconds must be between 1 and %d", fetchMaxWait)
 	}
 
-	res, err := t.wa.FetchOlder(ctx, t.canonicalChat(ctx, in.ChatJID), count, time.Duration(wait)*time.Second)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, FetchOlderOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
+	res, err := t.wa.FetchOlder(ctx, chat, count, time.Duration(wait)*time.Second)
 	if err != nil {
 		return nil, FetchOlderOut{}, err
 	}

@@ -324,14 +324,17 @@ func (t *tools) connectionStatus(context.Context, *mcp.CallToolRequest, struct{}
 	return nil, t.wa.Status(), nil
 }
 
-// canonicalChat maps a chat JID given by a client to the archive's form, so
-// an @lid reference finds a chat archived under the phone number. Input that
-// isn't a JID is passed through; it simply won't match anything. "" stays
+// canonicalChat maps a chat given by a client, as a JID or an international
+// phone number (the forms the write tools accept), to the archive's form, so
+// an @lid reference finds a chat archived under the phone number. "" stays
 // "", meaning no chat filter.
-func (t *tools) canonicalChat(ctx context.Context, chatJID string) string {
-	jid, err := types.ParseJID(chatJID)
-	if err != nil {
-		return chatJID
+func (t *tools) canonicalChat(ctx context.Context, chatJID string) (string, error) {
+	if chatJID == "" {
+		return "", nil
 	}
-	return t.wa.Canonical(ctx, jid).String()
+	jid, err := wa.ParseRecipient(chatJID)
+	if err != nil {
+		return "", err
+	}
+	return t.wa.Canonical(ctx, jid).String(), nil
 }

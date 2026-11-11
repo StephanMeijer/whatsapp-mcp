@@ -13,7 +13,7 @@ import (
 )
 
 type ForwardMessageIn struct {
-	FromChatJID string `json:"from_chat_jid" jsonschema:"the chat the message is in"`
+	FromChatJID string `json:"from_chat_jid" jsonschema:"the chat the message is in (a JID or an international phone number such as +31612345678)"`
 	MessageID   string `json:"message_id" jsonschema:"id of the message to forward"`
 	Recipient   string `json:"recipient" jsonschema:"where to forward it: a JID or an international phone number"`
 }
@@ -26,7 +26,10 @@ func (t *tools) forwardMessage(ctx context.Context, _ *mcp.CallToolRequest, in F
 	if err != nil {
 		return nil, Message{}, err
 	}
-	from := t.canonicalChat(ctx, in.FromChatJID)
+	from, err := t.canonicalChat(ctx, in.FromChatJID)
+	if err != nil {
+		return nil, Message{}, fmt.Errorf("from_chat_jid: %w", err)
+	}
 	m, err := t.store.MessageByID(ctx, from, in.MessageID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, Message{}, fmt.Errorf("message %s not found in chat %s", in.MessageID, from)

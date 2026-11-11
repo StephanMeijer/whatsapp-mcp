@@ -18,7 +18,7 @@ const (
 )
 
 type MessageContextIn struct {
-	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID, from a search or list result"`
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID (from a search or list result) or an international phone number such as +31612345678"`
 	MessageID string `json:"message_id" jsonschema:"the message id, from a search or list result"`
 	Before    *int   `json:"before,omitempty" jsonschema:"messages before it (default 5, max 50)"`
 	After     *int   `json:"after,omitempty" jsonschema:"messages after it (default 5, max 50)"`
@@ -53,7 +53,10 @@ func (t *tools) messageContext(ctx context.Context, _ *mcp.CallToolRequest, in M
 	if err != nil {
 		return nil, MessageContextOut{}, err
 	}
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, MessageContextOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
 
 	msgs, target, err := t.store.MessageContext(ctx, chat, in.MessageID, before, after)
 	if errors.Is(err, store.ErrNotFound) {
