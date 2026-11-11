@@ -264,6 +264,27 @@ func TestRetrySave(t *testing.T) {
 	}
 }
 
+// Once Stop begins, a history sync archives no further conversations, so
+// Stop does not wait for the rest of a large blob.
+func TestHistorySyncStopsOnShutdown(t *testing.T) {
+	c, _, _, _ := newTestClient(t)
+	c.stopBg()
+	c.onHistorySync(historySync(waHistorySync.HistorySync_RECENT,
+		&waHistorySync.Conversation{ID: proto.String(alicePN.String()),
+			Messages: []*waHistorySync.HistorySyncMsg{webMsg("A1", false, 100, "", text("hi"))}},
+		&waHistorySync.Conversation{ID: proto.String(bobPN.String()),
+			Messages: []*waHistorySync.HistorySyncMsg{webMsg("B1", false, 101, "", text("hi"))}},
+	))
+	for _, m := range []struct {
+		chat types.JID
+		id   string
+	}{{alicePN, "A1"}, {bobPN, "B1"}} {
+		if _, err := c.store.MessageByID(context.Background(), m.chat.String(), m.id); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("%s after Stop: %v, want not archived", m.id, err)
+		}
+	}
+}
+
 // Stop must not return while a handler is still writing to the archive,
 // which main closes right after.
 func TestStopWaitsForHandlers(t *testing.T) {

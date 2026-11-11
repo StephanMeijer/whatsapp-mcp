@@ -115,7 +115,12 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 	onDemand := e.Data.GetSyncType() == waHistorySync.HistorySync_ON_DEMAND
 	convs := e.Data.GetConversations()
 	saved, skipped := 0, 0
-	for _, conv := range convs {
+	for i, conv := range convs {
+		// Stop waits for this handler, so leave the rest of a long blob unarchived.
+		if c.bgCtx.Err() != nil {
+			c.log.Warn("history sync: stopping, conversations left unarchived", "count", len(convs)-i)
+			break
+		}
 		chatJID, err := types.ParseJID(conv.GetID())
 		if err != nil {
 			c.log.Warn("history sync: bad chat JID", "jid", conv.GetID(), "err", err)
