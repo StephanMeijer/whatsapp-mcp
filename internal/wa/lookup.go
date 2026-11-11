@@ -28,9 +28,12 @@ type NumberCheck struct {
 // NormalizePhone turns a phone number as people write it ("+31 6 1234 5678",
 // "0031 6 12345678") into "+" and its digits. The country code is required,
 // as "+" or "00": a national number such as "06 12345678" is rejected rather
-// than guessed at, since it would silently look up the wrong person.
+// than guessed at, since it would silently look up the wrong person. A
+// bracketed trunk zero ("+31 (0)6 …") is dropped.
 func NormalizePhone(s string) (string, error) {
 	rest, plus := strings.CutPrefix(strings.TrimSpace(s), "+")
+	// "(0)" is the national trunk prefix, never dialled after a country code.
+	rest = strings.Replace(rest, "(0)", "", 1)
 	var digits strings.Builder
 	for _, r := range rest {
 		switch {
