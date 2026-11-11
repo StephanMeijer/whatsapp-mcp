@@ -335,7 +335,7 @@ right after pairing. So the server keeps:
 
 1. **whatsmeow's device store**: identity keys and Signal sessions. Without it every restart
    needs a new QR scan and old sessions can't be decrypted. Tables are prefixed `whatsmeow_`.
-2. **The message archive** (`chats`, `messages`), which the tools read.
+2. **The message archive** (`chats`, `messages`, `calls`, `receipts`, `poll_votes`), which the tools read.
 
 WhatsApp increasingly addresses people by a privacy ID (`…@lid`) instead of their phone number. The
 archive stores each person under their phone-number JID whenever the mapping is known, and merges
@@ -359,7 +359,7 @@ internal/db          DATABASE_URL → GORM + *sql.DB
 internal/store       archive models, queries, per-dialect search
 internal/wa          whatsmeow client: pairing, event → archive, send
 internal/mcpserver   MCP tools
-internal/httpx       bearer auth
+internal/httpx       bearer auth, Host check
 contrib/systemd      user unit and example env file
 compose.yaml         Docker Compose with Postgres
 ```
@@ -381,7 +381,7 @@ Postgres, and a static build on every push and pull request.
 
 - Thumbnails for sent photos and videos (recipients see a blurred placeholder until they open them)
 - Downloading media archived before `get_media` existed, and media expired from WhatsApp's servers
-- Changing group settings or membership
+- Changing group settings (who may send, who may edit info, join approval)
 - Presence (typing indicators, online status) and archiving incoming reactions
 - Answering or placing calls: only call signalling is supported, not audio or video
 
