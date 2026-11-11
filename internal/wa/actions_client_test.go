@@ -617,3 +617,32 @@ func TestOnMessageStatusRevokeNoGroupLookup(t *testing.T) {
 		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
 	}
 }
+
+func TestOnMessageSecretEditAuthor(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	c.onMessage(liveMessage(alicePN, alicePN, "M1", false, "", text("hi")))
+	edit := func(sender types.JID, to string) {
+		fake.decrypted["M1"] = text(to)
+		c.onMessage(liveMessage(alicePN, sender, "E-"+to, false, "", &waE2E.Message{SecretEncryptedMessage: &waE2E.SecretEncryptedMessage{
+			TargetMessageKey: &waCommon.MessageKey{ID: proto.String("M1")},
+			SecretEncType:    waE2E.SecretEncryptedMessage_MESSAGE_EDIT.Enum(),
+		}}))
+	}
+	textOf := func() string {
+		t.Helper()
+		m, err := c.store.MessageByID(context.Background(), alicePN.String(), "M1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Text
+	}
+
+	edit(bobPN, "forged")
+	if got := textOf(); got != "hi" {
+		t.Errorf("M1 after a forged secret edit = %q", got)
+	}
+	edit(alicePN, "hi there")
+	if got := textOf(); got != "hi there" {
+		t.Errorf("M1 after Alice's secret edit = %q", got)
+	}
+}
