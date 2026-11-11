@@ -475,22 +475,12 @@ func (s *Store) ApplyEdit(ctx context.Context, chatJID, messageID, text string, 
 // bring the message back. It reports false when the message isn't archived
 // or was already deleted.
 func (s *Store) MarkDeleted(ctx context.Context, chatJID, messageID string) (bool, error) {
-	var deleted bool
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		res := tx.Model(&Message{}).
-			Where("chat_jid = ? AND message_id = ? AND deleted = ?", chatJID, messageID, false).
-			Updates(map[string]any{"deleted": true, "text": "", "media_ref": nil})
-		if res.Error != nil || res.RowsAffected == 0 {
-			return res.Error
-		}
-		deleted = true
-		// Who read it and how people voted go with the message.
-		if err := tx.Where("chat_jid = ? AND message_id = ?", chatJID, messageID).Delete(&Receipt{}).Error; err != nil {
-			return err
-		}
-		return tx.Where("chat_jid = ? AND poll_id = ?", chatJID, messageID).Delete(&PollVote{}).Error
+	var n int64
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) (err error) {
+		n, err = deleteMessages(tx, "chat_jid = ? AND message_id = ?", chatJID, messageID)
+		return err
 	})
-	return deleted, err
+	return n > 0, err
 }
 
 // KeepMessage records that a message was kept in the chat for everyone, so
@@ -507,25 +497,30 @@ func (s *Store) KeepMessage(ctx context.Context, chatJID, messageID string) (boo
 // disappearing timer ran out at or before now, and reports how many.
 func (s *Store) ExpireMessages(ctx context.Context, now int64) (int64, error) {
 	var expired int64
-	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		due := func() *gorm.DB {
-			return tx.Model(&Message{}).Select("chat_jid, message_id").
-				Where("expires_at > 0 AND expires_at <= ? AND deleted = ?", now, false)
-		}
-		// Receipts and votes first: once marked deleted, the messages no longer match.
-		if err := tx.Where("(chat_jid, message_id) IN (?)", due()).Delete(&Receipt{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("(chat_jid, poll_id) IN (?)", due()).Delete(&PollVote{}).Error; err != nil {
-			return err
-		}
-		res := tx.Model(&Message{}).
-			Where("expires_at > 0 AND expires_at <= ? AND deleted = ?", now, false).
-			Updates(map[string]any{"deleted": true, "text": "", "media_ref": nil})
-		expired = res.RowsAffected
-		return res.Error
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) (err error) {
+		expired, err = deleteMessages(tx, "expires_at > 0 AND expires_at <= ?", now)
+		return err
 	})
 	return expired, err
+}
+
+// deleteMessages deletes, for everyone, the not yet deleted messages that
+// where selects: it clears their text and media, keeping the rows, and drops
+// their receipts and, for polls, their votes. It reports how many messages
+// it deleted. Run it in a transaction.
+func deleteMessages(tx *gorm.DB, where string, args ...any) (int64, error) {
+	targets := func() *gorm.DB {
+		return tx.Model(&Message{}).Where("deleted = ?", false).Where(where, args...)
+	}
+	// Receipts and votes first: once marked deleted, the messages no longer match.
+	if err := tx.Where("(chat_jid, message_id) IN (?)", targets().Select("chat_jid, message_id")).Delete(&Receipt{}).Error; err != nil {
+		return 0, err
+	}
+	if err := tx.Where("(chat_jid, poll_id) IN (?)", targets().Select("chat_jid, message_id")).Delete(&PollVote{}).Error; err != nil {
+		return 0, err
+	}
+	res := targets().Updates(map[string]any{"deleted": true, "text": "", "media_ref": nil})
+	return res.RowsAffected, res.Error
 }
 
 // ErrNotFound is returned when a requested message is not in the archive.
