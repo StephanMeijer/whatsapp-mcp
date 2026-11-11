@@ -15,7 +15,7 @@ import (
 )
 
 type GetMediaIn struct {
-	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID or an international phone number such as +31612345678"`
 	MessageID string `json:"message_id" jsonschema:"id of a message with media_type set (not a poll, location or contact)"`
 }
 
@@ -25,7 +25,10 @@ func (t *tools) getMedia(ctx context.Context, _ *mcp.CallToolRequest, in GetMedi
 	if in.ChatJID == "" || in.MessageID == "" {
 		return nil, nil, errors.New("chat_jid and message_id are required")
 	}
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("chat_jid: %w", err)
+	}
 	m, err := t.store.MessageByID(ctx, chat, in.MessageID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, fmt.Errorf("message %s not found in chat %s", in.MessageID, chat)

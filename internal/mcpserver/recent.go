@@ -20,7 +20,7 @@ const recentDefaultLimit = 200
 type RecentMessagesIn struct {
 	Since         string `json:"since" jsonschema:"RFC 3339; messages at or after this time"`
 	Until         string `json:"until,omitempty" jsonschema:"RFC 3339; only messages before this time"`
-	ChatJID       string `json:"chat_jid,omitempty" jsonschema:"restrict to this chat"`
+	ChatJID       string `json:"chat_jid,omitempty" jsonschema:"restrict to this chat (a JID or an international phone number such as +31612345678)"`
 	IncludeFromMe bool   `json:"include_from_me,omitempty" jsonschema:"also return messages you sent (default false)"`
 	Limit         int    `json:"limit,omitempty" jsonschema:"maximum messages in total (default 200, max 500)"`
 }
@@ -58,7 +58,10 @@ func (t *tools) recentMessages(ctx context.Context, _ *mcp.CallToolRequest, in R
 	if limit <= 0 {
 		limit = recentDefaultLimit
 	}
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, RecentMessagesOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
 
 	msgs, truncated, err := t.store.RecentMessages(ctx, store.RecentQuery{
 		Since: since, Until: until, ChatJID: chat, IncludeFromMe: in.IncludeFromMe, Limit: limit,

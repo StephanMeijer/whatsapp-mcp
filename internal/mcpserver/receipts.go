@@ -13,7 +13,7 @@ import (
 )
 
 type MessageReceiptsIn struct {
-	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID"`
+	ChatJID   string `json:"chat_jid" jsonschema:"the chat's JID or an international phone number such as +31612345678"`
 	MessageID string `json:"message_id" jsonschema:"the id of a message you sent"`
 }
 
@@ -34,7 +34,10 @@ func (t *tools) messageReceipts(ctx context.Context, _ *mcp.CallToolRequest, in 
 	if in.ChatJID == "" || in.MessageID == "" {
 		return nil, MessageReceiptsOut{}, errors.New("chat_jid and message_id are required")
 	}
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, MessageReceiptsOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
 	m, err := t.store.MessageByID(ctx, chat, in.MessageID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, MessageReceiptsOut{}, fmt.Errorf("message %s not found in chat %s", in.MessageID, chat)

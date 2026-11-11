@@ -76,7 +76,7 @@ func (t *tools) listChats(ctx context.Context, _ *mcp.CallToolRequest, in ListCh
 }
 
 type ListMessagesIn struct {
-	ChatJID  string `json:"chat_jid" jsonschema:"the chat's JID, from list_chats"`
+	ChatJID  string `json:"chat_jid" jsonschema:"the chat's JID (from list_chats) or an international phone number such as +31612345678"`
 	BeforeID string `json:"before_id,omitempty" jsonschema:"id of the last message of the previous page; returns the messages before it (overrides before)"`
 	Before   string `json:"before,omitempty" jsonschema:"RFC 3339; only messages sent before this time (coarse: skips messages sharing that second, so prefer before_id for paging)"`
 	Limit    int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
@@ -90,9 +90,11 @@ func (t *tools) listMessages(ctx context.Context, _ *mcp.CallToolRequest, in Lis
 	if in.ChatJID == "" {
 		return nil, MessagesOut{}, errors.New("chat_jid is required")
 	}
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, MessagesOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
 	var msgs []store.Message
-	var err error
 	if in.BeforeID != "" {
 		msgs, err = t.store.ListMessagesBefore(ctx, chat, in.BeforeID, in.Limit)
 		if errors.Is(err, store.ErrNotFound) {
@@ -115,12 +117,15 @@ func (t *tools) listMessages(ctx context.Context, _ *mcp.CallToolRequest, in Lis
 
 type SearchMessagesIn struct {
 	Query   string `json:"query" jsonschema:"words to search for"`
-	ChatJID string `json:"chat_jid,omitempty" jsonschema:"restrict to this chat"`
+	ChatJID string `json:"chat_jid,omitempty" jsonschema:"restrict to this chat (a JID or an international phone number such as +31612345678)"`
 	Limit   int    `json:"limit,omitempty" jsonschema:"maximum results (default 50, max 500)"`
 }
 
 func (t *tools) searchMessages(ctx context.Context, _ *mcp.CallToolRequest, in SearchMessagesIn) (*mcp.CallToolResult, MessagesOut, error) {
-	chat := t.canonicalChat(ctx, in.ChatJID)
+	chat, err := t.canonicalChat(ctx, in.ChatJID)
+	if err != nil {
+		return nil, MessagesOut{}, fmt.Errorf("chat_jid: %w", err)
+	}
 	msgs, err := t.store.SearchMessages(ctx, in.Query, chat, in.Limit)
 	if err != nil {
 		return nil, MessagesOut{}, err
