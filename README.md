@@ -221,7 +221,7 @@ Things to know:
 One database holds the WhatsApp device keys and the whole message archive. WhatsApp cannot resend
 history, so a lost database means pairing again with an empty archive, and messages received after
 your last backup are not in it. A backup holds the keys: protect it like a secret. Take one before
-pulling a new image.
+pulling a new image. The commands below write backups only you can read.
 
 **SQLite** (the binary, systemd, `docker run`). Stop the server and copy the database; after a clean
 stop the one file holds everything. Copying it while the server runs misses the `-wal` file next to
@@ -239,21 +239,23 @@ The image has no shell, so back up its volume from a throwaway container, with t
 
 ```sh
 docker stop whatsapp-mcp
-docker run --rm -v whatsapp-mcp-data:/data:ro -v "$PWD":/out busybox \
-  tar czf /out/whatsapp-mcp-data.tgz -C /data .
+(umask 077; docker run --rm -v whatsapp-mcp-data:/data:ro busybox \
+  tar czf - -C /data . > whatsapp-mcp-data.tgz)
 docker start whatsapp-mcp
 
-# restore
+# restore: check the archive before emptying the volume
 docker stop whatsapp-mcp
-docker run --rm -v whatsapp-mcp-data:/data -v "$PWD":/in busybox \
-  sh -c 'find /data -mindepth 1 -delete && tar xzf /in/whatsapp-mcp-data.tgz -C /data'
+docker run --rm -v whatsapp-mcp-data:/data -v "$PWD":/in:ro busybox sh -c \
+  'tar tzf /in/whatsapp-mcp-data.tgz >/dev/null && find /data -mindepth 1 -delete &&
+   tar xzf /in/whatsapp-mcp-data.tgz -C /data'
 docker start whatsapp-mcp
 ```
 
 **Postgres** (Docker Compose). The dump drops and recreates every table when it is restored:
 
 ```sh
-docker compose exec -T postgres pg_dump -U whatsapp --clean --if-exists whatsapp > whatsapp.sql
+(umask 077; docker compose exec -T postgres \
+  pg_dump -U whatsapp --clean --if-exists whatsapp > whatsapp.sql)
 
 # restore
 docker compose stop whatsapp-mcp
