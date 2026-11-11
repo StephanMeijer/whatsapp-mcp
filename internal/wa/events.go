@@ -64,7 +64,9 @@ func (c *Client) onMessage(e *events.Message) {
 		return
 	}
 	if ch, ok := c.changeFor(ctx, e, canon); ok {
-		c.applyChange(ctx, ch)
+		if c.mayChange(ctx, e, ch, canon) {
+			c.applyChange(ctx, ch)
+		}
 		return
 	}
 	m, ok := toMessage(e, canon)

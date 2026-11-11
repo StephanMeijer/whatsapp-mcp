@@ -478,3 +478,83 @@ func TestWatchPairing(t *testing.T) {
 		})
 	}
 }
+
+func TestOnMessageChangeAuthor(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	c.groupLookups.Store(testGroup.String(), struct{}{}) // no background name lookup
+	edit := func(chat, sender types.JID, fromMe bool, target, to string) {
+		e := liveMessage(chat, sender, "E-"+target, fromMe, "", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+			Type:          waE2E.ProtocolMessage_MESSAGE_EDIT.Enum(),
+			Key:           &waCommon.MessageKey{ID: proto.String(target)},
+			EditedMessage: text(to),
+			TimestampMS:   proto.Int64(300_000),
+		}})
+		e.IsEdit = true
+		c.onMessage(e)
+	}
+	revoke := func(chat, sender types.JID, fromMe bool, target string) {
+		c.onMessage(liveMessage(chat, sender, "R-"+target, fromMe, "", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+			Type: waE2E.ProtocolMessage_REVOKE.Enum(),
+			Key:  &waCommon.MessageKey{ID: proto.String(target)},
+		}}))
+	}
+	textOf := func(chat types.JID, id string) string {
+		t.Helper()
+		m, err := c.store.MessageByID(context.Background(), chat.String(), id)
+		if errors.Is(err, store.ErrNotFound) {
+			return "<deleted>"
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m.Text
+	}
+
+	c.onMessage(liveMessage(alicePN, aliceLID, "M1", false, "", text("hi")))
+	c.onMessage(liveMessage(alicePN, ownJID, "O1", true, "", text("mine")))
+
+	edit(alicePN, bobPN, false, "M1", "forged")
+	revoke(alicePN, bobPN, false, "M1")
+	edit(alicePN, alicePN, false, "O1", "forged")
+	revoke(alicePN, alicePN, false, "O1")
+	if got := textOf(alicePN, "M1"); got != "hi" {
+		t.Errorf("M1 after others' changes = %q", got)
+	}
+	if got := textOf(alicePN, "O1"); got != "mine" {
+		t.Errorf("O1 after others' changes = %q", got)
+	}
+
+	// The author may edit, also when the edit comes from her LID device.
+	edit(alicePN, types.JID{User: aliceLID.User, Device: 3, Server: types.HiddenUserServer}, false, "M1", "hi there")
+	if got := textOf(alicePN, "M1"); got != "hi there" {
+		t.Errorf("M1 after Alice's edit = %q", got)
+	}
+	// The account's own devices: an own edit and a revoke apply.
+	edit(alicePN, ownLID, true, "O1", "mine, edited")
+	if got := textOf(alicePN, "O1"); got != "mine, edited" {
+		t.Errorf("O1 after own edit = %q", got)
+	}
+
+	// In a group, a member may not delete another's message; an admin may.
+	c.onMessage(liveMessage(testGroup, alicePN, "G1", false, "", text("group hi")))
+	fake.groups[testGroup] = &types.GroupInfo{JID: testGroup, Participants: []types.GroupParticipant{
+		{JID: alicePN}, {JID: bobLID, PhoneNumber: bobPN},
+	}}
+	revoke(testGroup, bobPN, false, "G1")
+	if got := textOf(testGroup, "G1"); got != "group hi" {
+		t.Errorf("G1 after a member's deletion = %q", got)
+	}
+	fake.groups[testGroup].Participants[1].IsAdmin = true
+	edit(testGroup, bobLID, false, "G1", "forged")
+	if got := textOf(testGroup, "G1"); got != "group hi" {
+		t.Errorf("G1 after an admin's edit = %q", got)
+	}
+	revoke(testGroup, bobLID, false, "G1")
+	if got := textOf(testGroup, "G1"); got != "<deleted>" {
+		t.Errorf("G1 after an admin's deletion = %q", got)
+	}
+	revoke(alicePN, ownJID, true, "O1")
+	if got := textOf(alicePN, "O1"); got != "<deleted>" {
+		t.Errorf("O1 after own deletion = %q", got)
+	}
+}
