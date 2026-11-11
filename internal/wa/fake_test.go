@@ -136,6 +136,7 @@ type fakeWA struct {
 	connectErr    error
 
 	groups      map[types.JID]*types.GroupInfo
+	groupBlock  chan struct{} // when set, GetGroupInfo waits for it to close
 	groupErr    error
 	joined      []*types.GroupInfo
 	joinedErr   error
@@ -279,8 +280,14 @@ func (f *fakeWA) DownloadToFile(_ context.Context, _ whatsmeow.DownloadableMessa
 
 func (f *fakeWA) GetGroupInfo(_ context.Context, jid types.JID) (*types.GroupInfo, error) {
 	f.mu.Lock()
-	defer f.mu.Unlock()
 	f.groupInfoCalls = append(f.groupInfoCalls, jid)
+	block := f.groupBlock
+	f.mu.Unlock()
+	if block != nil {
+		<-block // after recording the call, so a test can see it is blocked
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.groupErr != nil {
 		return nil, f.groupErr
 	}

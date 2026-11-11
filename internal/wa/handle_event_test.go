@@ -4,10 +4,13 @@ package wa
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
 
+	"go.mau.fi/whatsmeow/proto/waCommon"
+	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/proto/waSyncAction"
 	"go.mau.fi/whatsmeow/types"
@@ -217,5 +220,82 @@ func TestStatusUpdateStartsNoGroupLookup(t *testing.T) {
 	c.bg.Wait()
 	if len(fake.groupInfoCalls) != 0 {
 		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
+	}
+}
+
+func TestRetrySave(t *testing.T) {
+	ctx := context.Background()
+	failing := errors.New("database is closed")
+
+	calls := 0
+	err := retrySave(ctx, nil, func() error {
+		if calls++; calls < 3 {
+			return failing
+		}
+		return nil
+	})
+	if err != nil || calls != 3 {
+		t.Errorf("fails twice: err %v after %d calls, want nil after 3", err, calls)
+	}
+
+	short, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if err := retrySave(short, nil, func() error { return failing }); !errors.Is(err, failing) || time.Since(start) > time.Second {
+		t.Errorf("always failing: %v after %v, want the last error once ctx ends", err, time.Since(start))
+	}
+
+	stop := make(chan struct{})
+	close(stop)
+	calls = 0
+	if err := retrySave(ctx, stop, func() error { calls++; return failing }); !errors.Is(err, failing) || calls != 1 {
+		t.Errorf("stopped: %v after %d calls, want the error after 1", err, calls)
+	}
+}
+
+// Stop must not return while a handler is still writing to the archive,
+// which main closes right after.
+func TestStopWaitsForHandlers(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	c.groupLookups.Store(testGroup.String(), struct{}{}) // no background name lookup
+	c.handleEvent(liveMessage(testGroup, alicePN, "G1", false, "", text("hi")))
+	fake.groups[testGroup] = &types.GroupInfo{JID: testGroup, Participants: []types.GroupParticipant{{JID: alicePN}, {JID: bobPN}}}
+	fake.groupBlock = make(chan struct{})
+
+	// Bob is not the author, so the handler asks WhatsApp whether he is an admin, and blocks there.
+	handled := make(chan struct{})
+	go func() {
+		defer close(handled)
+		c.handleEvent(liveMessage(testGroup, bobPN, "R1", false, "", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+			Type: waE2E.ProtocolMessage_REVOKE.Enum(),
+			Key:  &waCommon.MessageKey{ID: proto.String("G1")},
+		}}))
+	}()
+	for !func() bool { fake.mu.Lock(); defer fake.mu.Unlock(); return len(fake.groupInfoCalls) > 0 }() {
+		select {
+		case <-handled:
+			t.Fatal("handler returned without asking for the group's admins")
+		case <-time.After(time.Millisecond):
+		}
+	}
+	stopped := make(chan struct{})
+	go func() { c.Stop(); close(stopped) }()
+	select {
+	case <-stopped:
+		t.Fatal("Stop returned while a handler was running")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(fake.groupBlock)
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after the handler did")
+	}
+	<-handled
+
+	// Events after Stop are dropped.
+	c.handleEvent(liveMessage(alicePN, alicePN, "LATE", false, "", text("late")))
+	if _, err := c.store.MessageByID(context.Background(), alicePN.String(), "LATE"); !errors.Is(err, store.ErrNotFound) {
+		t.Errorf("message after Stop: %v, want not archived", err)
 	}
 }
