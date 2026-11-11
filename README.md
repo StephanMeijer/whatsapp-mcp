@@ -230,9 +230,10 @@ it. To restore, stop the server, put the file back and delete any `whatsapp.db-w
 
 ```sh
 systemctl --user stop whatsapp-mcp
-cp ~/.local/state/whatsapp-mcp/whatsapp.db whatsapp-backup.db
+(umask 077; cp ~/.local/state/whatsapp-mcp/whatsapp.db whatsapp-backup.db)
 systemctl --user start whatsapp-mcp
-# or, while it runs, with the sqlite3 shell: sqlite3 <path>/whatsapp.db ".backup whatsapp-backup.db"
+# or, while it runs, with the sqlite3 shell:
+# (umask 077; sqlite3 <path>/whatsapp.db ".backup whatsapp-backup.db")
 ```
 
 The image has no shell, so back up its volume from a throwaway container, with the server stopped:
