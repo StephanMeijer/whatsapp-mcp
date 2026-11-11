@@ -5,10 +5,12 @@ package wa
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.mau.fi/whatsmeow/proto/waCommon"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
@@ -250,6 +252,15 @@ func TestRetrySave(t *testing.T) {
 	calls = 0
 	if err := retrySave(ctx, stop, func() error { calls++; return failing }); !errors.Is(err, failing) || calls != 1 {
 		t.Errorf("stopped: %v after %d calls, want the error after 1", err, calls)
+	}
+
+	// Postgres rejects U+0000 in text on every attempt.
+	permanent := fmt.Errorf("save messages: %w", &pgconn.PgError{Code: "22021"})
+	bounded, cancelBounded := context.WithTimeout(ctx, time.Second) // without the check, it retries until here
+	defer cancelBounded()
+	calls = 0
+	if err := retrySave(bounded, nil, func() error { calls++; return permanent }); !errors.Is(err, permanent) || calls != 1 {
+		t.Errorf("data error: %v after %d calls, want the error after 1", err, calls)
 	}
 }
 

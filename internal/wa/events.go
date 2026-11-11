@@ -5,8 +5,10 @@ package wa
 import (
 	"cmp"
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/types"
@@ -262,13 +264,14 @@ func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 }
 
 // retrySave calls save until it succeeds, waiting longer after each failure,
-// and gives up with the last error when ctx ends or stop is closed.
+// and gives up with the last error when ctx ends, stop is closed, or the
+// error is one a retry would only repeat.
 func retrySave(ctx context.Context, stop <-chan struct{}, save func() error) error {
 	wait := saveRetryFirst
 	for {
 		err := save()
-		if err == nil {
-			return nil
+		if err == nil || !retryable(err) {
+			return err
 		}
 		t := time.NewTimer(wait)
 		select {
@@ -282,4 +285,16 @@ func retrySave(ctx context.Context, stop <-chan struct{}, save func() error) err
 		}
 		wait = min(2*wait, saveRetryMax)
 	}
+}
+
+// retryable reports whether err may go away on a retry. A Postgres data
+// exception (class 22, such as U+0000 in text) or integrity constraint
+// violation (class 23) fails the same way every time.
+func retryable(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		class := pgErr.Code[:min(2, len(pgErr.Code))]
+		return class != "22" && class != "23"
+	}
+	return true
 }
