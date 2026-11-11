@@ -5,8 +5,10 @@ package wa
 import (
 	"cmp"
 	"context"
+	"errors"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/proto/waHistorySync"
 	"go.mau.fi/whatsmeow/types"
@@ -22,9 +24,21 @@ const (
 	reconcileTimeout = 2 * time.Minute
 	// historySyncTimeout bounds archiving one history sync blob.
 	historySyncTimeout = 5 * time.Minute
+	// saveRetryFirst and saveRetryMax bound the wait between archive write attempts.
+	saveRetryFirst = 250 * time.Millisecond
+	saveRetryMax   = 5 * time.Second
 )
 
 func (c *Client) handleEvent(evt any) {
+	c.handlersMu.Lock()
+	if c.stopped {
+		c.handlersMu.Unlock()
+		return
+	}
+	c.handlers.Add(1)
+	c.handlersMu.Unlock()
+	defer c.handlers.Done()
+
 	switch e := evt.(type) {
 	case *events.Message:
 		c.onMessage(e)
@@ -80,8 +94,10 @@ func (c *Client) onMessage(e *events.Message) {
 	if !e.Info.IsGroup && !e.Info.IsFromMe && e.Info.PushName != "" {
 		chats = append(chats, store.Chat{JID: m.ChatJID, Name: e.Info.PushName})
 	}
-	if err := c.store.Save(ctx, chats, []store.Message{m}); err != nil {
-		c.log.Error("archive message", "err", err, "chat", m.ChatJID, "id", m.MessageID)
+	// WhatsApp delivers a message once, so a failed write is retried.
+	if err := retrySave(ctx, c.bgCtx.Done(), func() error { return c.store.Save(ctx, chats, []store.Message{m}) }); err != nil {
+		c.log.Error("archive message", "err", err, "chat", m.ChatJID, "id", m.MessageID,
+			"timestamp", time.Unix(m.Timestamp, 0).UTC().Format(time.RFC3339))
 		return
 	}
 	// After saving, so a brand-new group's chat exists to be named.
@@ -99,7 +115,12 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 	onDemand := e.Data.GetSyncType() == waHistorySync.HistorySync_ON_DEMAND
 	convs := e.Data.GetConversations()
 	saved, skipped := 0, 0
-	for _, conv := range convs {
+	for i, conv := range convs {
+		// Stop waits for this handler, so leave the rest of a long blob unarchived.
+		if c.bgCtx.Err() != nil {
+			c.log.Warn("history sync: stopping, conversations left unarchived", "count", len(convs)-i)
+			break
+		}
 		chatJID, err := types.ParseJID(conv.GetID())
 		if err != nil {
 			c.log.Warn("history sync: bad chat JID", "jid", conv.GetID(), "err", err)
@@ -144,7 +165,7 @@ func (c *Client) onHistorySync(e *events.HistorySync) {
 			}
 		}
 		ctx, cancel := context.WithTimeout(syncCtx, saveTimeout)
-		err = c.store.Save(ctx, []store.Chat{chat}, msgs)
+		err = retrySave(ctx, c.bgCtx.Done(), func() error { return c.store.Save(ctx, []store.Chat{chat}, msgs) })
 		if err == nil {
 			// After saving, so changes can target originals from the same batch.
 			for _, ch := range changes {
@@ -245,4 +266,40 @@ func messageContent(m *waE2E.Message) (text string, mediaType store.MediaKind) {
 		return text, store.MediaContact
 	}
 	return "", ""
+}
+
+// retrySave calls save until it succeeds, waiting longer after each failure,
+// and gives up with the last error when ctx ends, stop is closed, or the
+// error is one a retry would only repeat.
+func retrySave(ctx context.Context, stop <-chan struct{}, save func() error) error {
+	wait := saveRetryFirst
+	for {
+		err := save()
+		if err == nil || !retryable(err) {
+			return err
+		}
+		t := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			t.Stop()
+			return err
+		case <-stop:
+			t.Stop()
+			return err
+		case <-t.C:
+		}
+		wait = min(2*wait, saveRetryMax)
+	}
+}
+
+// retryable reports whether err may go away on a retry. A Postgres data
+// exception (class 22, such as U+0000 in text) or integrity constraint
+// violation (class 23) fails the same way every time.
+func retryable(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		class := pgErr.Code[:min(2, len(pgErr.Code))]
+		return class != "22" && class != "23"
+	}
+	return true
 }

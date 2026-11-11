@@ -45,12 +45,16 @@ type Client struct {
 	mu sync.RWMutex
 	qr string // current pairing code, empty when none is pending
 
-	reconcileMu     sync.Mutex         // held by the one reconcile worker while it runs
-	reconcileWanted atomic.Bool        // a reconcile pass was requested since the last one started
-	reconcileGroups atomic.Bool        // the requested pass must also sync group names
-	bg              sync.WaitGroup     // goroutines Stop waits for: the reconcile worker and group name lookups
-	bgCtx           context.Context    // parent of every bg goroutine's context; Stop cancels it
-	stopBg          context.CancelFunc // cancels bgCtx
+	reconcileMu     sync.Mutex      // held by the one reconcile worker while it runs
+	reconcileWanted atomic.Bool     // a reconcile pass was requested since the last one started
+	reconcileGroups atomic.Bool     // the requested pass must also sync group names
+	bg              sync.WaitGroup  // goroutines Stop waits for: the reconcile worker and group name lookups
+	bgCtx           context.Context // parent of every bg goroutine's context; Stop cancels it
+
+	handlersMu sync.Mutex         // guards stopped and handlers.Add
+	stopped    bool               // Stop was called: events start no new handler
+	handlers   sync.WaitGroup     // event handlers running now, which Stop waits for
+	stopBg     context.CancelFunc // cancels bgCtx
 
 	fetches    pendingFetches // on-demand history requests awaiting the phone
 	fetchLimit rateLimit
@@ -162,12 +166,17 @@ func (c *Client) QRCode() string {
 	return c.qr
 }
 
-// Stop disconnects, cancels background work and waits for it to abort its
-// current statement, so the archive can be closed afterwards. Events whatsmeow
-// still delivers after Stop start no new work.
+// Stop disconnects, cancels background work and waits for it and for event
+// handlers still writing to finish their current statement, so the archive
+// can be closed afterwards. Events whatsmeow still delivers after Stop are
+// dropped.
 func (c *Client) Stop() {
 	c.cli.Disconnect()
+	c.handlersMu.Lock()
+	c.stopped = true
+	c.handlersMu.Unlock()
 	c.stopBg()
+	c.handlers.Wait()
 	c.bg.Wait()
 }
 
