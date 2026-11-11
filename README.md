@@ -207,7 +207,7 @@ shuts the server down cleanly and exits with status 0.
 Things to know:
 
 - `~/.local/state/whatsapp-mcp/` holds the WhatsApp session and your message archive. Back it up
-  and protect it like a secret.
+  (see [Backup and restore](#backup-and-restore)) and protect it like a secret.
 - The token is kept out of `ps aux` and the unit, but the same user can still read it from the env
   file or the process environment. The service protects against other users, not against you.
 - The sandbox options (`PrivateUsers=`, `ProtectSystem=` and the rest) need unprivileged user
@@ -215,6 +215,60 @@ Things to know:
   fallback. Check what is applied with `systemd-analyze --user security whatsapp-mcp`.
 - A user manager cannot wait for the network. If the network is not up at boot, the server exits
   and the unit retries every 10 seconds.
+
+## Backup and restore
+
+One database holds the WhatsApp device keys and the whole message archive. WhatsApp cannot resend
+history, so a lost database means pairing again with an empty archive, and messages received after
+your last backup are not in it. A backup holds the keys: protect it like a secret. Take one before
+pulling a new image. The commands below write backups only you can read.
+
+**SQLite** (the binary, systemd, `docker run`). Stop the server and copy the database; after a clean
+stop the one file holds everything. Copying it while the server runs misses the `-wal` file next to
+it. To restore, stop the server, put the file back and delete any `whatsapp.db-wal` and
+`whatsapp.db-shm` beside it.
+
+```sh
+systemctl --user stop whatsapp-mcp
+(umask 077; cp ~/.local/state/whatsapp-mcp/whatsapp.db whatsapp-backup.db)
+systemctl --user start whatsapp-mcp
+# or, while it runs, with the sqlite3 shell:
+# (umask 077; sqlite3 <path>/whatsapp.db ".backup whatsapp-backup.db")
+```
+
+The image has no shell, so back up its volume from a throwaway container, with the server stopped:
+
+```sh
+docker stop whatsapp-mcp
+(umask 077; docker run --rm -v whatsapp-mcp-data:/data:ro busybox \
+  tar czf - -C /data . > whatsapp-mcp-data.tgz)
+docker start whatsapp-mcp
+
+# restore: check the archive before emptying the volume
+docker stop whatsapp-mcp
+docker run --rm -v whatsapp-mcp-data:/data -v "$PWD":/in:ro busybox sh -c \
+  'tar tzf /in/whatsapp-mcp-data.tgz >/dev/null && find /data -mindepth 1 -delete &&
+   tar xzf /in/whatsapp-mcp-data.tgz -C /data'
+docker start whatsapp-mcp
+```
+
+**Postgres** (Docker Compose). The dump drops and recreates every table when it is restored:
+
+```sh
+(umask 077; docker compose exec -T postgres \
+  pg_dump -U whatsapp --clean --if-exists whatsapp > whatsapp.sql)
+
+# restore
+docker compose stop whatsapp-mcp
+docker compose exec -T postgres psql -U whatsapp -d whatsapp -v ON_ERROR_STOP=1 -1 < whatsapp.sql
+docker compose start whatsapp-mcp
+```
+
+`docker compose down -v` deletes the `pgdata` volume, and with it the database.
+
+Restore only with the server stopped. A restore also rolls the encryption sessions back to the time
+of the backup, so messages from some contacts may fail to decrypt for a while afterwards, until
+WhatsApp renews those sessions.
 
 ## Remote access over TLS
 
