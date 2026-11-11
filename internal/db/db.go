@@ -42,10 +42,15 @@ func Open(rawURL string) (*DB, error) {
 	var dialector gorm.Dialector
 	switch dialect {
 	case SQLite:
-		if dir := filepath.Dir(dsn); dir != "." {
+		dir := filepath.Dir(dsn)
+		if dir != "." {
 			if err := os.MkdirAll(dir, 0o700); err != nil {
 				return nil, fmt.Errorf("create database directory: %w", err)
 			}
+		}
+		// SQLite reports an unwritable directory as "out of memory (14)".
+		if err := checkWritable(dir); err != nil {
+			return nil, err
 		}
 		dialector = sqlite.Open(sqliteDSN(dsn))
 	case Postgres:
@@ -64,6 +69,17 @@ func Open(rawURL string) (*DB, error) {
 		return nil, err
 	}
 	return &DB{Gorm: g, SQL: sqlDB, Dialect: dialect}, nil
+}
+
+// checkWritable fails, naming dir and the user, when dir does not accept new
+// files, as SQLite needs for the database and its -wal and -shm files.
+func checkWritable(dir string) error {
+	f, err := os.CreateTemp(dir, ".write-test-*")
+	if err != nil {
+		return fmt.Errorf("database directory %s is not writable by uid %d: %w", dir, os.Getuid(), err)
+	}
+	f.Close()
+	return os.Remove(f.Name())
 }
 
 // Close closes the underlying connection pool.
