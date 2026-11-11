@@ -150,7 +150,8 @@ echo 'WHATSAPP_MCP_VERSION=0.6.0' >> .env
 
 To upgrade or roll back, [take a backup](#backup-and-restore), change the version, then run
 `docker compose pull && docker compose up -d --wait`. The version is in the server's start-up log
-line. `docker compose up -d --build --wait` builds and runs this checkout instead.
+line. `docker compose up -d --build --wait` builds and runs this checkout instead, as version `dev`;
+it replaces the local image under the pinned tag, so run `docker compose pull` to go back to the release.
 
 Things to know:
 
