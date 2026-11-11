@@ -4,6 +4,7 @@ package wa
 
 import (
 	"context"
+	"errors"
 
 	"github.com/StephanMeijer/whatsapp-mcp/internal/store"
 	"go.mau.fi/whatsmeow/proto/waE2E"
@@ -18,6 +19,8 @@ const (
 	changeRevoke
 	changeKeep
 )
+
+var changeNames = map[changeKind]string{changeEdit: "edit", changeRevoke: "deletion", changeKeep: "keep"}
 
 // change is an edit, a deletion for everyone, or a "keep in chat" of an
 // earlier message.
@@ -128,10 +131,68 @@ func (c *Client) applyChange(ctx context.Context, ch change) {
 		c.log.Error("apply message change", "err", err, "chat", ch.chat, "id", ch.target)
 		return
 	}
-	kind := map[changeKind]string{changeEdit: "edit", changeRevoke: "deletion", changeKeep: "keep"}[ch.kind]
+	kind := changeNames[ch.kind]
 	if !applied {
 		c.log.Debug("message change not applied: original not archived, or already newer", "kind", kind, "chat", ch.chat, "id", ch.target)
 		return
 	}
 	c.log.Info("applied message "+kind, "chat", ch.chat, "id", ch.target)
+}
+
+// mayChange reports whether the sender of the live message e may make the
+// edit or deletion ch: only a message's author may edit it, and only its
+// author or a group admin may delete it. WhatsApp checks neither on receipt,
+// so without this anyone in a chat could rewrite what others said in the
+// archive. The account's own devices are trusted: the phone already checked.
+func (c *Client) mayChange(ctx context.Context, e *events.Message, ch change, canon func(types.JID) types.JID) bool {
+	if ch.kind == changeKeep {
+		return true
+	}
+	target, err := c.store.MessageByID(ctx, ch.chat, ch.target)
+	if errors.Is(err, store.ErrNotFound) {
+		return true // nothing to change; applyChange says so
+	}
+	if err != nil {
+		c.log.Error("look up target of message change", "err", err, "chat", ch.chat, "id", ch.target)
+		return false
+	}
+	sender := canon(e.Info.Sender)
+	switch {
+	case e.Info.IsFromMe:
+		// Own messages are matched by from_me: the sender may be the own LID.
+		if ch.kind == changeRevoke || target.FromMe {
+			return true
+		}
+	case sameUser(sender, target.SenderJID, canon):
+		return true
+	// Not e.Info.IsGroup: whatsmeow sets it for status@broadcast too, which has no admins.
+	case ch.kind == changeRevoke && e.Info.Chat.Server == types.GroupServer && c.isGroupAdmin(ctx, e.Info.Chat, sender, canon):
+		return true
+	}
+	c.log.Warn("ignored "+changeNames[ch.kind]+" from someone other than the author",
+		"chat", ch.chat, "id", ch.target, "sender", sender.String())
+	return false
+}
+
+// sameUser reports whether sender is the archived author, comparing
+// canonical forms: the author may be archived under an @lid whose phone
+// number became known later.
+func sameUser(sender types.JID, author string, canon func(types.JID) types.JID) bool {
+	jid, err := types.ParseJID(author)
+	return err == nil && canon(jid) == sender
+}
+
+// isGroupAdmin asks WhatsApp whether user is an admin of group.
+func (c *Client) isGroupAdmin(ctx context.Context, group, user types.JID, canon func(types.JID) types.JID) bool {
+	info, err := c.cli.GetGroupInfo(ctx, group.ToNonAD())
+	if err != nil {
+		c.log.Warn("look up group admins", "err", err, "group", group.String())
+		return false
+	}
+	for _, p := range info.Participants {
+		if (p.IsAdmin || p.IsSuperAdmin) && canon(participantJID(p)) == user {
+			return true
+		}
+	}
+	return false
 }
