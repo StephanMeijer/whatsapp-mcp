@@ -83,3 +83,21 @@ func TestOpenErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestOpenUnwritableDirectory(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root writes to any directory")
+	}
+	dir := filepath.Join(t.TempDir(), "ro")
+	if err := os.Mkdir(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	d, err := Open("sqlite://" + filepath.Join(dir, "wa.db"))
+	if err == nil {
+		d.Close()
+		t.Fatal("Open in a read-only directory: want error")
+	}
+	if !strings.Contains(err.Error(), "not writable") || !strings.Contains(err.Error(), dir) {
+		t.Errorf("error %q does not say that %s is not writable", err, dir)
+	}
+}

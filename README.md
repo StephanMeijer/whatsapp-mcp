@@ -117,6 +117,10 @@ container keeps the session. The root filesystem is read-only, so `get_media` ne
 `/tmp`: downloads are at most 16 MB each, and 64m leaves room for a few concurrent ones, beyond
 which the call fails rather than growing. The other options from the table above work as environment variables.
 
+To keep the data in a host directory instead of a named volume (`-v /srv/whatsapp-mcp:/data`), make
+it writable by the image's user, uid 65532: `sudo chown 65532:65532 /srv/whatsapp-mcp`. Or run the
+container as yourself with `--user "$(id -u):$(id -g)"`.
+
 ## Run with Docker Compose and Postgres
 
 [`compose.yaml`](compose.yaml) runs the server against Postgres instead of SQLite. It builds the
