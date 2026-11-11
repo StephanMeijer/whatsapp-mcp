@@ -52,6 +52,17 @@ func TestLoad(t *testing.T) {
 			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnableGroupAdmin: true, AllowInviteLinks: true},
 		},
 		{
+			name: "presence by flag, with read-only",
+			args: []string{"-enable-presence", "-read-only"},
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnablePresence: true, ReadOnly: true},
+		},
+		{
+			name: "presence from the environment",
+			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken, "WHATSAPP_MCP_ENABLE_PRESENCE": "true"},
+			want: Config{Addr: "127.0.0.1:8080", DatabaseURL: "sqlite://data/whatsapp.db", AuthToken: testToken, LogLevel: "info", EnablePresence: true},
+		},
+		{
 			name: "group admin by flag",
 			args: []string{"-enable-group-admin"},
 			env:  map[string]string{"WHATSAPP_MCP_TOKEN": testToken},

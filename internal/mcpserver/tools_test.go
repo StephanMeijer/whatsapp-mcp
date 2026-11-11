@@ -258,6 +258,19 @@ func (f *fakeWA) RejectCall(_ context.Context, callID string) (store.Call, error
 	return store.Call{CallID: callID, CallerJID: "31600000001@s.whatsapp.net", Status: store.CallRejected, StartedAt: 1}, nil
 }
 
+func (f *fakeWA) Presence(_ context.Context, jid types.JID) (wa.Presence, error) {
+	f.sent = append(f.sent, "presence "+jid.String())
+	return wa.Presence{JID: jid.String(), State: "online"}, nil
+}
+
+func (f *fakeWA) SetTyping(_ context.Context, chat types.JID, state types.ChatPresence, media types.ChatPresenceMedia) error {
+	if f.writeErr != nil {
+		return f.writeErr
+	}
+	f.sent = append(f.sent, fmt.Sprintf("typing %s %s %s", chat, state, media))
+	return nil
+}
+
 func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer time.Duration) error {
 	if f.writeErr != nil {
 		return f.writeErr

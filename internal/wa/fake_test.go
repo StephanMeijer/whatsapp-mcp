@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -96,6 +97,10 @@ type fakeWA struct {
 	qrCalls     int
 
 	timers []timerCall
+	// SendPresence, SubscribePresence and SendChatPresence record each call
+	// in presence, as "available", "subscribe <jid>" and "<jid> composing audio".
+	presence    []string
+	presenceErr error
 	// CreateGroup returns created and createErr and records each request;
 	// LeaveGroup records the groups left and returns leaveErr.
 	createReqs []whatsmeow.ReqCreateGroup
@@ -258,6 +263,32 @@ func (f *fakeWA) SetDisappearingTimer(_ context.Context, chat types.JID, timer t
 	defer f.mu.Unlock()
 	f.timers = append(f.timers, timerCall{chat, timer})
 	return f.timerErr
+}
+
+func (f *fakeWA) presenceCall(s string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.presence = append(f.presence, s)
+	return f.presenceErr
+}
+
+// presenceCalls is a copy of presence, safe while a lease timer may still fire.
+func (f *fakeWA) presenceCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.presence)
+}
+
+func (f *fakeWA) SendPresence(_ context.Context, state types.Presence) error {
+	return f.presenceCall(string(state))
+}
+
+func (f *fakeWA) SubscribePresence(_ context.Context, jid types.JID) error {
+	return f.presenceCall("subscribe " + jid.String())
+}
+
+func (f *fakeWA) SendChatPresence(_ context.Context, jid types.JID, state types.ChatPresence, media types.ChatPresenceMedia) error {
+	return f.presenceCall(fmt.Sprintf("%s %s %s", jid, state, media))
 }
 
 func (f *fakeWA) Upload(_ context.Context, _ []byte, kind whatsmeow.MediaType) (whatsmeow.UploadResponse, error) {

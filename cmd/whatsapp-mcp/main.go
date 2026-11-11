@@ -94,6 +94,7 @@ func run() error {
 		Logger:          log,
 		MediaDir:        cfg.MediaDir,
 		GroupAdmin:      cfg.EnableGroupAdmin,
+		Presence:        cfg.EnablePresence,
 		InviteLinks:     cfg.AllowInviteLinks,
 		AllowStatus:     cfg.AllowStatus,
 	})
@@ -123,7 +124,7 @@ func run() error {
 	go func() {
 		log.Info("serving MCP", "url", mcpURL, "listen", cfg.Addr, "version", version,
 			"read_only", cfg.ReadOnly, "allowed_recipients", len(cfg.AllowRecipients),
-			"expire_disappearing", cfg.ExpireDisappearing, "group_admin", cfg.EnableGroupAdmin)
+			"expire_disappearing", cfg.ExpireDisappearing, "group_admin", cfg.EnableGroupAdmin, "presence", cfg.EnablePresence)
 		errc <- srv.ListenAndServe()
 	}()
 

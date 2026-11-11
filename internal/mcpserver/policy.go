@@ -26,6 +26,9 @@ type Options struct {
 	MediaDir string
 	// GroupAdmin offers the tools that create, change and leave groups.
 	GroupAdmin bool
+	// Presence offers get_presence and set_typing, which make the account
+	// appear online for a short while.
+	Presence bool
 	// InviteLinks lets group_invite_link work while AllowRecipients is set.
 	InviteLinks bool
 	// AllowStatus lets post_status work while AllowRecipients is set.
@@ -42,12 +45,13 @@ type policy struct {
 	allowed     []types.JID
 	log         *slog.Logger
 	groupAdmin  bool
+	presence    bool
 	inviteLinks bool
 	allowStatus bool
 }
 
 func newPolicy(opts Options) (*policy, error) {
-	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, inviteLinks: opts.InviteLinks, allowStatus: opts.AllowStatus}
+	p := &policy{readOnly: opts.ReadOnly, log: opts.Logger, groupAdmin: opts.GroupAdmin, presence: opts.Presence, inviteLinks: opts.InviteLinks, allowStatus: opts.AllowStatus}
 	if p.log == nil {
 		p.log = slog.Default()
 	}

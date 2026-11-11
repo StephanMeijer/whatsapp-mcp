@@ -56,6 +56,8 @@ type Client struct {
 	fetchLimit rateLimit
 	groupModes sync.Map // types.JID -> bool: whether the group uses LID addressing
 
+	presence presenceState
+
 	groupLookups sync.Map // group JID -> struct{}: groups whose missing name was looked up this run
 }
 

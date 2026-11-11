@@ -41,6 +41,7 @@ session without a new QR code.
 | `-log-level` | `WHATSAPP_MCP_LOG_LEVEL` | `info`: `debug` adds whatsmeow's protocol logs, which hold everything WhatsApp sends, message contents and group invite links included, so don't use it where logs are shared |
 | `-read-only` | `WHATSAPP_MCP_READ_ONLY` | `false`: hide all tools that send anything |
 | `-expire-disappearing` | `WHATSAPP_MCP_EXPIRE_DISAPPEARING` | `false`: keep messages from disappearing chats; `true` deletes them from the archive once their timer runs out, checked hourly, together with their read receipts and poll votes. Only messages archived with a timer qualify, so not ones archived before this option existed. A message kept in the chat ("Keep in chat") never expires, and stays kept if that is later undone |
+| `-enable-presence` | `WHATSAPP_MCP_ENABLE_PRESENCE` | `false`: `true` offers `get_presence` and `set_typing`, which show your account as online for about 30 seconds per call (see [Guardrails](#guardrails)) |
 | `-enable-group-admin` | `WHATSAPP_MCP_ENABLE_GROUP_ADMIN` | `false`: `true` offers the tools that create, change and leave groups (see [Guardrails](#guardrails)); not allowed with `-read-only` |
 | `-allow-invite-links` | `WHATSAPP_MCP_ALLOW_INVITE_LINKS` | `false`: with `-allow-recipients` set, group invite links are refused, because anyone with a link can join; `true` allows them for allowlisted groups |
 | `-allow-status` | `WHATSAPP_MCP_ALLOW_STATUS` | `false`: with `-allow-recipients` set, `post_status` is refused, because a status goes to your whole status audience; `true` allows it |
@@ -76,6 +77,12 @@ not added to the allowlist; add its JID and restart to manage or message it. Any
 group's invite link can join it, allowlist or not, so while an allowlist is set
 `group_invite_link` is refused unless you also pass `-allow-invite-links`. The server never logs the
 link itself, but at `-log-level debug` whatsmeow's protocol logs contain it.
+
+Seeing who is online and showing "typing…" are off unless you start the server with
+`-enable-presence`, because WhatsApp only allows them from an account that is itself online. Each
+`get_presence` or `set_typing` call marks your account online for about 30 seconds, then offline
+again. While it is online your contacts can see that, and your phone may hold back notifications,
+as it does while WhatsApp Web is in use. Both tools honour the allowlist.
 
 A status update goes to everyone your phone's status privacy settings allow, so only `post_status`
 posts one: every other write tool refuses `status@broadcast`, even when the allowlist lists it, except
@@ -321,6 +328,8 @@ claude mcp add --transport http whatsapp http://127.0.0.1:8080/mcp \
 | `delete_message` | delete one of your own messages for everyone (WhatsApp allows this only for a limited time) |
 | `mark_read` | mark a chat as read on all your devices |
 | `set_chat_state` | archive, pin or mute a chat (`mute`: off, forever or a duration), synced to your phone |
+| `get_presence` | whether a person is online, when they were last seen, and whether they are typing to you; `not_visible` when they hide it (needs `-enable-presence`; also offered with `-read-only`) |
+| `set_typing` | show "typing…" or "recording audio…" in a chat, or stop with `paused` (needs `-enable-presence`) |
 | `set_disappearing_timer` | turn disappearing messages on (`24h`, `7d`, `90d`) or `off` for a chat; `list_chats` shows each chat's timer |
 | `create_group` | create a group with you as admin and add up to 20 people; people WhatsApp refused are listed per member (needs `-enable-group-admin`) |
 | `leave_group` | leave a group (needs `-enable-group-admin`) |
