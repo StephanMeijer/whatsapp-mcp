@@ -601,3 +601,19 @@ func TestOnMessageAdminDeletesOwnMessage(t *testing.T) {
 		t.Errorf("own message after an admin's deletion = %q", got)
 	}
 }
+
+// whatsmeow marks status updates as group messages; deleting one must not look up group admins.
+func TestOnMessageStatusRevokeNoGroupLookup(t *testing.T) {
+	c, fake, _, _ := newTestClient(t)
+	c.onMessage(liveMessage(types.StatusBroadcastJID, alicePN, "S1", false, "", text("status")))
+	if _, err := c.store.MessageByID(context.Background(), types.StatusBroadcastJID.String(), "S1"); err != nil {
+		t.Fatalf("status not archived: %v", err)
+	}
+	c.onMessage(liveMessage(types.StatusBroadcastJID, bobPN, "R1", false, "", &waE2E.Message{ProtocolMessage: &waE2E.ProtocolMessage{
+		Type: waE2E.ProtocolMessage_REVOKE.Enum(),
+		Key:  &waCommon.MessageKey{ID: proto.String("S1")},
+	}}))
+	if len(fake.groupInfoCalls) != 0 {
+		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
+	}
+}

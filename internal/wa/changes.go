@@ -165,7 +165,8 @@ func (c *Client) mayChange(ctx context.Context, e *events.Message, ch change, ca
 		}
 	case sameUser(sender, target.SenderJID, canon):
 		return true
-	case ch.kind == changeRevoke && e.Info.IsGroup && c.isGroupAdmin(ctx, e.Info.Chat, sender, canon):
+	// Not e.Info.IsGroup: whatsmeow sets it for status@broadcast too, which has no admins.
+	case ch.kind == changeRevoke && e.Info.Chat.Server == types.GroupServer && c.isGroupAdmin(ctx, e.Info.Chat, sender, canon):
 		return true
 	}
 	c.log.Warn("ignored "+changeNames[ch.kind]+" from someone other than the author",
