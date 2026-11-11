@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.6.0...v0.6.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **mcpserver:** raise maxEmojiLen to 64 bytes for complex single emoji ([#164](https://github.com/StephanMeijer/whatsapp-mcp/issues/164)) ([8faf224](https://github.com/StephanMeijer/whatsapp-mcp/commit/8faf224a03be867bb10d9eb5b1fcbcc8bd9fff5e))
+
 ## [0.6.0](https://github.com/StephanMeijer/whatsapp-mcp/compare/v0.5.0...v0.6.0) (2026-11-09)
 
 
