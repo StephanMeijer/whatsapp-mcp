@@ -101,7 +101,7 @@ Released images are published to GHCR; or build one yourself:
 docker pull ghcr.io/stephanmeijer/whatsapp-mcp:latest   # or a version, e.g. :0.1.0
 # make docker-build IMAGE=ghcr.io/stephanmeijer/whatsapp-mcp:latest   # or build it locally
 
-docker run -d --name whatsapp-mcp \
+docker run -d --name whatsapp-mcp --restart unless-stopped \
   -e WHATSAPP_MCP_TOKEN="$WHATSAPP_MCP_TOKEN" \
   -v whatsapp-mcp-data:/data \
   -p 127.0.0.1:8080:8080 \
@@ -113,7 +113,8 @@ docker logs -f whatsapp-mcp            # scan the QR code shown here on first st
 
 Publish the port on `127.0.0.1` only, as above; the container listens on all interfaces internally.
 Pass the token at run time (`-e` or `--env-file`); it is never part of the image. Restarting the
-container keeps the session. The root filesystem is read-only, so `get_media` needs the tmpfs on
+container keeps the session. The server exits when it cannot reach WhatsApp at start;
+`--restart unless-stopped` retries it then, and starts it again after a reboot. The root filesystem is read-only, so `get_media` needs the tmpfs on
 `/tmp`: downloads are at most 16 MB each, and 64m leaves room for a few concurrent ones, beyond
 which the call fails rather than growing. The other options from the table above work as environment variables.
 
