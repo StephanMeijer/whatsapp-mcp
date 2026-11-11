@@ -616,6 +616,9 @@ func TestOnMessageStatusRevokeNoGroupLookup(t *testing.T) {
 	if len(fake.groupInfoCalls) != 0 {
 		t.Errorf("GetGroupInfo calls = %v, want none", fake.groupInfoCalls)
 	}
+	if m, err := c.store.MessageByID(context.Background(), types.StatusBroadcastJID.String(), "S1"); err != nil || m.Text != "status" {
+		t.Errorf("status after someone else's deletion = %+v, %v; want it unchanged", m, err)
+	}
 }
 
 func TestOnMessageSecretEditAuthor(t *testing.T) {
