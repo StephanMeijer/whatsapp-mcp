@@ -3,7 +3,7 @@
 # The build stage runs on the build platform and cross-compiles: the binary is
 # pure Go (CGO_ENABLED=0), so no emulation is needed for other platforms.
 # Keep the Go version here in step with mise.toml: bump both in the same PR.
-FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.23@sha256:7fd63dd7c37f5ddaef15bd8fd3f3e4f90f0d50cd9cae255c7cf73887a494d8df AS build
+FROM --platform=$BUILDPLATFORM golang:1.27.3-alpine3.23@sha256:5d5113301ffcac84e2bfb20c42648803fecaea6789c89bb9b66884e18cbb30a7 AS build
 
 WORKDIR /src
 
